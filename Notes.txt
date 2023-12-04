@@ -1,0 +1,12 @@
+﻿Todo:
+Data file support
+Options to show/hide data points and averages lines
+Update data points text box
+Update Standard Deviation
+Update Mean Deviation (difference from average to 0.5)
+Change COM Port entry to a auto-populated dropdown list (https://stackoverflow.com/questions/16245706/check-for-device-change-add-remove-events)
+Add checking devices dialog (progress bar if possible)
+
+Done:
+Simulator
+Target value

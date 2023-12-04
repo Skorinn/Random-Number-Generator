@@ -1,0 +1,811 @@
+﻿//*********************************************************************************************************************
+// File Name:      GeneratorForm.cs
+// Description:    Implementation of the Random Number Generator GUI
+//
+// Copyright (C) 2022-2023 Mike Pullen. All Rights Reserved.
+// Confidential and Proprietary
+//
+// Revision History: 
+//====================================================================================================================
+// 2022/09/10 - Mike Pullen - Original implementation.
+// 2022/10/30 - Mike Pullen - Recreated under VS2022 and added ARM64 support.
+// 2023/12/02 - Mike Pullen - Added simulate, pause, and target value
+//*********************************************************************************************************************
+
+// Enable to dump the USB device information
+//#define DUMP_DEVICES
+
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Drawing;
+using System.Linq;
+using System.Management;
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Windows.Forms;
+using System.Windows.Forms.DataVisualization.Charting;
+
+namespace RandomNumberGenerator
+{
+    /// <summary>
+    /// Random Number Generator form
+    /// </summary>
+    public partial class GeneratorForm : Form
+    {
+        #region Imports
+
+        [DllImport("TruRNGpro.dll", CallingConvention = CallingConvention.Winapi)]
+        internal static extern bool Initialize(int iPort, bool bSimulate);
+
+        [DllImport("TruRNGpro.dll", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern bool GetRandomBitAverage(ref double fResult);
+
+        #endregion
+
+        #region Constructors
+
+        /// <summary>
+        /// Default constructor
+        /// </summary>
+        public GeneratorForm()
+        {
+            // Dump USB devices if debugging and defined
+            #if DUMP_DEVICES && DEBUG
+                DumpUSBDevices();
+            #endif
+
+            // Initialize GUI
+            InitializeComponent();
+            InitPlot();
+
+            // Set the info box to idle
+            m_StatusTextBox.Text = m_sIDLE_MESSAGE;
+            m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
+
+            // Start the device update watchdog thread and trigger an update
+            DeviceWatchDog.Parent = this;
+            DeviceWatchDog.Update = true;
+            m_DeviceWatchDogThread = new Thread(DeviceWatchDog.ThreadProc);
+            m_DeviceWatchDogThread.Start();
+
+            // Create the source from the list of device ports
+            m_DeviceBindingSource = new BindingSource();
+            m_DeviceBindingSource.DataSource = new BindingList<RNGDevice>();
+
+            // Set the port combo box data source and define the display and value members
+            m_PortComboBox.DataSource = m_DeviceBindingSource.DataSource;
+            m_PortComboBox.DisplayMember = RNGDevice.DisplayMember;
+            m_PortComboBox.ValueMember = RNGDevice.ValueMember;
+
+            // Ensure the correct default state of the simulate button
+            m_SimulateToggle.Checked = m_bSimulate;
+
+            // Initialize the target combo box and selection
+            m_TargetComboBox.Items.AddRange((object[])TargetValues.TargetStrings.Clone());
+            m_TargetComboBox.SelectedIndex = 0;
+
+            // Setup the session timer
+            SessionTimer.Interval = 1000;
+            SessionTimer.Elapsed += this.SessionTimer_Tick;
+        }
+
+        #endregion
+        #region Event Handlers
+
+        /// <summary>
+        /// Override for the message processer
+        /// </summary>
+        /// <param name="rMessageData">INOUT - Message to be processed</param>
+        protected override void WndProc(ref Message rMessageData)
+        {
+            // Start with relaying to the forms message processer
+            base.WndProc(ref rMessageData);
+
+            // Check for device messages
+            if (USBDeviceNotification.iWM_DEVICECHANGE == rMessageData.Msg)
+            {
+                switch ((int)rMessageData.WParam)
+                {
+                    // For both connect and remove, trigger the watchdog to do an update
+                    case USBDeviceNotification.iDEVICE_CONNECTED:
+                    case USBDeviceNotification.iDEVICE_REMOVED:
+                        DeviceWatchDog.Update = true;
+                        break;
+
+                    // Ignore any other events
+                    default:
+                        // Do nothing
+                        break;
+                }
+            }
+        }
+            
+        /// <summary>
+        /// Event handler for the tick of the session timer
+        /// </summary>
+        /// <param name="sender">IN - Sender of the event (not used)</param>
+        /// <param name="e">IN - The event arguments (not used)</param>
+        private void SessionTimer_Tick(object sender, EventArgs e)
+        {
+            string sTimerText;
+
+            // Executes in a thread so protect against collision when updating members
+            lock (this)
+            {
+                // Update the timer value
+                m_iSessionMilliseconds += (int)SessionTimer.Interval;
+                if (m_iSessionMilliseconds >= 1000)
+                {
+                    ++m_iSessionSeconds;
+                    m_iSessionMilliseconds -= 1000;
+                }
+
+                if (m_iSessionSeconds > 60)
+                {
+                    ++m_iSessionMinutes;
+                    m_iSessionSeconds -= 60;
+                }
+
+                if (m_iSessionMinutes > 60)
+                {
+                    ++m_iSessionHours;
+                    m_iSessionMinutes -= 60;
+                }
+
+                // Build the string to display to the user
+                sTimerText = m_iSessionHours.ToString("00") + ":" + m_iSessionMinutes.ToString("00") + ":" + m_iSessionSeconds.ToString("00");
+            }
+
+            // Create a copy of the string and use it to update the control
+            UpdateTimerText((string)sTimerText.Clone());
+        }
+
+        /// <summary>
+        /// Event handler for tick of the timer to read data
+        /// </summary>
+        /// <param name="sender">IN - Sender of the event (not used)</param>
+        /// <param name="e">IN - The event arguments (not used)</param>
+        private void ReadTimer_Tick(object sender, EventArgs e)
+        {
+            // Update the average
+            double fCurrentValue = 0.0;
+            bool bStatus = GetRandomBitAverage(ref fCurrentValue);
+
+            if (false == bStatus)
+            {
+                // Stop so the user can correct the error
+                StopButton_Click(sender, e);
+
+                // Record and display error condition
+                m_bInterfaceInitialized = false;
+                this.m_StatusTextBox.BackColor = System.Drawing.Color.Red;
+                m_StatusTextBox.Text = m_sDEVICE_READ_ERROR;
+            }
+            else // Successfully read from generator
+            {
+                // Update the stored data point, windowing the samples
+                if (m_DataPoints.Count >= m_iMAX_DATA_SIZE)
+                {
+                    m_DataPoints.RemoveAt(0);
+                }
+                m_DataPoints.Add(fCurrentValue);
+
+                // Update and display the average
+                m_fCurrentAverage = m_DataPoints.Average();
+                m_CurrentAverageTextBox.Text = m_fCurrentAverage.ToString("0.000000000");
+
+                // Store the average, windowing the samples
+                if (m_Averages.Count >= m_iMAX_DATA_SIZE)
+                {
+                    m_Averages.RemoveAt(0);
+                }
+                m_Averages.Add(m_fCurrentAverage);
+
+                // Update the data points on the chart
+                DataPointCollection DataPoints = m_AverageChart.Series[(int)SeriesIndex.DataPointSeries].Points;
+                if (DataPoints.Count >= m_iMAX_DATA_SIZE)
+                {
+                    DataPoints.RemoveAt(0);
+                }
+                DataPoints.AddY(fCurrentValue);
+
+                // Update the averages on the chart
+                DataPointCollection AveragePoints = m_AverageChart.Series[(int)SeriesIndex.AverageSeries].Points;
+                if (AveragePoints.Count >= m_iMAX_DATA_SIZE)
+                {
+                    AveragePoints.RemoveAt(0);
+                }
+                AveragePoints.AddY(m_fCurrentAverage);
+
+                // Find the min and max values on the chart
+                double fDataPointsMax = m_DataPoints.Max();
+                double fAveragesMax = m_Averages.Max();
+                double fMax = (fDataPointsMax > fAveragesMax) ? fDataPointsMax : fAveragesMax;
+                double fDataPointsMin = m_DataPoints.Min();
+                double fAveragesMin = m_Averages.Min();
+                double fMin = (fDataPointsMin > fAveragesMin) ? fDataPointsMin : fAveragesMin;
+
+                // Check if the limits need to be tightened
+                Axis AverageChartYAxis = m_AverageChart.ChartAreas[0].AxisY;
+                bool bMaxTooWide = ((AverageChartYAxis.Maximum - m_fYAXIS_INCREMENT) > fMax);
+                bool bMinTooWide = ((AverageChartYAxis.Minimum + m_fYAXIS_INCREMENT) < fMin);
+                if (bMaxTooWide && bMinTooWide)
+                {
+                    // Tighten the limits
+                    while (bMaxTooWide && bMinTooWide)
+                    {
+                        // Adjust them symetrically to maintain center
+                        AverageChartYAxis.Maximum += m_fYAXIS_INCREMENT;
+                        AverageChartYAxis.Minimum -= m_fYAXIS_INCREMENT;
+
+                        bMaxTooWide = ((AverageChartYAxis.Maximum - m_fYAXIS_INCREMENT) > fMax);
+                        bMinTooWide = ((AverageChartYAxis.Minimum + m_fYAXIS_INCREMENT) < fMin);
+                    }
+                }
+                else
+                {
+                    // Widen the limits as needed
+                    while ((fMax >= AverageChartYAxis.Maximum) || (fMin <= AverageChartYAxis.Minimum))
+                    {
+                        // Adjust them symetrically to maintain center
+                        AverageChartYAxis.Maximum += m_fYAXIS_INCREMENT;
+                        AverageChartYAxis.Minimum -= m_fYAXIS_INCREMENT;
+                    }
+                }
+
+                // Clear any displayed errors 
+                m_StatusTextBox.Text = RunningMessage;
+                this.m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
+            }
+        }
+
+        /// <summary>
+        /// Event handler for the simulate toggle
+        /// </summary>
+        /// <param name="sender">IN - Sender of the event (not used)</param>
+        /// <param name="e">IN - The event arguments (not used)</param>
+        private void SimulateToggle_CheckedChanged(object sender, EventArgs e)
+        {
+            // Update the simulation status and button
+            m_bSimulate = !m_bSimulate;
+            m_SimulateToggle.Checked = m_bSimulate;
+
+            // Record the interface requires initialization
+            m_bInterfaceInitialized = false;
+
+            // If simulating
+            if (m_bSimulate)
+            {
+                // Change the Port field to Seed
+                this.m_PortLabel.Text = "Seed";
+                this.m_PortComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.Simple;
+                this.m_PortComboBox.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
+                this.m_PortComboBox.Text = "0";
+            }
+            // Otherwise, using device
+            else
+            {
+                // Change the Seed field to Port
+                this.m_PortLabel.Text = "Port";
+                this.m_PortComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+                this.m_PortComboBox.RightToLeft = System.Windows.Forms.RightToLeft.Inherit;
+            }
+        }
+
+        /// <summary>
+        /// Event handler for start button
+        /// </summary>
+        /// <param name="sender">IN - Sender of the event (not used)</param>
+        /// <param name="e">IN - The event arguments (not used)</param>
+        private void StartButton_Click(object sender, EventArgs e)
+        {
+            // Disable the interface controls
+            m_SimulateToggle.Enabled = false;
+            m_PortComboBox.Enabled = false;
+
+            // Disable the target number field
+            m_TargetComboBox.Enabled = false;
+
+            // Check if the target number has changed
+            CheckTargetChanged();
+
+            // If the interface is not initialized, attempt to initialize it
+            if (false == m_bInterfaceInitialized)
+            {
+                InitializeInterface();
+            }
+
+            // Update button statuses
+            m_StartButton.Enabled = false;
+            m_StopButton.Enabled = true;
+            m_PauseButton.Enabled = true;
+
+            // Start the timers
+            m_ReadTimer.Start();
+            SessionTimer.Start();
+
+            // Update the info box
+            m_StatusTextBox.Text = RunningMessage;
+            this.m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
+        }
+
+        /// <summary>
+        /// Event handler for clicking the pause button
+        /// </summary>
+        /// <param name="sender">IN - Sender of the event (not used)</param>
+        /// <param name="e">IN - The event arguments (not used)</param>
+        private void PauseButton_Click(object sender, EventArgs e)
+        {
+            // Check if pausing or resuming
+            if (m_bPaused)
+            {
+                // Resume
+                m_bPaused = false;
+
+                // Change the button back to pause
+                m_PauseButton.Text = m_sPAUSE_BUTTON;
+
+                // Re-enable the timers
+                m_ReadTimer.Enabled = true;
+                SessionTimer.Enabled = true;
+
+                // Update the info box message
+                m_StatusTextBox.Text = m_sIDLE_MESSAGE;
+            }
+            else
+            {
+                // Pause
+                m_bPaused = true;
+
+                // Change the button to resume
+                m_PauseButton.Text = m_sRESUME_BUTTON;
+
+                // Disable the timers
+                m_ReadTimer.Enabled = false;
+                SessionTimer.Enabled = false;
+
+                // Update the info box message
+                m_StatusTextBox.Text = m_sPAUSED_MESSAGE;
+            }
+
+            // Reset the background color of the info box
+            this.m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
+        }
+
+        /// <summary>
+        /// Event handler for stop button
+        /// </summary>
+        /// <param name="sender">IN - Sender of the event (not used)</param>
+        /// <param name="e">IN - The event arguments (not used)</param>
+        private void StopButton_Click(object sender, EventArgs e)
+        {
+            // Stop the timers
+            m_ReadTimer.Stop();
+            SessionTimer.Stop();
+
+            // Update the button statuses
+            m_StartButton.Enabled = true;
+            m_StopButton.Enabled = false;
+            m_PauseButton.Enabled = false;
+
+            // Reset the pause button
+            m_PauseButton.Text = m_sPAUSE_BUTTON;
+            m_bPaused = false;
+
+            // Enable the target number field
+            m_TargetComboBox.Enabled = true;
+
+            // Enable the interface controls
+            m_SimulateToggle.Enabled = true;
+            m_PortComboBox.Enabled = true;
+
+            // Update the info box
+            m_StatusTextBox.Text = m_sIDLE_MESSAGE;
+            this.m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
+        }
+
+        /// <summary>
+        /// Event handler for reset button
+        /// </summary>
+        /// <param name="sender">IN - Sender of the event (not used)</param>
+        /// <param name="e">IN - The event arguments (not used)</param>
+        private void ClearButton_Click(object sender, EventArgs e)
+        {
+            /// !!! mpullen - TODO !!!
+            // Warn the user that resetting will clear the currently selected file
+
+            // Reset the timer and data
+            m_iSessionMilliseconds = 0;
+            m_iSessionSeconds = 0;
+            m_iSessionMinutes = 0;
+            m_iSessionHours = 0;
+            m_fCurrentAverage = 0.0;
+            m_DataPoints.Clear();
+            m_Averages.Clear();
+
+            // Reset the target value
+            m_iTargetValue = null;
+            m_TargetComboBox.SelectedIndex = 0;
+
+            // Clear the chart data and add a point so the area is displayed
+            Series DataPointSeries = m_AverageChart.Series[(int)SeriesIndex.DataPointSeries];
+            DataPointSeries.Points.Clear();
+            DataPointSeries.Points.AddY(0.5);
+            Series AverageSeries = m_AverageChart.Series[(int)SeriesIndex.AverageSeries];
+            AverageSeries.Points.Clear();
+
+            // Reset the Y-Axis
+            Axis AverageChartYAxis = m_AverageChart.ChartAreas[0].AxisY;
+            AverageChartYAxis.Maximum = 0.5 + m_fYAXIS_INCREMENT;
+            AverageChartYAxis.Minimum = 0.5 - m_fYAXIS_INCREMENT;
+
+            // Update the timer and average displayed
+            m_SessionTimerTextBox.Text = m_iSessionHours.ToString("00") + ":" + m_iSessionMinutes.ToString("00") + ":" + m_iSessionSeconds.ToString("00");
+            m_CurrentAverageTextBox.Text = m_fCurrentAverage.ToString("0.000000000");
+        }
+
+        /// <summary>
+        /// Event handler for change to port number selection
+        /// </summary>
+        /// <param name="sender">IN - Sender of the event (not used)</param>
+        /// <param name="e">IN - The event arguments (not used)</param>
+        private void PortComboBox_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            // Invalidate the device interface
+            m_bInterfaceInitialized = false;
+        }
+
+        /// <summary>
+        /// Event handler for validating the port number
+        /// </summary>
+        /// <param name="sender">IN - Sender of the event (not used)</param>
+        /// <param name="e">IN - The event arguments (not used)</param>
+        private void PortTextBox_Validating(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            // Only need to validate when simulating
+            if (m_bSimulate)
+            {
+                // Verify a valid number was specified
+                bool bValid = int.TryParse(m_PortComboBox.Text, out int iPortNum);
+
+                if (true == bValid)
+                {
+                    // Limit to positive integer values
+                    bValid = (0 <= iPortNum);
+                }
+
+                // If the value specified is not a valid number
+                if (false == bValid)
+                {
+                    // Display error in info box
+                    this.m_StatusTextBox.BackColor = System.Drawing.Color.Red;
+                    m_StatusTextBox.Text = m_sINVALID_SEED_ERROR;
+
+                    // Set back to the last value
+                    m_PortComboBox.Text = m_iSeed.ToString();
+                }
+                else
+                {
+                    // Record the port and initialize the interface
+                    m_iSeed = iPortNum;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Event handler for the form closing event
+        /// </summary>
+        /// <param name="sender">IN - Sender of the event (not used)</param>
+        /// <param name="e">IN - The event arguments (not used)</param>
+        private void GeneratorForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            // Signal the device watchdog to terminate
+            DeviceWatchDog.Continue = false;
+
+            // Make sure any running session is stoped
+            StopButton_Click(sender, e);
+
+            // Do not wait for device watchdog thread. It creates a deadlock if the thread attempts
+            // to invoke an update to the device list.
+        }
+
+        #endregion
+        #region Methods
+
+        /// <summary>
+        /// Initializes the plot of the results
+        /// </summary>
+        private void InitPlot()
+        {
+            // Disable the X-Axis
+            Axis AverageChartXAxis = m_AverageChart.ChartAreas[0].AxisX;
+            AverageChartXAxis.Enabled = AxisEnabled.False;
+
+            // Setup the Y-Axis
+            Axis AverageChartYAxis = m_AverageChart.ChartAreas[0].AxisY;
+            AverageChartYAxis.Maximum = 0.5 + m_fYAXIS_INCREMENT;
+            AverageChartYAxis.Minimum = 0.5 - m_fYAXIS_INCREMENT;
+            AverageChartYAxis.Interval = 0.005;
+
+            // Setup the data point series and add a single point to force display
+            Series DataPointSeries = m_AverageChart.Series[(int)SeriesIndex.DataPointSeries];
+            DataPointSeries.IsVisibleInLegend = false;
+            DataPointSeries.ChartType = SeriesChartType.Line;
+            DataPointSeries.Color = Color.Blue;
+            DataPointSeries.Points.AddY(0.5);
+
+            // Setup the average series (no need to add initial point as data point series will display the chart)
+            Series AverageSeries = m_AverageChart.Series[(int)SeriesIndex.AverageSeries];
+            AverageSeries.IsVisibleInLegend = false;
+            AverageSeries.ChartType = SeriesChartType.Line;
+            AverageSeries.Color = Color.Red;
+        }
+
+        /// <summary>
+        /// Initializes the interface to the device
+        /// NOTE1: Port number data member must be set before calling.
+        /// NOTE2: Success can be determined using initialized data member
+        /// </summary>
+        private void InitializeInterface()
+        {
+            // Attempt to initialize the interface
+            int iPort = GetSelectedPort();
+            m_bInterfaceInitialized = Initialize(iPort, m_bSimulate);
+
+            // Initialization failed
+            if (false == m_bInterfaceInitialized)
+            {
+                // Most likely issue is that the device is not at the specified port number
+                this.m_StatusTextBox.BackColor = System.Drawing.Color.Red;
+                m_StatusTextBox.Text = m_sDEVICE_INIT_ERROR;
+            }
+            else
+            {
+                // Initialized successfully to clear any displayed errors
+                m_StatusTextBox.Text = m_sINIT_MESSAGE;
+                this.m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
+            }
+        }
+
+        /// <summary>
+        /// Updates the session timer text box control
+        /// </summary>
+        /// <param name="sTimerText">IN - The text to set in the text box</param>
+        private void UpdateTimerText(string sTimerText)
+        {
+            // Executes in a thread, so need to invoke in the main GUI thread
+            if (true == m_SessionTimerTextBox.InvokeRequired)
+            {
+                m_SessionTimerTextBox.Invoke((MethodInvoker)delegate { UpdateTimerText(sTimerText); });
+            }
+            else
+            {
+                m_SessionTimerTextBox.Text = sTimerText;
+            }
+        }
+
+        /// <summary>
+        /// Checks for an notifies the user if the target value has changed
+        /// </summary>
+        /// <returns>true if the target has changed; otherwise, false</returns>
+        private bool CheckTargetChanged()
+        {
+            bool bTargetChanged = false;
+
+            // If no target has been set
+            if (null == m_iTargetValue)
+            {
+                // Record the current selection
+                m_iTargetValue = SelectedTarget;
+            }
+            // Otherwise, if the target has changed
+            else if (SelectedTarget != m_iTargetValue)
+            {
+                // Notify the user and prompt if they would like to accept or revert the change
+                string sTargetChangedCaption = "Target Changed";
+                string sTargetChangedMessage = "The target has changed from " + TargetValues.ToString((int)m_iTargetValue) + " to " +
+                    SelectedTarget.ToString() + "\n\nAccept change?";
+                MessageBoxButtons TargetChangedButtons = MessageBoxButtons.YesNo;
+                DialogResult TargetChangedResult = MessageBox.Show(sTargetChangedMessage, sTargetChangedCaption, TargetChangedButtons);
+
+                // If the user accepts the change
+                if (DialogResult.Yes == TargetChangedResult)
+                {
+                    // Record the change
+                    bTargetChanged = true;
+                    m_iTargetValue = SelectedTarget;
+                }
+                // If the user does not accept the change
+                else
+                {
+                    // Revert the change to the combo box
+                    m_TargetComboBox.SelectedItem = m_iTargetValue;
+                }
+            }
+
+            return bTargetChanged;
+        }
+
+        /// <summary>
+        /// Gets the selected port (or seed) value
+        /// </summary>
+        /// <returns></returns>
+        private int GetSelectedPort()
+        {
+            int iPort = 0;
+
+            // If simulating
+            if (m_bSimulate)
+            {
+                // Seed member is updated when validating entry, so it can just be returned
+                iPort = m_iSeed;
+            }
+            // Otherwise, using device
+            else
+            {
+                // Get the selected value (default to 0 if no selection)
+                iPort = (m_PortComboBox.SelectedValue is null) ? 0 : (int)m_PortComboBox.SelectedValue;
+            }
+
+            return iPort;
+        }
+
+        /// <summary>
+        /// Debugging utility to dump the USB device information
+        /// </summary>
+        private void DumpUSBDevices()
+        {
+            // Dump all device information
+            using (System.IO.StreamWriter deviceDumpFile = new System.IO.StreamWriter("USBDevices.txt"))
+            {
+                // Search for all USB controller devices
+                ManagementObjectSearcher controllerSearcher = new ManagementObjectSearcher(@"Select * From Win32_USBControllerDevice");
+                ManagementObjectCollection controllerCollection = controllerSearcher.Get();
+
+                foreach (ManagementBaseObject controller in controllerCollection)
+                {
+                    // Get the dependent device for the controller
+                    string sDependent = (string)controller.GetPropertyValue("Dependent");
+                    string[] sDependentSplit = System.Text.RegularExpressions.Regex.Split(sDependent, "DeviceID=");
+                    string sDeviceID = sDependentSplit[1];//.Replace("\"", "");
+
+                    ManagementObjectSearcher deviceSearcher = new ManagementObjectSearcher(@"Select * From Win32_PnPEntity Where DeviceID=" + sDeviceID);
+                    ManagementObjectCollection deviceCollection = deviceSearcher.Get();
+                    foreach (ManagementBaseObject device in deviceCollection)
+                    {
+                        deviceDumpFile.WriteLine("\nBegin Device:");
+                        deviceDumpFile.WriteLine("uint16 Availability " + ((device.GetPropertyValue("Availability") == null) ? "null" : device.GetPropertyValue("Availability").ToString()));
+                        deviceDumpFile.WriteLine("string Caption " + ((device.GetPropertyValue("Caption") == null) ? "null" : device.GetPropertyValue("Caption").ToString()));
+                        deviceDumpFile.WriteLine("string ClassGuid " + ((device.GetPropertyValue("ClassGuid") == null) ? "null" : device.GetPropertyValue("ClassGuid").ToString()));
+                        deviceDumpFile.WriteLine("string CompatibleID[] " + ((device.GetPropertyValue("CompatibleID") == null) ? "null" : device.GetPropertyValue("CompatibleID").ToString()));
+                        deviceDumpFile.WriteLine("uint32 ConfigManagerErrorCode " + ((device.GetPropertyValue("ConfigManagerErrorCode") == null) ? "null" : device.GetPropertyValue("ConfigManagerErrorCode").ToString()));
+                        deviceDumpFile.WriteLine("boolean ConfigManagerUserConfig " + ((device.GetPropertyValue("ConfigManagerUserConfig") == null) ? "null" : device.GetPropertyValue("ConfigManagerUserConfig").ToString()));
+                        deviceDumpFile.WriteLine("string CreationClassName " + ((device.GetPropertyValue("CreationClassName") == null) ? "null" : device.GetPropertyValue("CreationClassName").ToString()));
+                        deviceDumpFile.WriteLine("string Description " + ((device.GetPropertyValue("Description") == null) ? "null" : device.GetPropertyValue("Description").ToString()));
+                        deviceDumpFile.WriteLine("string DeviceID " + ((device.GetPropertyValue("DeviceID") == null) ? "null" : device.GetPropertyValue("DeviceID").ToString()));
+                        deviceDumpFile.WriteLine("boolean ErrorCleared " + ((device.GetPropertyValue("ErrorCleared") == null) ? "null" : device.GetPropertyValue("ErrorCleared").ToString()));
+                        deviceDumpFile.WriteLine("string ErrorDescription " + ((device.GetPropertyValue("ErrorDescription") == null) ? "null" : device.GetPropertyValue("ErrorDescription").ToString()));
+                        deviceDumpFile.WriteLine("string HardwareID[] " + ((device.GetPropertyValue("HardwareID") == null) ? "null" : device.GetPropertyValue("HardwareID").ToString()));
+                        deviceDumpFile.WriteLine("datetime InstallDate " + ((device.GetPropertyValue("InstallDate") == null) ? "null" : device.GetPropertyValue("InstallDate").ToString()));
+                        deviceDumpFile.WriteLine("uint32 LastErrorCode " + ((device.GetPropertyValue("LastErrorCode") == null) ? "null" : device.GetPropertyValue("LastErrorCode").ToString()));
+                        deviceDumpFile.WriteLine("string Manufacturer " + ((device.GetPropertyValue("Manufacturer") == null) ? "null" : device.GetPropertyValue("Manufacturer").ToString()));
+                        deviceDumpFile.WriteLine("string Name " + ((device.GetPropertyValue("Name") == null) ? "null" : device.GetPropertyValue("Name").ToString()));
+                        deviceDumpFile.WriteLine("string PNPClass " + ((device.GetPropertyValue("PNPClass") == null) ? "null" : device.GetPropertyValue("PNPClass").ToString()));
+                        deviceDumpFile.WriteLine("string PNPDeviceID " + ((device.GetPropertyValue("PNPDeviceID") == null) ? "null" : device.GetPropertyValue("PNPDeviceID").ToString()));
+                        deviceDumpFile.WriteLine("uint16 PowerManagementCapabilities[] " + ((device.GetPropertyValue("PowerManagementCapabilities") == null) ? "null" : device.GetPropertyValue("PowerManagementCapabilities").ToString()));
+                        deviceDumpFile.WriteLine("boolean PowerManagementSupported " + ((device.GetPropertyValue("PowerManagementSupported") == null) ? "null" : device.GetPropertyValue("PowerManagementSupported").ToString()));
+                        deviceDumpFile.WriteLine("boolean Present " + ((device.GetPropertyValue("Present") == null) ? "null" : device.GetPropertyValue("Present").ToString()));
+                        deviceDumpFile.WriteLine("string Service " + ((device.GetPropertyValue("Service") == null) ? "null" : device.GetPropertyValue("Service").ToString()));
+                        deviceDumpFile.WriteLine("string Status " + ((device.GetPropertyValue("Status") == null) ? "null" : device.GetPropertyValue("Status").ToString()));
+                        deviceDumpFile.WriteLine("uint16 StatusInfo " + ((device.GetPropertyValue("StatusInfo") == null) ? "null" : device.GetPropertyValue("StatusInfo").ToString()));
+                        deviceDumpFile.WriteLine("string SystemCreationClassName " + ((device.GetPropertyValue("SystemCreationClassName") == null) ? "null" : device.GetPropertyValue("SystemCreationClassName").ToString()));
+                        deviceDumpFile.WriteLine("string SystemName " + ((device.GetPropertyValue("SystemName") == null) ? "null" : device.GetPropertyValue("SystemName").ToString()));
+                        deviceDumpFile.WriteLine("uint32 ConfigManagerErrorCode " + ((device.GetPropertyValue("ConfigManagerErrorCode") == null) ? "null" : device.GetPropertyValue("ConfigManagerErrorCode").ToString()));
+                        deviceDumpFile.WriteLine("End Device");
+                    }
+                }
+            }
+        }
+
+#endregion
+#region Properties
+
+        /// <summary>
+        /// Binding list of devices used to populate the port combo box list
+        /// </summary>
+        internal BindingList<RNGDevice> DeviceList
+        { 
+            set
+            {
+                // Update and rebind the list
+                m_DeviceBindingSource.DataSource = value;
+                m_PortComboBox.DataSource = m_DeviceBindingSource.DataSource;
+            }
+        }
+
+        /// <summary>
+        /// Text displayed in the statatus box
+        /// </summary>
+        internal string StatusBoxText { get => m_StatusTextBox.Text; set => m_StatusTextBox.Text = value; }
+
+        /// <summary>
+        /// Text color of the status box
+        /// </summary>
+        internal Color StatusBoxTextColor { get => m_StatusTextBox.ForeColor; set => m_StatusTextBox.ForeColor = value; }
+
+        /// <summary>
+        /// Background color of the status box
+        /// </summary>
+        internal Color StatusBoxBackColor { get => m_StatusTextBox.BackColor; set => m_StatusTextBox.BackColor = value; }
+
+        /// <summary>
+        /// Selected target value
+        /// </summary>
+        private int? SelectedTarget
+        {
+            get { return TargetValues.GetValueAt((uint)m_TargetComboBox.SelectedIndex); }
+            set { m_TargetComboBox.SelectedItem = TargetValues.ToString((int)value); }
+        }
+
+        /// <summary>
+        /// Message to display in the info box while a session is running
+        /// </summary>
+        private string RunningMessage
+        {
+            get { return "Running with Target = " + TargetValues.ToString((int)m_iTargetValue) + "..."; }
+        }
+
+        #endregion
+        #region Data Members
+
+        // Session timer
+        private int m_iSessionMilliseconds = 0;
+        private int m_iSessionSeconds = 0;
+        private int m_iSessionMinutes = 0;
+        private int m_iSessionHours = 0;
+        private System.Timers.Timer SessionTimer = new System.Timers.Timer(); // Use system timer instead of forms timer for threading, so the update is reliable
+        private bool m_bPaused = false;
+
+        // RNG Data
+        private double m_fCurrentAverage = 0.0;
+        private List<double> m_DataPoints = new List<double>();
+        private List<double> m_Averages = new List<double>();
+
+        // Target values
+        private enum PossibleTargetsIndex // Indexes for the targets array
+        {
+            None = 0,
+            Zero = 1,
+            One = 2,
+            TARGETS_SIZE = 3 // Keep at end
+        }
+        private int? m_iTargetValue = null;
+
+        // Chart
+        private int m_iMAX_DATA_SIZE = 1000 * 1024; // 1000 * 1024 * 4  = 4 MB
+        private double m_fYAXIS_INCREMENT = 0.01;
+        private enum SeriesIndex { DataPointSeries, AverageSeries, };
+
+        // Device settings
+        private int m_iSeed = 0;
+        private bool m_bInterfaceInitialized = false;
+        private bool m_bSimulate = false;
+        private Thread m_DeviceWatchDogThread;
+        private BindingSource m_DeviceBindingSource;
+
+        // Button text
+        internal const string m_sPAUSE_BUTTON = "PAUSE";
+        internal const string m_sRESUME_BUTTON = "RESUME";
+        
+        // Status and error messages
+        private const string m_sINVALID_SEED_ERROR = "Specified seed is not valid. Must be positive integer. Reset to last valid value.";
+        private const string m_sDEVICE_INIT_ERROR = "Error initializing TruRNGpro. Please verify device is connected and correct COM port is selected.";
+        private const string m_sDEVICE_READ_ERROR = "Error reading from TruRNGpro. Please verify device is connected and correct COM port is selected.";
+        private const string m_sINIT_MESSAGE = "Initialized";
+        private const string m_sIDLE_MESSAGE = "Idle";
+        private const string m_sPAUSED_MESSAGE = "Paused";
+
+        #endregion
+    }
+}
