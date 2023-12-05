@@ -19,6 +19,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Management;
 using System.Runtime.InteropServices;
@@ -78,8 +79,12 @@ namespace RandomNumberGenerator
             m_PortComboBox.DisplayMember = RNGDevice.DisplayMember;
             m_PortComboBox.ValueMember = RNGDevice.ValueMember;
 
+            // Set the maximumn number of data points and averages to hold in memory
+            // NOTE: Should match the window size of the data for the chart
+            m_Data.DataWindowSize = m_iMAX_DATA_SIZE;
+
             // Ensure the correct default state of the simulate button
-            m_SimulateToggle.Checked = m_bSimulate;
+            m_SimulateToggle.Checked = m_Data.Simulated;
 
             // Initialize the target combo box and selection
             m_TargetComboBox.Items.AddRange((object[])TargetValues.TargetStrings.Clone());
@@ -134,31 +139,14 @@ namespace RandomNumberGenerator
             lock (this)
             {
                 // Update the timer value
-                m_iSessionMilliseconds += (int)SessionTimer.Interval;
-                if (m_iSessionMilliseconds >= 1000)
-                {
-                    ++m_iSessionSeconds;
-                    m_iSessionMilliseconds -= 1000;
-                }
+                m_Data.TickSessionTimer((int)SessionTimer.Interval);
 
-                if (m_iSessionSeconds > 60)
-                {
-                    ++m_iSessionMinutes;
-                    m_iSessionSeconds -= 60;
-                }
-
-                if (m_iSessionMinutes > 60)
-                {
-                    ++m_iSessionHours;
-                    m_iSessionMinutes -= 60;
-                }
-
-                // Build the string to display to the user
-                sTimerText = m_iSessionHours.ToString("00") + ":" + m_iSessionMinutes.ToString("00") + ":" + m_iSessionSeconds.ToString("00");
+                // Create a copy of the session timer string
+                sTimerText = (string)m_Data.SessionTime.Clone();
             }
 
-            // Create a copy of the string and use it to update the control
-            UpdateTimerText((string)sTimerText.Clone());
+            // Update the control
+            UpdateTimerText(sTimerText);
         }
 
         /// <summary>
@@ -185,22 +173,11 @@ namespace RandomNumberGenerator
             else // Successfully read from generator
             {
                 // Update the stored data point, windowing the samples
-                if (m_DataPoints.Count >= m_iMAX_DATA_SIZE)
-                {
-                    m_DataPoints.RemoveAt(0);
-                }
-                m_DataPoints.Add(fCurrentValue);
+                m_Data.AddDataPoint(fCurrentValue);
 
-                // Update and display the average
-                m_fCurrentAverage = m_DataPoints.Average();
-                m_CurrentAverageTextBox.Text = m_fCurrentAverage.ToString("0.000000000");
+                // Update the displayed average
+                m_CurrentAverageTextBox.Text = m_Data.CurrentAverage.ToString("0.000000000");
 
-                // Store the average, windowing the samples
-                if (m_Averages.Count >= m_iMAX_DATA_SIZE)
-                {
-                    m_Averages.RemoveAt(0);
-                }
-                m_Averages.Add(m_fCurrentAverage);
 
                 // Update the data points on the chart
                 DataPointCollection DataPoints = m_AverageChart.Series[(int)SeriesIndex.DataPointSeries].Points;
@@ -216,15 +193,11 @@ namespace RandomNumberGenerator
                 {
                     AveragePoints.RemoveAt(0);
                 }
-                AveragePoints.AddY(m_fCurrentAverage);
+                AveragePoints.AddY(m_Data.CurrentAverage);
 
                 // Find the min and max values on the chart
-                double fDataPointsMax = m_DataPoints.Max();
-                double fAveragesMax = m_Averages.Max();
-                double fMax = (fDataPointsMax > fAveragesMax) ? fDataPointsMax : fAveragesMax;
-                double fDataPointsMin = m_DataPoints.Min();
-                double fAveragesMin = m_Averages.Min();
-                double fMin = (fDataPointsMin > fAveragesMin) ? fDataPointsMin : fAveragesMin;
+                double fMax = m_Data.MaxPoint;
+                double fMin = m_Data.MinPoint;
 
                 // Check if the limits need to be tightened
                 Axis AverageChartYAxis = m_AverageChart.ChartAreas[0].AxisY;
@@ -268,14 +241,14 @@ namespace RandomNumberGenerator
         private void SimulateToggle_CheckedChanged(object sender, EventArgs e)
         {
             // Update the simulation status and button
-            m_bSimulate = !m_bSimulate;
-            m_SimulateToggle.Checked = m_bSimulate;
+            m_Data.Simulated = !(m_Data.Simulated);
+            m_SimulateToggle.Checked = m_Data.Simulated;
 
             // Record the interface requires initialization
             m_bInterfaceInitialized = false;
 
             // If simulating
-            if (m_bSimulate)
+            if (m_Data.Simulated)
             {
                 // Change the Port field to Seed
                 this.m_PortLabel.Text = "Seed";
@@ -415,17 +388,10 @@ namespace RandomNumberGenerator
             /// !!! mpullen - TODO !!!
             // Warn the user that resetting will clear the currently selected file
 
-            // Reset the timer and data
-            m_iSessionMilliseconds = 0;
-            m_iSessionSeconds = 0;
-            m_iSessionMinutes = 0;
-            m_iSessionHours = 0;
-            m_fCurrentAverage = 0.0;
-            m_DataPoints.Clear();
-            m_Averages.Clear();
+            // Reset the session data
+            m_Data.Reset();
 
-            // Reset the target value
-            m_iTargetValue = null;
+            // Reset the target value combo
             m_TargetComboBox.SelectedIndex = 0;
 
             // Clear the chart data and add a point so the area is displayed
@@ -441,8 +407,8 @@ namespace RandomNumberGenerator
             AverageChartYAxis.Minimum = 0.5 - m_fYAXIS_INCREMENT;
 
             // Update the timer and average displayed
-            m_SessionTimerTextBox.Text = m_iSessionHours.ToString("00") + ":" + m_iSessionMinutes.ToString("00") + ":" + m_iSessionSeconds.ToString("00");
-            m_CurrentAverageTextBox.Text = m_fCurrentAverage.ToString("0.000000000");
+            m_SessionTimerTextBox.Text = m_Data.SessionTime;
+            m_CurrentAverageTextBox.Text = m_Data.CurrentAverage.ToString("0.000000000");
         }
 
         /// <summary>
@@ -464,7 +430,7 @@ namespace RandomNumberGenerator
         private void PortTextBox_Validating(object sender, System.ComponentModel.CancelEventArgs e)
         {
             // Only need to validate when simulating
-            if (m_bSimulate)
+            if (m_Data.Simulated)
             {
                 // Verify a valid number was specified
                 bool bValid = int.TryParse(m_PortComboBox.Text, out int iPortNum);
@@ -489,6 +455,72 @@ namespace RandomNumberGenerator
                 {
                     // Record the port and initialize the interface
                     m_iSeed = iPortNum;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Event handler for the file browse button
+        /// </summary>
+        /// <param name="sender">IN - Sender of the event (not used)</param>
+        /// <param name="e">IN - The event arguments (not used)</param>
+        private void FileBrowseButton_Click(object sender, EventArgs e)
+        {
+            // Do not allow a new session while processing action
+            Busy = true;
+
+            // Prompt the user to select a file
+            string sSelectedFile = null;
+            using (OpenFileDialog dataFileOpenDialog = new OpenFileDialog())
+            {
+                dataFileOpenDialog.Title = "Create or open a Random Number Generage data file";
+                dataFileOpenDialog.FileName = "Select a data file";
+                dataFileOpenDialog.Filter = "RNG data files (*.rng)|*.rng";
+
+                // Allow creation of new files but directory must exist
+                dataFileOpenDialog.CheckFileExists = false;
+                dataFileOpenDialog.CheckPathExists = true;
+
+                // Show the file open dialog
+                DialogResult result = dataFileOpenDialog.ShowDialog();
+                if (DialogResult.OK == result)
+                {
+                    sSelectedFile = dataFileOpenDialog.FileName;
+                }
+            }
+
+            // If no file was selected
+            if (String.IsNullOrEmpty(sSelectedFile))
+            {
+                // Re-enable session actions
+                Busy = false;
+            }
+            // User has selected a file
+            else
+            {
+                // Check if the file exists
+                bool bFileExists = File.Exists(sSelectedFile);
+                if (bFileExists)
+                {
+                    //!!! mpullen - TBD load file
+
+                    // Leave busy flag set until the file has been loaded (updated by thread)
+                }
+                else
+                {
+                    // Verify the user wants to start a new session
+                    const string sCaption = "Create Session";
+                    const string sMessage = "File does not exist. Would you like to create it and begin a new session?";
+                    DialogResult confirmResult = MessageBox.Show(sMessage, sCaption, MessageBoxButtons.OKCancel);
+
+                    // Reset the string if user opts to cancel
+                    if (DialogResult.OK != confirmResult)
+                    {
+                        sSelectedFile = null;
+                    }
+
+                    // Either way we can re-enable session actions
+                    Busy = false;
                 }
             }
         }
@@ -551,7 +583,7 @@ namespace RandomNumberGenerator
         {
             // Attempt to initialize the interface
             int iPort = GetSelectedPort();
-            m_bInterfaceInitialized = Initialize(iPort, m_bSimulate);
+            m_bInterfaceInitialized = Initialize(iPort, m_Data.Simulated);
 
             // Initialization failed
             if (false == m_bInterfaceInitialized)
@@ -594,17 +626,17 @@ namespace RandomNumberGenerator
             bool bTargetChanged = false;
 
             // If no target has been set
-            if (null == m_iTargetValue)
+            if (null == m_Data.TargetValue)
             {
                 // Record the current selection
-                m_iTargetValue = SelectedTarget;
+                m_Data.TargetValue = SelectedTarget;
             }
             // Otherwise, if the target has changed
-            else if (SelectedTarget != m_iTargetValue)
+            else if (SelectedTarget != m_Data.TargetValue)
             {
                 // Notify the user and prompt if they would like to accept or revert the change
                 string sTargetChangedCaption = "Target Changed";
-                string sTargetChangedMessage = "The target has changed from " + TargetValues.ToString((int)m_iTargetValue) + " to " +
+                string sTargetChangedMessage = "The target has changed from " + TargetValues.ToString((int)m_Data.TargetValue) + " to " +
                     SelectedTarget.ToString() + "\n\nAccept change?";
                 MessageBoxButtons TargetChangedButtons = MessageBoxButtons.YesNo;
                 DialogResult TargetChangedResult = MessageBox.Show(sTargetChangedMessage, sTargetChangedCaption, TargetChangedButtons);
@@ -614,13 +646,13 @@ namespace RandomNumberGenerator
                 {
                     // Record the change
                     bTargetChanged = true;
-                    m_iTargetValue = SelectedTarget;
+                    m_Data.TargetValue = SelectedTarget;
                 }
                 // If the user does not accept the change
                 else
                 {
                     // Revert the change to the combo box
-                    m_TargetComboBox.SelectedItem = m_iTargetValue;
+                    m_TargetComboBox.SelectedItem = m_Data.TargetValue;
                 }
             }
 
@@ -636,7 +668,7 @@ namespace RandomNumberGenerator
             int iPort = 0;
 
             // If simulating
-            if (m_bSimulate)
+            if (m_Data.Simulated)
             {
                 // Seed member is updated when validating entry, so it can just be returned
                 iPort = m_iSeed;
@@ -708,9 +740,53 @@ namespace RandomNumberGenerator
             }
         }
 
-#endregion
-#region Properties
+        #endregion
+        #region Properties
 
+        /// <summary>
+        /// Whether the system is busy processing a change and should prevent session changes.
+        /// NOTE: Exception is thrown by set if a session is currently running.
+        /// </summary>
+        internal bool Busy
+        { 
+            get => m_bBusy;
+            set
+            {
+                // Do not allow changes while a session is running
+                if (Running)
+                {
+                    throw new Exception(m_sBUSY_CHANGE_WHILE_RUNNING_EXCEPTION);
+                }
+                else
+                {
+                    // Record the state change
+                    m_bBusy = value;
+
+                    // If setting as busy
+                    if (m_bBusy)
+                    {
+                        // Disable the browse, start, and clear buttons
+                        m_FileBrowseButton.Enabled = false;
+                        m_StartButton.Enabled = false;
+                        m_ClearButton.Enabled = false;
+                    }
+                    // Changes are complete
+                    else
+                    {
+                        // Enable the browse, start, and clear buttons
+                        m_FileBrowseButton.Enabled = true;
+                        m_StartButton.Enabled = true;
+                        m_ClearButton.Enabled = true;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Whether a session is currently running
+        /// </summary>
+        internal bool Running { get => SessionTimer.Enabled; }
+        
         /// <summary>
         /// Binding list of devices used to populate the port combo box list
         /// </summary>
@@ -753,34 +829,19 @@ namespace RandomNumberGenerator
         /// </summary>
         private string RunningMessage
         {
-            get { return "Running with Target = " + TargetValues.ToString((int)m_iTargetValue) + "..."; }
+            get { return $"Running with Target = {m_Data.TargetValue}..."; }
         }
 
         #endregion
         #region Data Members
 
+        // Form status and session data
+        private bool m_bBusy = false;
+        private RNGSessionData m_Data = new RNGSessionData();
+
         // Session timer
-        private int m_iSessionMilliseconds = 0;
-        private int m_iSessionSeconds = 0;
-        private int m_iSessionMinutes = 0;
-        private int m_iSessionHours = 0;
         private System.Timers.Timer SessionTimer = new System.Timers.Timer(); // Use system timer instead of forms timer for threading, so the update is reliable
         private bool m_bPaused = false;
-
-        // RNG Data
-        private double m_fCurrentAverage = 0.0;
-        private List<double> m_DataPoints = new List<double>();
-        private List<double> m_Averages = new List<double>();
-
-        // Target values
-        private enum PossibleTargetsIndex // Indexes for the targets array
-        {
-            None = 0,
-            Zero = 1,
-            One = 2,
-            TARGETS_SIZE = 3 // Keep at end
-        }
-        private int? m_iTargetValue = null;
 
         // Chart
         private int m_iMAX_DATA_SIZE = 1000 * 1024; // 1000 * 1024 * 4  = 4 MB
@@ -790,7 +851,6 @@ namespace RandomNumberGenerator
         // Device settings
         private int m_iSeed = 0;
         private bool m_bInterfaceInitialized = false;
-        private bool m_bSimulate = false;
         private Thread m_DeviceWatchDogThread;
         private BindingSource m_DeviceBindingSource;
 
@@ -798,13 +858,16 @@ namespace RandomNumberGenerator
         internal const string m_sPAUSE_BUTTON = "PAUSE";
         internal const string m_sRESUME_BUTTON = "RESUME";
         
-        // Status and error messages
-        private const string m_sINVALID_SEED_ERROR = "Specified seed is not valid. Must be positive integer. Reset to last valid value.";
-        private const string m_sDEVICE_INIT_ERROR = "Error initializing TruRNGpro. Please verify device is connected and correct COM port is selected.";
-        private const string m_sDEVICE_READ_ERROR = "Error reading from TruRNGpro. Please verify device is connected and correct COM port is selected.";
-        private const string m_sINIT_MESSAGE = "Initialized";
-        private const string m_sIDLE_MESSAGE = "Idle";
-        private const string m_sPAUSED_MESSAGE = "Paused";
+        // Status and error messages for the info box
+        private const string m_sINVALID_SEED_ERROR = " Specified seed is not valid. Must be positive integer. Reset to last valid value.";
+        private const string m_sDEVICE_INIT_ERROR = " Error initializing TruRNGpro. Please verify device is connected and correct COM port is selected.";
+        private const string m_sDEVICE_READ_ERROR = " Error reading from TruRNGpro. Please verify device is connected and correct COM port is selected.";
+        private const string m_sINIT_MESSAGE = " Initialized";
+        private const string m_sIDLE_MESSAGE = " Idle";
+        private const string m_sPAUSED_MESSAGE = " Paused";
+
+        // Other error messages
+        private const string m_sBUSY_CHANGE_WHILE_RUNNING_EXCEPTION = "Busy property cannot be changed while a session is running.";
 
         #endregion
     }

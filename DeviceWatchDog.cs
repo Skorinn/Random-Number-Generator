@@ -228,7 +228,7 @@ namespace RandomNumberGenerator
         private static Color m_StatusBoxBackColor = System.Drawing.SystemColors.Info;
 
         // Message to display in the info box when reading devices
-        private static readonly string m_sREADING_DEVICES_MESSAGE = "Checking attached devices and updating port list...";
+        private static readonly string m_sREADING_DEVICES_MESSAGE = " Checking attached devices and updating port list...";
         private static readonly Color m_READING_DEVICES_TEXTCOLOR = System.Drawing.Color.White;
         private static readonly Color m_READING_DEVICES_BACKCOLOR = System.Drawing.SystemColors.Highlight;
     }

@@ -43,10 +43,10 @@ namespace RandomNumberGenerator
         private void InitializeComponent()
         {
             this.components = new System.ComponentModel.Container();
-            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea4 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
-            System.Windows.Forms.DataVisualization.Charting.Legend legend4 = new System.Windows.Forms.DataVisualization.Charting.Legend();
-            System.Windows.Forms.DataVisualization.Charting.Series series7 = new System.Windows.Forms.DataVisualization.Charting.Series();
-            System.Windows.Forms.DataVisualization.Charting.Series series8 = new System.Windows.Forms.DataVisualization.Charting.Series();
+            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea1 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
+            System.Windows.Forms.DataVisualization.Charting.Legend legend1 = new System.Windows.Forms.DataVisualization.Charting.Legend();
+            System.Windows.Forms.DataVisualization.Charting.Series series1 = new System.Windows.Forms.DataVisualization.Charting.Series();
+            System.Windows.Forms.DataVisualization.Charting.Series series2 = new System.Windows.Forms.DataVisualization.Charting.Series();
             this.m_CurrentAverageLabel = new System.Windows.Forms.Label();
             this.m_CurrentAverageTextBox = new System.Windows.Forms.TextBox();
             this.m_SessionTimerTextBox = new System.Windows.Forms.TextBox();
@@ -215,20 +215,20 @@ namespace RandomNumberGenerator
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.m_AverageChart.BackColor = System.Drawing.Color.Transparent;
-            chartArea4.Name = "MainChartArea";
-            this.m_AverageChart.ChartAreas.Add(chartArea4);
-            legend4.Name = "MainLegend";
-            this.m_AverageChart.Legends.Add(legend4);
+            chartArea1.Name = "MainChartArea";
+            this.m_AverageChart.ChartAreas.Add(chartArea1);
+            legend1.Name = "MainLegend";
+            this.m_AverageChart.Legends.Add(legend1);
             this.m_AverageChart.Location = new System.Drawing.Point(6, 202);
             this.m_AverageChart.Name = "m_AverageChart";
-            series7.ChartArea = "MainChartArea";
-            series7.Legend = "MainLegend";
-            series7.Name = "Data Points";
-            series8.ChartArea = "MainChartArea";
-            series8.Legend = "MainLegend";
-            series8.Name = "Averages";
-            this.m_AverageChart.Series.Add(series7);
-            this.m_AverageChart.Series.Add(series8);
+            series1.ChartArea = "MainChartArea";
+            series1.Legend = "MainLegend";
+            series1.Name = "Data Points";
+            series2.ChartArea = "MainChartArea";
+            series2.Legend = "MainLegend";
+            series2.Name = "Averages";
+            this.m_AverageChart.Series.Add(series1);
+            this.m_AverageChart.Series.Add(series2);
             this.m_AverageChart.Size = new System.Drawing.Size(748, 463);
             this.m_AverageChart.TabIndex = 9;
             this.m_AverageChart.TabStop = false;
@@ -334,12 +334,14 @@ namespace RandomNumberGenerator
             this.m_FileBrowseButton.TabIndex = 2;
             this.m_FileBrowseButton.Text = "Browse...";
             this.m_FileBrowseButton.UseVisualStyleBackColor = true;
+            this.m_FileBrowseButton.Click += new System.EventHandler(this.FileBrowseButton_Click);
             // 
             // m_FileTextBox
             // 
             this.m_FileTextBox.Font = new System.Drawing.Font("Segoe UI", 10F);
             this.m_FileTextBox.Location = new System.Drawing.Point(12, 42);
             this.m_FileTextBox.Name = "m_FileTextBox";
+            this.m_FileTextBox.ReadOnly = true;
             this.m_FileTextBox.Size = new System.Drawing.Size(329, 25);
             this.m_FileTextBox.TabIndex = 1;
             // 
