@@ -19,6 +19,7 @@
     <CustomBuildStep>
       <Command>xcopy /y "$(TargetPath)" "$(SolutionDir)bin\"
 if errorlevel  1 goto end
+echo Copied to "$(SolutionDir)bin\$(TargetFileName)"
 
 :end</Command>
     </CustomBuildStep>
