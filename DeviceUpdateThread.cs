@@ -1,6 +1,6 @@
 ﻿//*********************************************************************************************************************
-// File Name:      DeviceWatchDog.cs
-// Description:    Watchdog for asynchronously updating the device list
+// File Name:      DeviceUpdateThread.cs
+// Description:    Thread for asynchronously updating the device list
 //
 // Copyright (C) 2023 Mike Pullen. All Rights Reserved.
 // Confidential and Proprietary
@@ -8,6 +8,7 @@
 // Revision History: 
 //====================================================================================================================
 // 2023/12/03 - Mike Pullen - Original implementation.
+// 2023/12/06 - Mike Pullen - Changed from an always-running watchdog to a thread pool
 //*********************************************************************************************************************
 using System;
 using System.Drawing;
@@ -21,35 +22,27 @@ namespace RandomNumberGenerator
     /// <summary>
     /// Watchdog for asynchronously updating the device list
     /// </summary>
-    static class DeviceWatchDog
+    /// <param name="oStateInfo">IN - State info for executing in the thread pool (not used)</param>
+    static class DeviceUpdateThread
     {
-        public static void ThreadProc()
+        public static void ThreadProc(object stateInfo)
         {
-            // Continue until told to stop
-            while (m_bContinue)
+            // Discard unused parameters
+            _ = stateInfo;
+
+            // Only allow one thread to execute the update at a time (first come first served)
+            lock(m_Lock)
             {
-                // Check the update flag
-                if (m_bUpdate)
-                {
-                    // Reset the flag
-                    m_bUpdate = false;
+                // Backup the info box and display the "reading devices" message
+                BackupInfoBox();
+                UpdateInfoBox(m_sREADING_DEVICES_MESSAGE, m_READING_DEVICES_TEXTCOLOR, m_READING_DEVICES_BACKCOLOR);
 
-                    // Backup the info box and display the "reading devices" message
-                    BackupInfoBox();
-                    UpdateInfoBox(m_sREADING_DEVICES_MESSAGE, m_READING_DEVICES_TEXTCOLOR, m_READING_DEVICES_BACKCOLOR);
+                // Update the device list
+                GetDevicePorts();
+                UpdateDeviceList();
 
-                    // Update the device list
-                    GetDevicePorts();
-                    UpdateDeviceList();
-
-                    // Restore the previous info box message
-                    UpdateInfoBox(m_sStatusBoxText, m_StatusBoxTextColor, m_StatusBoxBackColor);
-                }
-                else
-                {
-                    // Sleep until next check
-                    Thread.Sleep((int)m_iInterval);
-                }
+                // Restore the previous info box message
+                UpdateInfoBox(m_sStatusBoxText, m_StatusBoxTextColor, m_StatusBoxBackColor);
             }
         }
 
@@ -194,29 +187,12 @@ namespace RandomNumberGenerator
         internal static BindingList<RNGDevice> DeviceList { get => m_DeviceList; }
 
         /// <summary>
-        /// Whether the watchdog should continue checking or terminate
-        /// </summary>
-        internal static bool Continue { get => m_bContinue; set => m_bContinue = value; }
-
-        /// <summary>
-        /// Flag to signal the watchdog to update the device list
-        /// </summary>
-        public static bool Update { get => m_bUpdate; set => m_bUpdate = value; }
-
-        /// <summary>
-        /// Interval to check the update flag in milliseconds (default = 1000)
-        /// </summary>
-        public static uint Interval { get => m_iInterval; set => m_iInterval = value; }
-
-        /// <summary>
         /// The parent form to which to relay the updated device list
         /// </summary>
         public static GeneratorForm Parent { get => m_Parent; set => m_Parent = value; }
 
-        // Watchdog parameters and flags
-        private static bool m_bContinue = true;
-        private static bool m_bUpdate = false;
-        private static uint m_iInterval = 1000;
+        // Synchronizaion object
+        private static object m_Lock = new object();
 
         // Device list update data members
         private static BindingList<RNGDevice> m_DeviceList = new BindingList<RNGDevice>();

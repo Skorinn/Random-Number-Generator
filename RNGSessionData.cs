@@ -42,15 +42,14 @@ namespace RandomNumberGenerator
         internal void Reset()
         {
             // Use of the session time is exclusive
-            Monitor.Enter(m_TimerLock);
-
-            // Reset the timer
-            m_iSessionMilliseconds = 0;
-            m_iSessionSeconds = 0;
-            m_iSessionMinutes = 0;
-            m_iSessionHours = 0;
-
-            Monitor.Exit(m_TimerLock);
+            lock(m_TimerLock)
+            {
+                // Reset the timer
+                m_iSessionMilliseconds = 0;
+                m_iSessionSeconds = 0;
+                m_iSessionMinutes = 0;
+                m_iSessionHours = 0;
+            }
 
             // Clear cannot be done atomically so just create new queues
             m_DataPoints = new ConcurrentQueue<double>();
@@ -68,29 +67,28 @@ namespace RandomNumberGenerator
         internal void TickSessionTimer(int iInterval)
         {
             // Use of the session time is exclusive
-            Monitor.Enter(m_TimerLock);
-
-            // Update the millisecond counter then check for rollovers
-            m_iSessionMilliseconds += iInterval;
-            if (m_iSessionMilliseconds >= 1000)
+            lock(m_TimerLock)
             {
-                ++m_iSessionSeconds;
-                m_iSessionMilliseconds -= 1000;
-            }
+                // Update the millisecond counter then check for rollovers
+                m_iSessionMilliseconds += iInterval;
+                if (m_iSessionMilliseconds >= 1000)
+                {
+                    ++m_iSessionSeconds;
+                    m_iSessionMilliseconds -= 1000;
+                }
 
-            if (m_iSessionSeconds > 60)
-            {
-                ++m_iSessionMinutes;
-                m_iSessionSeconds -= 60;
-            }
+                if (m_iSessionSeconds > 60)
+                {
+                    ++m_iSessionMinutes;
+                    m_iSessionSeconds -= 60;
+                }
 
-            if (m_iSessionMinutes > 60)
-            {
-                ++m_iSessionHours;
-                m_iSessionMinutes -= 60;
+                if (m_iSessionMinutes > 60)
+                {
+                    ++m_iSessionHours;
+                    m_iSessionMinutes -= 60;
+                }
             }
-
-            Monitor.Exit(m_TimerLock);
         }
 
         /// <summary>
@@ -99,14 +97,13 @@ namespace RandomNumberGenerator
         internal void ResetSessionTimings()
         {
             // Use of the session time is exclusive
-            Monitor.Enter(m_TimerLock);
-
-            m_iSessionMilliseconds = 0;
-            m_iSessionSeconds = 0;
-            m_iSessionMinutes = 0;
-            m_iSessionHours = 0;
-
-            Monitor.Exit(m_TimerLock);
+            lock(m_TimerLock)
+            {
+                m_iSessionMilliseconds = 0;
+                m_iSessionSeconds = 0;
+                m_iSessionMinutes = 0;
+                m_iSessionHours = 0;
+            }
         }
 
         /// <summary>
@@ -133,7 +130,8 @@ namespace RandomNumberGenerator
             }
 
             // Add the new average value
-            m_Averages.Enqueue(CurrentAverage);
+            double fDataPointAverage = m_DataPoints.Average();
+            m_Averages.Enqueue(fDataPointAverage);
 
             // Update the current average
             Interlocked.Exchange(ref m_fCurrentAverage, m_Averages.Average());
@@ -149,13 +147,15 @@ namespace RandomNumberGenerator
         {
             get
             {
-                // Use of the session time is exclusive
-                Monitor.Enter(m_TimerLock);
-                
-                // Build and return the formatted string representation of the updated session time
-                string sTimerText = m_iSessionHours.ToString("00") + ":" + m_iSessionMinutes.ToString("00") + ":" + m_iSessionSeconds.ToString("00");
+                string sTimerText;
 
-                Monitor.Exit(m_TimerLock);
+                // Use of the session time is exclusive
+                lock(m_TimerLock)
+                {
+                    // Build and return the formatted string representation of the updated session time
+                    sTimerText = m_iSessionHours.ToString("00") + ":" + m_iSessionMinutes.ToString("00") + ":" + m_iSessionSeconds.ToString("00");
+                }
+
                 return sTimerText;
             }
         }

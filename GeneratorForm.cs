@@ -52,9 +52,11 @@ namespace RandomNumberGenerator
         public GeneratorForm()
         {
             // Dump USB devices if debugging and defined
-            #if DUMP_DEVICES && DEBUG
+#if DUMP_DEVICES && DEBUG
                 DumpUSBDevices();
-            #endif
+#endif
+            // Initialize the thread pool
+            InitializeThreadPool();
 
             // Initialize GUI
             InitializeComponent();
@@ -64,11 +66,9 @@ namespace RandomNumberGenerator
             m_StatusTextBox.Text = m_sIDLE_MESSAGE;
             m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
 
-            // Start the device update watchdog thread and trigger an update
-            DeviceWatchDog.Parent = this;
-            DeviceWatchDog.Update = true;
-            m_DeviceWatchDogThread = new Thread(DeviceWatchDog.ThreadProc);
-            m_DeviceWatchDogThread.Start();
+            // Start the device update thread and trigger an update
+            DeviceUpdateThread.Parent = this;
+            ThreadPool.QueueUserWorkItem(DeviceUpdateThread.ThreadProc);
 
             // Create the source from the list of device ports
             m_DeviceBindingSource = new BindingSource();
@@ -115,7 +115,7 @@ namespace RandomNumberGenerator
                     // For both connect and remove, trigger the watchdog to do an update
                     case USBDeviceNotification.iDEVICE_CONNECTED:
                     case USBDeviceNotification.iDEVICE_REMOVED:
-                        DeviceWatchDog.Update = true;
+                        ThreadPool.QueueUserWorkItem(DeviceUpdateThread.ThreadProc);
                         break;
 
                     // Ignore any other events
@@ -133,6 +133,10 @@ namespace RandomNumberGenerator
         /// <param name="e">IN - The event arguments (not used)</param>
         private void SessionTimer_Tick(object sender, EventArgs e)
         {
+            // Discard unused parameters
+            _ = sender;
+            _ = e;
+
             string sTimerText;
 
             // Executes in a thread so protect against collision when updating members
@@ -156,6 +160,10 @@ namespace RandomNumberGenerator
         /// <param name="e">IN - The event arguments (not used)</param>
         private void ReadTimer_Tick(object sender, EventArgs e)
         {
+            // Discard unused parameters
+            _ = sender;
+            _ = e;
+
             // Update the average
             double fCurrentValue = 0.0;
             bool bStatus = GetRandomBitAverage(ref fCurrentValue);
@@ -240,6 +248,10 @@ namespace RandomNumberGenerator
         /// <param name="e">IN - The event arguments (not used)</param>
         private void SimulateToggle_CheckedChanged(object sender, EventArgs e)
         {
+            // Discard unused parameters
+            _ = sender;
+            _ = e;
+
             // Update the simulation status and button
             m_Data.Simulated = !(m_Data.Simulated);
             m_SimulateToggle.Checked = m_Data.Simulated;
@@ -273,6 +285,10 @@ namespace RandomNumberGenerator
         /// <param name="e">IN - The event arguments (not used)</param>
         private void StartButton_Click(object sender, EventArgs e)
         {
+            // Discard unused parameters
+            _ = sender;
+            _ = e;
+
             // Disable the interface controls
             m_SimulateToggle.Enabled = false;
             m_PortComboBox.Enabled = false;
@@ -310,6 +326,10 @@ namespace RandomNumberGenerator
         /// <param name="e">IN - The event arguments (not used)</param>
         private void PauseButton_Click(object sender, EventArgs e)
         {
+            // Discard unused parameters
+            _ = sender;
+            _ = e;
+
             // Check if pausing or resuming
             if (m_bPaused)
             {
@@ -353,6 +373,10 @@ namespace RandomNumberGenerator
         /// <param name="e">IN - The event arguments (not used)</param>
         private void StopButton_Click(object sender, EventArgs e)
         {
+            // Discard unused parameters
+            _ = sender;
+            _ = e;
+
             // Stop the timers
             m_ReadTimer.Stop();
             SessionTimer.Stop();
@@ -385,6 +409,10 @@ namespace RandomNumberGenerator
         /// <param name="e">IN - The event arguments (not used)</param>
         private void ClearButton_Click(object sender, EventArgs e)
         {
+            // Discard unused parameters
+            _ = sender;
+            _ = e;
+
             /// !!! mpullen - TODO !!!
             // Warn the user that resetting will clear the currently selected file
 
@@ -418,6 +446,10 @@ namespace RandomNumberGenerator
         /// <param name="e">IN - The event arguments (not used)</param>
         private void PortComboBox_SelectedIndexChanged(object sender, EventArgs e)
         {
+            // Discard unused parameters
+            _ = sender;
+            _ = e;
+
             // Invalidate the device interface
             m_bInterfaceInitialized = false;
         }
@@ -426,9 +458,12 @@ namespace RandomNumberGenerator
         /// Event handler for validating the port number
         /// </summary>
         /// <param name="sender">IN - Sender of the event (not used)</param>
-        /// <param name="e">IN - The event arguments (not used)</param>
+        /// <param name="e">IN - The event arguments</param>
         private void PortTextBox_Validating(object sender, System.ComponentModel.CancelEventArgs e)
         {
+            // Discard unused parameters
+            _ = sender;
+
             // Only need to validate when simulating
             if (m_Data.Simulated)
             {
@@ -448,8 +483,8 @@ namespace RandomNumberGenerator
                     this.m_StatusTextBox.BackColor = System.Drawing.Color.Red;
                     m_StatusTextBox.Text = m_sINVALID_SEED_ERROR;
 
-                    // Set back to the last value
-                    m_PortComboBox.Text = m_iSeed.ToString();
+                    // Cancel the input
+                    e.Cancel = true;
                 }
                 else
                 {
@@ -466,6 +501,10 @@ namespace RandomNumberGenerator
         /// <param name="e">IN - The event arguments (not used)</param>
         private void FileBrowseButton_Click(object sender, EventArgs e)
         {
+            // Discard unused parameters
+            _ = sender;
+            _ = e;
+
             // Do not allow a new session while processing action
             Busy = true;
 
@@ -532,18 +571,34 @@ namespace RandomNumberGenerator
         /// <param name="e">IN - The event arguments (not used)</param>
         private void GeneratorForm_FormClosing(object sender, FormClosingEventArgs e)
         {
-            // Signal the device watchdog to terminate
-            DeviceWatchDog.Continue = false;
+            // Discard unused parameters
+            _ = sender;
+            _ = e;
 
             // Make sure any running session is stoped
             StopButton_Click(sender, e);
-
-            // Do not wait for device watchdog thread. It creates a deadlock if the thread attempts
-            // to invoke an update to the device list.
         }
 
         #endregion
         #region Methods
+
+        /// <summary>
+        /// Initializes the thread pool
+        /// </summary>
+        private void InitializeThreadPool()
+        {
+            // Set the maximum number of threads for the thread pool
+            const int iMAX_WORKERS = 6;
+            const int iMAX_COMPLETION = 2;
+            ThreadPool.SetMaxThreads(iMAX_WORKERS, iMAX_COMPLETION); // Use no more than 8 parallel executions
+
+            // Set the minimum number of threads to the minimum needed for normal execution
+            // Workers = 1 for the device update, 1 for updating data set, 1 for file I/O
+            // Completion - None currently used
+            const int iMIN_WORKS = 3;
+            const int iMIN_COMPLETION = 0;
+            ThreadPool.SetMinThreads(iMIN_WORKS, iMIN_COMPLETION);
+        }
 
         /// <summary>
         /// Initializes the plot of the results
@@ -851,7 +906,6 @@ namespace RandomNumberGenerator
         // Device settings
         private int m_iSeed = 0;
         private bool m_bInterfaceInitialized = false;
-        private Thread m_DeviceWatchDogThread;
         private BindingSource m_DeviceBindingSource;
 
         // Button text
