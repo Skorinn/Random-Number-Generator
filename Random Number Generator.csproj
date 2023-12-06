@@ -146,7 +146,6 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Externals\CommonControls.dll" />
-    <Content Include="Notes.txt" />
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
