@@ -75,6 +75,9 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>Externals\CommonControls.dll</HintPath>
     </Reference>
+    <Reference Include="DeviceInterfaces">
+      <HintPath>Externals\DeviceInterfaces.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Management" />
@@ -103,7 +106,6 @@
     <Compile Include="RNGSessionData.cs" />
     <Compile Include="TargetValues.cs" />
     <Compile Include="RNGDevice.cs" />
-    <Compile Include="USBDeviceNotification.cs" />
     <EmbeddedResource Include="GeneratorForm.resx">
       <DependentUpon>GeneratorForm.cs</DependentUpon>
     </EmbeddedResource>
@@ -151,6 +153,7 @@
   <PropertyGroup>
     <PostBuildEvent>xcopy /y "$(TargetPath)" "$(SolutionDir)bin\"
 if errorlevel  1 goto end
+echo Copied to "$(SolutionDir)bin\"
 
 :end</PostBuildEvent>
   </PropertyGroup>

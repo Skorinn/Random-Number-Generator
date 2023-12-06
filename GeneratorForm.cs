@@ -16,16 +16,16 @@
 //#define DUMP_DEVICES
 
 using System;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
 using System.IO;
-using System.Linq;
 using System.Management;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
 using System.Windows.Forms.DataVisualization.Charting;
+
+using DeviceInterfaces;
 
 namespace RandomNumberGenerator
 {
@@ -626,7 +626,7 @@ namespace RandomNumberGenerator
             bool bTargetChanged = false;
 
             // If no target has been set
-            if (null == m_Data.TargetValue)
+            if (TargetValues.NO_VALUE_SET == m_Data.TargetValue)
             {
                 // Record the current selection
                 m_Data.TargetValue = SelectedTarget;
@@ -636,7 +636,7 @@ namespace RandomNumberGenerator
             {
                 // Notify the user and prompt if they would like to accept or revert the change
                 string sTargetChangedCaption = "Target Changed";
-                string sTargetChangedMessage = "The target has changed from " + TargetValues.ToString((int)m_Data.TargetValue) + " to " +
+                string sTargetChangedMessage = "The target has changed from " + TargetValues.ToString(m_Data.TargetValue) + " to " +
                     SelectedTarget.ToString() + "\n\nAccept change?";
                 MessageBoxButtons TargetChangedButtons = MessageBoxButtons.YesNo;
                 DialogResult TargetChangedResult = MessageBox.Show(sTargetChangedMessage, sTargetChangedCaption, TargetChangedButtons);
@@ -818,10 +818,10 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Selected target value
         /// </summary>
-        private int? SelectedTarget
+        private int SelectedTarget
         {
             get { return TargetValues.GetValueAt((uint)m_TargetComboBox.SelectedIndex); }
-            set { m_TargetComboBox.SelectedItem = TargetValues.ToString((int)value); }
+            set { m_TargetComboBox.SelectedItem = TargetValues.ToString(value); }
         }
 
         /// <summary>
@@ -829,7 +829,7 @@ namespace RandomNumberGenerator
         /// </summary>
         private string RunningMessage
         {
-            get { return $"Running with Target = {m_Data.TargetValue}..."; }
+            get { return $"Running with Target = {m_TargetComboBox.SelectedItem}..."; }
         }
 
         #endregion
