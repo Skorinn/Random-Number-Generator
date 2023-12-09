@@ -15,7 +15,31 @@ using System.Threading;
 
 namespace RandomNumberGenerator
 {
-    class RNGSessionData
+    /// <summary>
+    /// Interface for the RNG session data
+    /// </summary>
+    internal interface IRNGSessionData
+    {
+        void Reset();
+        void TickSessionTimer(int iInterval);
+        void ResetSessionTimings();
+        void AddDataPoint(double fDataPoint);
+
+
+        string SessionTime { get; }
+        double CurrentAverage { get; }
+        double MaxPoint { get; }
+        double MinPoint { get; }
+        ConcurrentQueue<double> DataPoints { get; set; }
+        int DataWindowSize { get; set; }
+        int TargetValue { get; set; }
+        bool Simulated { get; set; }
+    }
+
+    /// <summary>
+    /// Representation of the data from a Random Number Generator session
+    /// </summary>
+    internal class RNGSessionData : IRNGSessionData
     {
         #region Type definitions
         internal enum PossibleTargetsIndex // Indexes for the targets array
@@ -39,7 +63,7 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Resets the data to start a a new session
         /// </summary>
-        internal void Reset()
+        public void Reset()
         {
             // Use of the session time is exclusive
             lock(m_TimerLock)
@@ -64,7 +88,7 @@ namespace RandomNumberGenerator
         /// Increments the session counter
         /// </summary>
         /// <param name="iInterval">IN - Amount to add to the timer</param>
-        internal void TickSessionTimer(int iInterval)
+        public void TickSessionTimer(int iInterval)
         {
             // Use of the session time is exclusive
             lock(m_TimerLock)
@@ -94,7 +118,7 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Resets the session time to 0
         /// </summary>
-        internal void ResetSessionTimings()
+        public void ResetSessionTimings()
         {
             // Use of the session time is exclusive
             lock(m_TimerLock)
@@ -110,9 +134,9 @@ namespace RandomNumberGenerator
         /// Adds a new data point to the data sets
         /// </summary>
         /// <param name="fDataPoint">IN - The new data point</param>
-        internal void AddDataPoint(double fDataPoint)
+        public void AddDataPoint(double fDataPoint)
         {
-            // Remove the oldest point if at the window size limit
+            // Check if the data set is full
             if (m_DataPoints.Count >= m_iDataWindowSize)
             {
                 double fResult; // unused out parameter
@@ -122,19 +146,8 @@ namespace RandomNumberGenerator
             // Add the point to the data set
             m_DataPoints.Enqueue(fDataPoint);
 
-            // Remove the oldest average if at the window size limit
-            if (m_Averages.Count >= m_iDataWindowSize)
-            {
-                double fResult; // unused out parameter
-                m_Averages.TryDequeue(out fResult);
-            }
-
-            // Add the new average value
-            double fDataPointAverage = m_DataPoints.Average();
-            m_Averages.Enqueue(fDataPointAverage);
-
             // Update the current average
-            Interlocked.Exchange(ref m_fCurrentAverage, m_Averages.Average());
+            Interlocked.Exchange(ref m_fCurrentAverage, m_DataPoints.Average());
         }
 
         #endregion
@@ -143,7 +156,7 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Formated session time string
         /// </summary>
-        internal string SessionTime
+        public string SessionTime
         {
             get
             {
@@ -159,16 +172,16 @@ namespace RandomNumberGenerator
                 return sTimerText;
             }
         }
-        
+
         /// <summary>
         /// The current average of the data points
         /// </summary>
-        internal double CurrentAverage { get => m_fCurrentAverage; }
+        public double CurrentAverage { get => m_fCurrentAverage; }
 
         /// <summary>
         /// Gets the maximum data or average value (whichever is greater)
         /// </summary>
-        internal double MaxPoint
+        public double MaxPoint
         {
             get
             {
@@ -181,7 +194,7 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Gets the minimum data or average value (whichever is less)
         /// </summary>
-        internal double MinPoint
+        public double MinPoint
         {
             get
             {
@@ -194,27 +207,22 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Full data point set
         /// </summary>
-        internal ConcurrentQueue<double> DataPoints { get => m_DataPoints; set => m_DataPoints = value; }
-
-        /// <summary>
-        /// Average set
-        /// </summary>
-        internal ConcurrentQueue<double> Averages { get => m_Averages; set => m_Averages = value; }
+        public ConcurrentQueue<double> DataPoints { get => m_DataPoints; set => m_DataPoints = value; }
 
         /// <summary>
         /// Maximum size for the data and average sets held in memory
         /// </summary>
-        internal int DataWindowSize { get => m_iDataWindowSize; set => Interlocked.Exchange(ref m_iDataWindowSize, value); }
+        public int DataWindowSize { get => m_iDataWindowSize; set => Interlocked.Exchange(ref m_iDataWindowSize, value); }
 
         /// <summary>
         /// The selected target value for the session
         /// </summary>
-        internal int TargetValue { get => m_iTargetValue; set => Interlocked.Exchange(ref m_iTargetValue, value); }
+        public int TargetValue { get => m_iTargetValue; set => Interlocked.Exchange(ref m_iTargetValue, value); }
 
         /// <summary>
         /// Whether the data is simulated or from a real RNG device
         /// </summary>
-        internal bool Simulated
+        public bool Simulated
         {
             get
             {
@@ -240,7 +248,6 @@ namespace RandomNumberGenerator
         // RNG Data
         private double m_fCurrentAverage = 0.0;
         private ConcurrentQueue<double> m_DataPoints = new ConcurrentQueue<double>();
-        private ConcurrentQueue<double> m_Averages = new ConcurrentQueue<double>();
         private int m_iDataWindowSize = 4096;
 
         // Target values

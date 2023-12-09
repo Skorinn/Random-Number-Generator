@@ -32,7 +32,7 @@ namespace RandomNumberGenerator
     /// <summary>
     /// Random Number Generator form
     /// </summary>
-    public partial class GeneratorForm : Form
+    internal partial class GeneratorForm : Form
     {
         #region Imports
 
@@ -49,8 +49,14 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Default constructor
         /// </summary>
-        public GeneratorForm()
+        /// <param name="sessionData">IN - The session data object</param>
+        /// <param name="sessionDataFile">IN - The session data file object</param>
+        internal GeneratorForm(IRNGSessionData sessionData, IRNGSessionDataFile sessionDataFile)
         {
+            // Record the data and file objects
+            m_Data = sessionData;
+            m_DataFile = sessionDataFile;
+
             // Dump USB devices if debugging and defined
 #if DUMP_DEVICES && DEBUG
                 DumpUSBDevices();
@@ -180,11 +186,11 @@ namespace RandomNumberGenerator
             }
             else // Successfully read from generator
             {
-                // Update the stored data point, windowing the samples
-                m_Data.AddDataPoint(fCurrentValue);
+                // Record the new data point
+                RecordDataPoint(fCurrentValue);
 
                 // Update the displayed average
-                m_CurrentAverageTextBox.Text = m_Data.CurrentAverage.ToString("0.000000000");
+                m_CurrentAverageTextBox.Text = CurrentAverage;
 
 
                 // Update the data points on the chart
@@ -259,6 +265,9 @@ namespace RandomNumberGenerator
             // Record the interface requires initialization
             m_bInterfaceInitialized = false;
 
+            // End any session in progress
+            EndSession();
+
             // If simulating
             if (m_Data.Simulated)
             {
@@ -309,6 +318,9 @@ namespace RandomNumberGenerator
             m_StartButton.Enabled = false;
             m_StopButton.Enabled = true;
             m_PauseButton.Enabled = true;
+
+            // Start a new session (will continue existing session if already in progress)
+            StartSession();
 
             // Start the timers
             m_ReadTimer.Start();
@@ -436,7 +448,7 @@ namespace RandomNumberGenerator
 
             // Update the timer and average displayed
             m_SessionTimerTextBox.Text = m_Data.SessionTime;
-            m_CurrentAverageTextBox.Text = m_Data.CurrentAverage.ToString("0.000000000");
+            m_CurrentAverageTextBox.Text = m_sAVERAGE_FORMAT;
         }
 
         /// <summary>
@@ -528,15 +540,21 @@ namespace RandomNumberGenerator
                 }
             }
 
-            // If no file was selected
-            if (String.IsNullOrEmpty(sSelectedFile))
+            //!!! mpullen - need to verify if it is possible to go from having a file selected to not having one !!!
+
+            // Check if the selection will have any effect
+            Busy = (false == String.IsNullOrEmpty(sSelectedFile));
+            if (Busy)
             {
-                // Re-enable session actions
-                Busy = false;
+                Busy = (sSelectedFile != m_DataFile.FilePath); 
             }
-            // User has selected a file
-            else
+
+            // If the file is being changed
+            if (Busy)
             {
+                // Close any open session
+                EndSession();
+
                 // Check if the file exists
                 bool bFileExists = File.Exists(sSelectedFile);
                 if (bFileExists)
@@ -577,6 +595,10 @@ namespace RandomNumberGenerator
 
             // Make sure any running session is stoped
             StopButton_Click(sender, e);
+            if (m_DataFile.SessionInProgress)
+            {
+                m_DataFile.EndSession();
+            }
         }
 
         #endregion
@@ -702,6 +724,13 @@ namespace RandomNumberGenerator
                     // Record the change
                     bTargetChanged = true;
                     m_Data.TargetValue = SelectedTarget;
+
+                    // If a session is currently in progress
+                    if (m_DataFile.SessionInProgress)
+                    {
+                        // End it and start a new session (next time start is clicked
+                        m_DataFile.EndSession();
+                    }
                 }
                 // If the user does not accept the change
                 else
@@ -736,6 +765,97 @@ namespace RandomNumberGenerator
             }
 
             return iPort;
+        }
+
+        /// <summary>
+        /// Start a new session if one is not already in progress
+        /// </summary>
+        /// <returns>true if successful; otherwise, false</returns>
+        private bool StartSession()
+        {
+            // Default to true as the call is successful if nothings needs to be done
+            bool bStatus = true;
+
+            // Write the session start if a file has been selected and session is not currently in progress
+            if (m_DataFile.Valid && (false == m_DataFile.SessionInProgress))
+            {
+                bStatus = m_DataFile.StartSession(m_Data);
+            }
+
+            return bStatus;
+        }
+
+        /// <summary>
+        /// Ends the current session, if one is in progress
+        /// </summary>
+        /// <returns>true if successful; otherwise, false</returns>
+        private bool EndSession()
+        {
+            // Default to true as the call is successful if nothings needs to be done
+            bool bStatus = true;
+
+            // Only need to write to the file if a session is in progress
+            if (m_DataFile.SessionInProgress)
+            {
+                // Flush any pending data and end the session
+                bStatus = FlushPendingData();
+                bStatus &= m_DataFile.EndSession();
+            }
+
+            return bStatus;
+        }
+
+        /// <summary>
+        /// Records a new data point
+        /// </summary>
+        /// <param name="fDataPoint">IN - The new data point</param>
+        /// <returns>true, if successful; otherwise false</returns>
+        private bool RecordDataPoint(double fDataPoint)
+        {
+            // Record the data point and check for write
+            m_Data.AddDataPoint(fDataPoint);
+            bool bStatus = WritePendingData();
+
+            return bStatus;
+        }
+
+        /// <summary>
+        /// Write a datap point to the file if the data interval has beenr reached
+        /// </summary>
+        /// <returns>true, if successful; otherwise false</returns>
+        private bool WritePendingData()
+        {
+            // Default to true as the call is successful if nothings needs to be done
+            bool bStatus = true;
+
+            // If the data point interval has been reached
+            if (m_iWRITE_FILE_INTERVAL <= ++m_iPendingDataPointCounter)
+            {
+                // Write the data point and reset the counter
+                bStatus = m_DataFile.WriteDataPoint(m_Data.CurrentAverage);
+                m_iPendingDataPointCounter = 0;
+            }
+
+            return bStatus;
+        }
+
+        /// <summary>
+        /// Flushes the data point to the file if one is pending
+        /// </summary>
+        /// <returns>true, if successful; otherwise false</returns>
+        private bool FlushPendingData()
+        {
+            // Default to true as the call is successful if nothings needs to be done
+            bool bStatus = true;
+
+            // Write the data point if one is pending and reset the counter
+            if (0 < m_iPendingDataPointCounter)
+            {
+                bStatus = m_DataFile.WriteDataPoint(m_Data.CurrentAverage);
+                m_iPendingDataPointCounter = 0;
+            }
+
+            return bStatus;
         }
 
         /// <summary>
@@ -887,12 +1007,20 @@ namespace RandomNumberGenerator
             get { return $"Running with Target = {m_TargetComboBox.SelectedItem}..."; }
         }
 
+        /// <summary>
+        /// Current average string
+        /// </summary>
+        private string CurrentAverage { get => m_Data.CurrentAverage.ToString(m_sAVERAGE_FORMAT); }
+
         #endregion
         #region Data Members
 
         // Form status and session data
         private bool m_bBusy = false;
-        private RNGSessionData m_Data = new RNGSessionData();
+        private IRNGSessionData m_Data = null;
+        private IRNGSessionDataFile m_DataFile = null;
+        private uint m_iPendingDataPointCounter = 0;
+        private const uint m_iWRITE_FILE_INTERVAL = 1000;
 
         // Session timer
         private System.Timers.Timer SessionTimer = new System.Timers.Timer(); // Use system timer instead of forms timer for threading, so the update is reliable
@@ -907,6 +1035,9 @@ namespace RandomNumberGenerator
         private int m_iSeed = 0;
         private bool m_bInterfaceInitialized = false;
         private BindingSource m_DeviceBindingSource;
+
+        // Display settings
+        private const string m_sAVERAGE_FORMAT = "0.000000000";
 
         // Button text
         internal const string m_sPAUSE_BUTTON = "PAUSE";

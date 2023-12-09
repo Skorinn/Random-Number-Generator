@@ -13,21 +13,30 @@
 namespace RandomNumberGenerator
 {
     /// <summary>
+    /// Interface for an RNG device
+    /// </summary>
+    internal interface IRNGDevice
+    {
+        string Description { get; set; }
+        int Port { get; set; }
+    }
+
+    /// <summary>
     /// Representation of an RNG device
     /// </summary>
-    class RNGDevice
+    internal class RNGDevice : IRNGDevice
     {
         /// <summary>
         /// Default constructor
         /// </summary>
-        public RNGDevice() { }
+        internal RNGDevice() { }
 
         /// <summary>
         /// Initializing constructor
         /// </summary>
         /// <param name="sDescription">IN - Description for the device</param>
         /// <param name="iPort">IN - Device port number</param>
-        public RNGDevice(string sDescription, int iPort)
+        internal RNGDevice(string sDescription, int iPort)
         {
             m_sDescription = sDescription;
             m_iPort = iPort;
@@ -46,12 +55,12 @@ namespace RandomNumberGenerator
         /// <summary>
         /// The member used for display in combo box list
         /// </summary>
-        public static string DisplayMember { get => "Description"; }
+        internal static string DisplayMember { get => "Description"; }
 
         /// <summary>
         /// The value used in combo box list
         /// </summary>
-        public static string ValueMember { get => "Port"; }
+        internal static string ValueMember { get => "Port"; }
 
         private string m_sDescription = "";
         private int m_iPort = -1;

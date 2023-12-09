@@ -25,7 +25,7 @@ namespace RandomNumberGenerator
     /// <param name="oStateInfo">IN - State info for executing in the thread pool (not used)</param>
     static class DeviceUpdateThread
     {
-        public static void ThreadProc(object stateInfo)
+        internal static void ThreadProc(object stateInfo)
         {
             // Discard unused parameters
             _ = stateInfo;
@@ -189,7 +189,7 @@ namespace RandomNumberGenerator
         /// <summary>
         /// The parent form to which to relay the updated device list
         /// </summary>
-        public static GeneratorForm Parent { get => m_Parent; set => m_Parent = value; }
+        internal static GeneratorForm Parent { get => m_Parent; set => m_Parent = value; }
 
         // Synchronizaion object
         private static object m_Lock = new object();

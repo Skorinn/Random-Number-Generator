@@ -18,43 +18,143 @@ using System.Threading.Tasks;
 
 namespace RandomNumberGenerator
 {
-    class RNGSessionDataFile
+    /// <summary>
+    /// Interface for the Random Number Generator session data file
+    /// </summary>
+    internal interface IRNGSessionDataFile
+    {
+        bool StartSession(IRNGSessionData sessionData);
+        bool WriteDataPoint(double fAverage);
+        bool EndSession();
+
+        string FilePath { get; set; }
+        bool Valid { get; }
+        bool SessionInProgress { get; }
+    }
+
+    /// <summary>
+    /// Represents a Random Number Generator session file
+    /// </summary>
+    internal class RNGSessionDataFile : IRNGSessionDataFile
     {
         #region Constructors
 
         /// <summary>
-        /// Default constructor
+        /// Construct with the writer and parent
         /// </summary>
-        public RNGSessionDataFile() { }
+        /// <param name="writer">IN - The XML writer object to use to for the file</param>
+        internal RNGSessionDataFile(IRNGXMLWriter writer)
+        {
+            m_Writer = writer;
+        }
+
+        #endregion
+        #region Methods
 
         /// <summary>
-        /// Construct with the specified path and parent
+        /// Starts a new session in the data file
         /// </summary>
-        /// <param name="sFilePath">IN - Path for this file</param>
-        public RNGSessionDataFile(string sFilePath, GeneratorForm parentForm)
+        /// <param name="sessionData">IN - The data for the new session</param>
+        /// <returns>true if successful; otherwise, false</returns>
+        public bool StartSession(IRNGSessionData sessionData)
         {
-            m_sFilePath = sFilePath;
-            m_Parent = parentForm;
+            // Default the status to failure
+            bool bStatus = false;
+
+            // Check if the writer is valid
+            if (m_Writer != null)
+            {
+                // Write the session start
+                m_bSessionInProgress = true;
+                bStatus = m_Writer.WriteSessionStart(sessionData.TargetValue);
+            }
+
+            return bStatus; 
+        }
+
+        /// <summary>
+        /// Writes a data point to the file
+        /// </summary>
+        /// <param name="fAverage">IN - The average for the data point to write</param>
+        /// <returns>true if successful; otherwise, false</returns>
+        public bool WriteDataPoint(double fAverage)
+        {
+            // Default the status to failure
+            bool bStatus = false;
+
+            // Check if the writer is valid
+            if (m_Writer != null)
+            {
+                // Write the data point
+                bStatus = m_Writer.WriteDataPoint(fAverage);
+            }
+
+            return bStatus;
+        }
+
+        /// <summary>
+        /// Writes the session end and closes the file
+        /// </summary>
+        /// <returns>true if successful; otherwise, false</returns>
+        public bool EndSession()
+        {
+            // Default the status to failure
+            bool bStatus = false;
+
+            // Check if the writer is valid
+            if (m_Writer != null)
+            {
+                // Write the session end
+                m_bSessionInProgress = false;
+                bStatus = m_Writer.WriteSessionEnd();
+            }
+
+            return bStatus;
         }
 
         #endregion
         #region Properties
 
         /// <summary>
-        /// Parent form for this file
-        /// </summary>
-        public GeneratorForm Parent { get => m_Parent; set => m_Parent = value; }
-
-        /// <summary>
         /// File path for this file
         /// </summary>
-        public string FilePath { get => m_sFilePath; set => m_sFilePath = value; }
+        public string FilePath { get => m_Writer.FilePath; set => m_Writer.FilePath = value; }
+
+        /// <summary>
+        /// Checks the a valid file path has been set
+        /// </summary>
+        public bool Valid
+        {
+            get
+            {
+                // Default to valid
+                bool bValid = true;
+
+                // Check if a file info object can be created from the writer's file property
+                try
+                {
+                    FileInfo file = new FileInfo(m_Writer.FilePath);
+                }
+                catch
+                {
+                    // File is not valid
+                    bValid = false;
+                }
+
+                return bValid;
+            }
+        }
+
+        /// <summary>
+        /// Specifies if a session is in progress (start has been written but not end)
+        /// </summary>
+        public bool SessionInProgress { get => m_bSessionInProgress; }
 
         #endregion
         #region Data Members
 
-        private GeneratorForm m_Parent = null;
-        private string m_sFilePath = null;
+        private IRNGXMLWriter m_Writer = null;
+        private bool m_bSessionInProgress = false;
 
         #endregion
     }
