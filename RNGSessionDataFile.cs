@@ -24,7 +24,7 @@ namespace RandomNumberGenerator
     internal interface IRNGSessionDataFile
     {
         bool StartSession(IRNGSessionData sessionData);
-        bool WriteDataPoint(double fAverage);
+        bool WriteDataPoint(IRNGSessionData sessionData);
         bool EndSession();
 
         string FilePath { get; set; }
@@ -75,9 +75,9 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Writes a data point to the file
         /// </summary>
-        /// <param name="fAverage">IN - The average for the data point to write</param>
+        /// <param name="fDataPoint">IN - The average for the data point to write</param>
         /// <returns>true if successful; otherwise, false</returns>
-        public bool WriteDataPoint(double fAverage)
+        public bool WriteDataPoint(IRNGSessionData sessionData)
         {
             // Default the status to failure
             bool bStatus = false;
@@ -86,7 +86,7 @@ namespace RandomNumberGenerator
             if (m_Writer != null)
             {
                 // Write the data point
-                bStatus = m_Writer.WriteDataPoint(fAverage);
+                bStatus = m_Writer.WriteDataPoint(sessionData.SessionTime, sessionData.CurrentAverage);
             }
 
             return bStatus;

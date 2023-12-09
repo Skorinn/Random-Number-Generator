@@ -832,7 +832,7 @@ namespace RandomNumberGenerator
             if (m_iWRITE_FILE_INTERVAL <= ++m_iPendingDataPointCounter)
             {
                 // Write the data point and reset the counter
-                bStatus = m_DataFile.WriteDataPoint(m_Data.CurrentAverage);
+                bStatus = m_DataFile.WriteDataPoint(m_Data);
                 m_iPendingDataPointCounter = 0;
             }
 
@@ -851,7 +851,7 @@ namespace RandomNumberGenerator
             // Write the data point if one is pending and reset the counter
             if (0 < m_iPendingDataPointCounter)
             {
-                bStatus = m_DataFile.WriteDataPoint(m_Data.CurrentAverage);
+                bStatus = m_DataFile.WriteDataPoint(m_Data);
                 m_iPendingDataPointCounter = 0;
             }
 

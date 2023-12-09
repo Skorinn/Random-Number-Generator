@@ -20,7 +20,7 @@ namespace RandomNumberGenerator
     internal interface IRNGXMLWriter
     {
         bool WriteSessionStart(int iTargetValue);
-        bool WriteDataPoint(double fAverage);
+        bool WriteDataPoint(string sSessionTime, double fDataPoint);
         bool WriteSessionEnd();
 
         string FilePath { get; set; }
@@ -106,9 +106,10 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Writes the specified daa point to the file
         /// </summary>
-        /// <param name="fAverage">IN - Average value</param>
+        /// <param name="sSessionTime">IN - Time for the data point</param>
+        /// <param name="fDataPoint">IN - Average value</param>
         /// <returns>true if successful; otherwise false</returns>
-        public bool WriteDataPoint(double fAverage)
+        public bool WriteDataPoint(string sSessionTime, double fDataPoint)
         {
             // Default status to failure
             bool bStatus = false;
@@ -117,7 +118,7 @@ namespace RandomNumberGenerator
             lock (this)
             {
                 // Create the data point object
-                XMLDataPoint dataPoint = new XMLDataPoint(fAverage);
+                XMLDataPoint dataPoint = new XMLDataPoint(sSessionTime, fDataPoint);
 
                 // Attempt to write the data point to the file
                 bStatus = dataPoint.WriteDataPoint(m_Writer);
@@ -196,12 +197,14 @@ namespace RandomNumberGenerator
         internal XMLDataPoint() { }
 
         /// <summary>
-        /// Constructs the objet witht the specified data point and average
+        /// Constructs the point with the time and value
         /// </summary>
-        /// <param name="fAverage">IN - Average value</param>
-        internal XMLDataPoint(double fAverage)
+        /// <param name="sSessionTime">IN - Time for the data point</param>
+        /// <param name="fDataPoint">IN - Average value</param>
+        internal XMLDataPoint(string sSessionTime, double fDataPoint)
         {
-            m_fAverage = fAverage;
+            m_sSessionTime = sSessionTime;
+            m_fDataPoint = fDataPoint;
         }
 
         /// <summary>
@@ -219,7 +222,8 @@ namespace RandomNumberGenerator
             {
                 // <DataPoint Value="0.123456789" Average="0.123456789" />
                 writer.WriteStartElement("DataPoint");
-                writer.WriteAttributeString("Average", m_fAverage.ToString());
+                writer.WriteAttributeString("Tine", m_sSessionTime);
+                writer.WriteValue(m_fDataPoint.ToString());
                 writer.WriteEndElement();
             }
             catch (Exception)
@@ -232,10 +236,16 @@ namespace RandomNumberGenerator
         }
 
         /// <summary>
+        /// Session time for the data point
+        /// </summary>
+        internal string SessionTime { get => m_sSessionTime; set => m_sSessionTime = value; }
+
+        /// <summary>
         /// Average value for the data point
         /// </summary>
-        internal double Average { get => m_fAverage; set => m_fAverage = value; }
+        internal double DataPoint { get => m_fDataPoint; set => m_fDataPoint = value; }
 
-        private double m_fAverage = 0.0;
+        private string m_sSessionTime = "";
+        private double m_fDataPoint = 0.0;
     }
 }
