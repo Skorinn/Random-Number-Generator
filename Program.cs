@@ -11,7 +11,6 @@
 // 10/30/2022 - Mike Pullen - Recreated under VS2022 and added ARM64 support.
 //*********************************************************************************************************************
 using System;
-using System.Data;
 using System.Windows.Forms;
 using System.Xml;
 

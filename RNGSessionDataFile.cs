@@ -2,30 +2,25 @@
 // File Name:      RNGSessionDataFile.cs
 // Description:    Interface to a Random Number Generator file
 //
-// Copyright (C) 2023 Mike Pullen. All Rights Reserved.
+// Copyright (C) 2023-2024 Mike Pullen. All Rights Reserved.
 // Confidential and Proprietary
 //
 // Revision History: 
 //====================================================================================================================
 // 2023/12/04 - Mike Pullen - Original implementation.
 //*********************************************************************************************************************
-using System;
 using System.IO;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace RandomNumberGenerator
 {
     /// <summary>
     /// Interface for the Random Number Generator session data file
     /// </summary>
-    internal interface IRNGSessionDataFile
+    public interface IRNGSessionDataFile
     {
         bool StartSession(IRNGSessionData sessionData);
         bool WriteDataPoint(IRNGSessionData sessionData);
-        bool EndSession();
+        bool EndSession(IRNGSessionData sessionData);
 
         string FilePath { get; set; }
         bool Valid { get; }
@@ -35,7 +30,7 @@ namespace RandomNumberGenerator
     /// <summary>
     /// Represents a Random Number Generator session file
     /// </summary>
-    internal class RNGSessionDataFile : IRNGSessionDataFile
+    public class RNGSessionDataFile : IRNGSessionDataFile
     {
         #region Constructors
 
@@ -43,7 +38,7 @@ namespace RandomNumberGenerator
         /// Construct with the writer and parent
         /// </summary>
         /// <param name="writer">IN - The XML writer object to use to for the file</param>
-        internal RNGSessionDataFile(IRNGXMLWriter writer)
+        public RNGSessionDataFile(IRNGXMLWriter writer)
         {
             m_Writer = writer;
         }
@@ -66,10 +61,10 @@ namespace RandomNumberGenerator
             {
                 // Write the session start
                 m_bSessionInProgress = true;
-                bStatus = m_Writer.WriteSessionStart(sessionData.TargetValue);
+                bStatus = m_Writer.WriteSessionStart(sessionData.SessionTime, sessionData.TargetValue);
             }
 
-            return bStatus; 
+            return bStatus;
         }
 
         /// <summary>
@@ -86,7 +81,8 @@ namespace RandomNumberGenerator
             if (m_Writer != null)
             {
                 // Write the data point
-                bStatus = m_Writer.WriteDataPoint(sessionData.SessionTime, sessionData.CurrentAverage);
+                XMLDataPoint dataPoint = new XMLDataPoint(sessionData.SessionTime, sessionData.CurrentAverage);
+                bStatus = m_Writer.WriteDataPoint(dataPoint);
             }
 
             return bStatus;
@@ -95,8 +91,9 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Writes the session end and closes the file
         /// </summary>
+        /// <param name="sessionData">IN - The data for the session</param>
         /// <returns>true if successful; otherwise, false</returns>
-        public bool EndSession()
+        public bool EndSession(IRNGSessionData sessionData)
         {
             // Default the status to failure
             bool bStatus = false;
@@ -106,7 +103,7 @@ namespace RandomNumberGenerator
             {
                 // Write the session end
                 m_bSessionInProgress = false;
-                bStatus = m_Writer.WriteSessionEnd();
+                bStatus = m_Writer.WriteSessionEnd(sessionData.SessionTime);
             }
 
             return bStatus;

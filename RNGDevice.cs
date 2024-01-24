@@ -2,7 +2,7 @@
 // File Name:      RNGDevice.cs
 // Description:    Implementation of the RNG device class
 //
-// Copyright (C) 2023 Mike Pullen. All Rights Reserved.
+// Copyright (C) 2023-2024 Mike Pullen. All Rights Reserved.
 // Confidential and Proprietary
 //
 // Revision History: 
@@ -15,7 +15,7 @@ namespace RandomNumberGenerator
     /// <summary>
     /// Interface for an RNG device
     /// </summary>
-    internal interface IRNGDevice
+    public interface IRNGDevice
     {
         string Description { get; set; }
         int Port { get; set; }
@@ -24,19 +24,19 @@ namespace RandomNumberGenerator
     /// <summary>
     /// Representation of an RNG device
     /// </summary>
-    internal class RNGDevice : IRNGDevice
+    public class RNGDevice : IRNGDevice
     {
         /// <summary>
         /// Default constructor
         /// </summary>
-        internal RNGDevice() { }
+        public RNGDevice() { }
 
         /// <summary>
         /// Initializing constructor
         /// </summary>
         /// <param name="sDescription">IN - Description for the device</param>
         /// <param name="iPort">IN - Device port number</param>
-        internal RNGDevice(string sDescription, int iPort)
+        public RNGDevice(string sDescription, int iPort)
         {
             m_sDescription = sDescription;
             m_iPort = iPort;

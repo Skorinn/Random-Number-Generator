@@ -2,7 +2,7 @@
 // File Name:      GeneratorForm.Designer.cs
 // Description:    Auto-generated code for the Random Number Generator GUI
 //
-// Copyright (C) 2022-2023 Mike Pullen. All Rights Reserved.
+// Copyright (C) 2022-2024 Mike Pullen. All Rights Reserved.
 // Confidential and Proprietary
 //
 // Revision History: 

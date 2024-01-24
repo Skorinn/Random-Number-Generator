@@ -2,13 +2,14 @@
 // File Name:      RNGSessionData.cs
 // Description:    Representation of the data from a Random Number Generator session
 //
-// Copyright (C) 2023 Mike Pullen. All Rights Reserved.
+// Copyright (C) 2023-2024 Mike Pullen. All Rights Reserved.
 // Confidential and Proprietary
 //
 // Revision History: 
 //====================================================================================================================
 // 2023/12/04 - Mike Pullen - Original implementation.
 //*********************************************************************************************************************
+using System;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
@@ -18,7 +19,7 @@ namespace RandomNumberGenerator
     /// <summary>
     /// Interface for the RNG session data
     /// </summary>
-    internal interface IRNGSessionData
+    public interface IRNGSessionData
     {
         void Reset();
         void TickSessionTimer(int iInterval);
@@ -39,10 +40,10 @@ namespace RandomNumberGenerator
     /// <summary>
     /// Representation of the data from a Random Number Generator session
     /// </summary>
-    internal class RNGSessionData : IRNGSessionData
+    public class RNGSessionData : IRNGSessionData
     {
         #region Type definitions
-        internal enum PossibleTargetsIndex // Indexes for the targets array
+        public enum PossibleTargetsIndex // Indexes for the targets array
         {
             None = 0,
             Zero = 1,
@@ -55,7 +56,7 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Default constructor
         /// </summary>
-        internal RNGSessionData() { }
+        public RNGSessionData() { }
 
         #endregion
         #region Methods
@@ -65,15 +66,8 @@ namespace RandomNumberGenerator
         /// </summary>
         public void Reset()
         {
-            // Use of the session time is exclusive
-            lock(m_TimerLock)
-            {
-                // Reset the timer
-                m_iSessionMilliseconds = 0;
-                m_iSessionSeconds = 0;
-                m_iSessionMinutes = 0;
-                m_iSessionHours = 0;
-            }
+            // Reset the timer
+            ResetSessionTimings();
 
             // Clear cannot be done atomically so just create new queues
             m_DataPoints = new ConcurrentQueue<double>();
@@ -89,8 +83,18 @@ namespace RandomNumberGenerator
         /// <param name="iInterval">IN - Amount to add to the timer</param>
         public void TickSessionTimer(int iInterval)
         {
+            // Validate the interval
+            if (0 >= iInterval)
+            {
+                throw new ArgumentOutOfRangeException("Interval must be greater than 0");
+            }
+            else if (1000 < iInterval)
+            {
+                throw new ArgumentOutOfRangeException("Interval cannot be greater than 1000");
+            }
+
             // Use of the session time is exclusive
-            lock(m_TimerLock)
+            lock (m_TimerLock)
             {
                 // Update the millisecond counter then check for rollovers
                 m_iSessionMilliseconds += iInterval;
@@ -120,7 +124,7 @@ namespace RandomNumberGenerator
         public void ResetSessionTimings()
         {
             // Use of the session time is exclusive
-            lock(m_TimerLock)
+            lock (m_TimerLock)
             {
                 m_iSessionMilliseconds = 0;
                 m_iSessionSeconds = 0;
@@ -162,7 +166,7 @@ namespace RandomNumberGenerator
                 string sTimerText;
 
                 // Use of the session time is exclusive
-                lock(m_TimerLock)
+                lock (m_TimerLock)
                 {
                     // Build and return the formatted string representation of the updated session time
                     sTimerText = m_iSessionHours.ToString("00") + ":" + m_iSessionMinutes.ToString("00") + ":" + m_iSessionSeconds.ToString("00");

@@ -11,9 +11,8 @@
 // 2023/12/06 - Mike Pullen - Changed from an always-running watchdog to a thread pool
 //*********************************************************************************************************************
 using System;
-using System.Drawing;
-using System.Threading;
 using System.ComponentModel;
+using System.Drawing;
 using System.Management;
 using System.Text.RegularExpressions;
 
@@ -23,15 +22,15 @@ namespace RandomNumberGenerator
     /// Watchdog for asynchronously updating the device list
     /// </summary>
     /// <param name="oStateInfo">IN - State info for executing in the thread pool (not used)</param>
-    static class DeviceUpdateThread
+    public static class DeviceUpdateThread
     {
-        internal static void ThreadProc(object stateInfo)
+        public static void ThreadProc(object stateInfo)
         {
             // Discard unused parameters
             _ = stateInfo;
 
             // Only allow one thread to execute the update at a time (first come first served)
-            lock(m_Lock)
+            lock (m_Lock)
             {
                 // Backup the info box and display the "reading devices" message
                 BackupInfoBox();
@@ -53,7 +52,7 @@ namespace RandomNumberGenerator
         private static void GetDevicePorts()
         {
             // Create a new list
-            m_DeviceList = new BindingList<RNGDevice>();
+            m_DeviceList = new BindingList<IRNGDevice>();
 
             // Search for all USB controller devices
             ManagementObjectSearcher controllerSearcher = new ManagementObjectSearcher(@"Select * From Win32_USBControllerDevice");
@@ -184,19 +183,19 @@ namespace RandomNumberGenerator
         /// <summary>
         /// The binding list of devices
         /// </summary>
-        internal static BindingList<RNGDevice> DeviceList { get => m_DeviceList; }
+        public static BindingList<IRNGDevice> DeviceList { get => m_DeviceList; }
 
         /// <summary>
         /// The parent form to which to relay the updated device list
         /// </summary>
-        internal static GeneratorForm Parent { get => m_Parent; set => m_Parent = value; }
+        public static IGeneratorForm Parent { get => m_Parent; set => m_Parent = value; }
 
         // Synchronizaion object
         private static object m_Lock = new object();
 
         // Device list update data members
-        private static BindingList<RNGDevice> m_DeviceList = new BindingList<RNGDevice>();
-        private static GeneratorForm m_Parent = null;
+        private static BindingList<IRNGDevice> m_DeviceList = new BindingList<IRNGDevice>();
+        private static IGeneratorForm m_Parent = null;
 
         // Test and color for restoring the info box after update
         private static string m_sStatusBoxText = "";

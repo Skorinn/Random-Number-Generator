@@ -2,7 +2,7 @@
 // File Name:      GeneratorForm.cs
 // Description:    Implementation of the Random Number Generator GUI
 //
-// Copyright (C) 2022-2023 Mike Pullen. All Rights Reserved.
+// Copyright (C) 2022-2024 Mike Pullen. All Rights Reserved.
 // Confidential and Proprietary
 //
 // Revision History: 
@@ -30,9 +30,26 @@ using DeviceInterfaces;
 namespace RandomNumberGenerator
 {
     /// <summary>
+    /// Interface for the Random Number Generator form
+    /// <\summary>
+    public interface IGeneratorForm : ISynchronizeInvoke
+    {
+        bool Busy { get; set; }
+        bool Running { get; }
+        BindingList<IRNGDevice> DeviceList { set; }
+
+        string StatusBoxText { get; set; }
+        Color StatusBoxTextColor { get; set; }
+        Color StatusBoxBackColor { get; set; }
+
+        // Action version of Invoke not included in ISynchronizeInvoke
+        object Invoke(Action method);
+    }
+
+    /// <summary>
     /// Random Number Generator form
     /// </summary>
-    internal partial class GeneratorForm : Form
+    public partial class GeneratorForm : Form, IGeneratorForm
     {
         #region Imports
 
@@ -51,7 +68,7 @@ namespace RandomNumberGenerator
         /// </summary>
         /// <param name="sessionData">IN - The session data object</param>
         /// <param name="sessionDataFile">IN - The session data file object</param>
-        internal GeneratorForm(IRNGSessionData sessionData, IRNGSessionDataFile sessionDataFile)
+        public GeneratorForm(IRNGSessionData sessionData, IRNGSessionDataFile sessionDataFile)
         {
             // Record the data and file objects
             m_Data = sessionData;
@@ -189,57 +206,9 @@ namespace RandomNumberGenerator
                 // Record the new data point
                 RecordDataPoint(fCurrentValue);
 
-                // Update the displayed average
+                // Update the displayed average and add the point to the chart
                 m_CurrentAverageTextBox.Text = CurrentAverage;
-
-
-                // Update the data points on the chart
-                DataPointCollection DataPoints = m_AverageChart.Series[(int)SeriesIndex.DataPointSeries].Points;
-                if (DataPoints.Count >= m_iMAX_DATA_SIZE)
-                {
-                    DataPoints.RemoveAt(0);
-                }
-                DataPoints.AddY(fCurrentValue);
-
-                // Update the averages on the chart
-                DataPointCollection AveragePoints = m_AverageChart.Series[(int)SeriesIndex.AverageSeries].Points;
-                if (AveragePoints.Count >= m_iMAX_DATA_SIZE)
-                {
-                    AveragePoints.RemoveAt(0);
-                }
-                AveragePoints.AddY(m_Data.CurrentAverage);
-
-                // Find the min and max values on the chart
-                double fMax = m_Data.MaxPoint;
-                double fMin = m_Data.MinPoint;
-
-                // Check if the limits need to be tightened
-                Axis AverageChartYAxis = m_AverageChart.ChartAreas[0].AxisY;
-                bool bMaxTooWide = ((AverageChartYAxis.Maximum - m_fYAXIS_INCREMENT) > fMax);
-                bool bMinTooWide = ((AverageChartYAxis.Minimum + m_fYAXIS_INCREMENT) < fMin);
-                if (bMaxTooWide && bMinTooWide)
-                {
-                    // Tighten the limits
-                    while (bMaxTooWide && bMinTooWide)
-                    {
-                        // Adjust them symetrically to maintain center
-                        AverageChartYAxis.Maximum += m_fYAXIS_INCREMENT;
-                        AverageChartYAxis.Minimum -= m_fYAXIS_INCREMENT;
-
-                        bMaxTooWide = ((AverageChartYAxis.Maximum - m_fYAXIS_INCREMENT) > fMax);
-                        bMinTooWide = ((AverageChartYAxis.Minimum + m_fYAXIS_INCREMENT) < fMin);
-                    }
-                }
-                else
-                {
-                    // Widen the limits as needed
-                    while ((fMax >= AverageChartYAxis.Maximum) || (fMin <= AverageChartYAxis.Minimum))
-                    {
-                        // Adjust them symetrically to maintain center
-                        AverageChartYAxis.Maximum += m_fYAXIS_INCREMENT;
-                        AverageChartYAxis.Minimum -= m_fYAXIS_INCREMENT;
-                    }
-                }
+                AddChartPoint(fCurrentValue);
 
                 // Clear any displayed errors 
                 m_StatusTextBox.Text = RunningMessage;
@@ -597,12 +566,20 @@ namespace RandomNumberGenerator
             StopButton_Click(sender, e);
             if (m_DataFile.SessionInProgress)
             {
-                m_DataFile.EndSession();
+                m_DataFile.EndSession(m_Data);
             }
         }
 
         #endregion
         #region Methods
+
+        /// <summary>
+        /// Implementation of Invoke as needed by the ISynchronizeInvoke interface
+        /// <\summary>
+        public object Invoke(Action method)
+        {
+            return base.Invoke(method);
+        }
 
         /// <summary>
         /// Initializes the thread pool
@@ -729,7 +706,7 @@ namespace RandomNumberGenerator
                     if (m_DataFile.SessionInProgress)
                     {
                         // End it and start a new session (next time start is clicked
-                        m_DataFile.EndSession();
+                        m_DataFile.EndSession(m_Data);
                     }
                 }
                 // If the user does not accept the change
@@ -799,10 +776,65 @@ namespace RandomNumberGenerator
             {
                 // Flush any pending data and end the session
                 bStatus = FlushPendingData();
-                bStatus &= m_DataFile.EndSession();
+                bStatus &= m_DataFile.EndSession(m_Data);
             }
 
             return bStatus;
+        }
+
+        /// <summary>
+        /// Adds a data point to the chart
+        /// </summary>
+        /// <param name="fDataPoint">IN - Data point to be added</param>
+        private void AddChartPoint(double fDataPoint)
+        {
+            // Update the data points on the chart
+            DataPointCollection DataPoints = m_AverageChart.Series[(int)SeriesIndex.DataPointSeries].Points;
+            if (DataPoints.Count >= m_iMAX_DATA_SIZE)
+            {
+                DataPoints.RemoveAt(0);
+            }
+            DataPoints.AddY(fDataPoint);
+
+            // Update the averages on the chart
+            DataPointCollection AveragePoints = m_AverageChart.Series[(int)SeriesIndex.AverageSeries].Points;
+            if (AveragePoints.Count >= m_iMAX_DATA_SIZE)
+            {
+                AveragePoints.RemoveAt(0);
+            }
+            AveragePoints.AddY(m_Data.CurrentAverage);
+
+            // Find the min and max values on the chart
+            double fMax = m_Data.MaxPoint;
+            double fMin = m_Data.MinPoint;
+
+            // Check if the limits need to be tightened
+            Axis AverageChartYAxis = m_AverageChart.ChartAreas[0].AxisY;
+            bool bMaxTooWide = ((AverageChartYAxis.Maximum - m_fYAXIS_INCREMENT) > fMax);
+            bool bMinTooWide = ((AverageChartYAxis.Minimum + m_fYAXIS_INCREMENT) < fMin);
+            if (bMaxTooWide && bMinTooWide)
+            {
+                // Tighten the limits
+                while (bMaxTooWide && bMinTooWide)
+                {
+                    // Adjust them symetrically to maintain center
+                    AverageChartYAxis.Maximum += m_fYAXIS_INCREMENT;
+                    AverageChartYAxis.Minimum -= m_fYAXIS_INCREMENT;
+
+                    bMaxTooWide = ((AverageChartYAxis.Maximum - m_fYAXIS_INCREMENT) > fMax);
+                    bMinTooWide = ((AverageChartYAxis.Minimum + m_fYAXIS_INCREMENT) < fMin);
+                }
+            }
+            else
+            {
+                // Widen the limits as needed
+                while ((fMax >= AverageChartYAxis.Maximum) || (fMin <= AverageChartYAxis.Minimum))
+                {
+                    // Adjust them symetrically to maintain center
+                    AverageChartYAxis.Maximum += m_fYAXIS_INCREMENT;
+                    AverageChartYAxis.Minimum -= m_fYAXIS_INCREMENT;
+                }
+            }
         }
 
         /// <summary>
@@ -922,7 +954,7 @@ namespace RandomNumberGenerator
         /// Whether the system is busy processing a change and should prevent session changes.
         /// NOTE: Exception is thrown by set if a session is currently running.
         /// </summary>
-        internal bool Busy
+        public bool Busy
         { 
             get => m_bBusy;
             set
@@ -960,12 +992,12 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Whether a session is currently running
         /// </summary>
-        internal bool Running { get => SessionTimer.Enabled; }
-        
+        public bool Running { get => SessionTimer.Enabled; }
+
         /// <summary>
         /// Binding list of devices used to populate the port combo box list
         /// </summary>
-        internal BindingList<RNGDevice> DeviceList
+        public BindingList<IRNGDevice> DeviceList
         { 
             set
             {
@@ -978,17 +1010,17 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Text displayed in the statatus box
         /// </summary>
-        internal string StatusBoxText { get => m_StatusTextBox.Text; set => m_StatusTextBox.Text = value; }
+        public string StatusBoxText { get => m_StatusTextBox.Text; set => m_StatusTextBox.Text = value; }
 
         /// <summary>
         /// Text color of the status box
         /// </summary>
-        internal Color StatusBoxTextColor { get => m_StatusTextBox.ForeColor; set => m_StatusTextBox.ForeColor = value; }
+        public Color StatusBoxTextColor { get => m_StatusTextBox.ForeColor; set => m_StatusTextBox.ForeColor = value; }
 
         /// <summary>
         /// Background color of the status box
         /// </summary>
-        internal Color StatusBoxBackColor { get => m_StatusTextBox.BackColor; set => m_StatusTextBox.BackColor = value; }
+        public Color StatusBoxBackColor { get => m_StatusTextBox.BackColor; set => m_StatusTextBox.BackColor = value; }
 
         /// <summary>
         /// Selected target value
