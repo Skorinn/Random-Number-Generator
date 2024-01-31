@@ -55,7 +55,7 @@ namespace RandomNumberGenerator.Test
         private TestContext testContextInstance;
 
         // Paths for files used for testing
-        private const string m_sTEST_FILE_PATH = "TestSessionDataFile.xml";
+        private const string m_sTEST_FILE_PATH = "TestSessionDataFile.RNGSessionDataFileTests.xml";
 
         #endregion
         #region Additional test attributes
@@ -224,21 +224,17 @@ namespace RandomNumberGenerator.Test
             // Mock the IRNGXMLWriter interface
             var xmlWriterMock = new Mock<IRNGXMLWriter>();
             xmlWriterMock.Setup(mock => mock.FilePath).Returns(m_sTEST_FILE_PATH);
-            xmlWriterMock.Setup(mock => mock.WriteSessionEnd(It.IsAny<string>())).Returns(true);
+            xmlWriterMock.Setup(mock => mock.WriteSessionEnd()).Returns(true);
 
             // Create the object under test
             RNGSessionDataFile sessionDataFile = new RNGSessionDataFile(xmlWriterMock.Object);
-
-            // Mock the iRNGSessionData interface
-            var sessionDataMock = new Mock<IRNGSessionData>();
-            sessionDataMock.Setup(mock => mock.SessionTime).Returns("00:00:00");
 
             //**************************************************************//
             // Act
             //**************************************************************//
 
             // End the session
-            bool bStatus = sessionDataFile.EndSession(sessionDataMock.Object);
+            bool bStatus = sessionDataFile.EndSession();
 
             //**************************************************************//
             // Assert
@@ -261,11 +257,10 @@ namespace RandomNumberGenerator.Test
 
             // Expected and actual valies for the file path
             const string sEXPECTED_FILE_PATH = "Expected Path";
-            string sActualPath = m_sTEST_FILE_PATH;
 
-            // Mock the IRNGXMLWriter interface
+            // Mock the IRNGXMLWriter interface to set the file path
             var xmlWriterMock = new Mock<IRNGXMLWriter>();
-            xmlWriterMock.Setup(mock => mock.FilePath).Returns(sActualPath);
+            xmlWriterMock.SetupProperty(mock => mock.FilePath, m_sTEST_FILE_PATH);
 
             // Create the object under test
             RNGSessionDataFile sessionDataFile = new RNGSessionDataFile(xmlWriterMock.Object);

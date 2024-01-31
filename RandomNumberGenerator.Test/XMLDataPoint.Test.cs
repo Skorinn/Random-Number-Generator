@@ -29,8 +29,7 @@ namespace RandomNumberGenerator.Test
         /// </summary>
         public XMLDataPointTests()
         {
-            // Create the XML writer
-            m_xmlWriter = XmlWriter.Create(m_sTEST_FILE_PATH);
+            // Nothing to do
         }
 
         /// <summary>
@@ -56,10 +55,7 @@ namespace RandomNumberGenerator.Test
         private TestContext testContextInstance;
 
         // Paths for files used for testing
-        private const string m_sTEST_FILE_PATH = "TestSessionDataFile.xml";
-
-        // XML writer to use for testing
-        XmlWriter m_xmlWriter;
+        private const string m_sTEST_FILE_PATH = "TestSessionDataFile.XMLDataPointTests.xml";
 
         // Session time to use for testing
         private const string m_sSESSION_DATA_TIME = "01:54:21";
@@ -68,7 +64,7 @@ namespace RandomNumberGenerator.Test
         private const double m_fDATA_POINT = 9.1;
 
         // Define the expected XML entries here as they depend on the time, target, and data values above
-        private const string sEXPECTED_DATA_POINT_ENTRY = "<Data Time=\"01:54:21\">9.1</DataPoint>";
+        private const string sEXPECTED_DATA_POINT_ENTRY = "<Data Time=\"01:54:21\">9.1</Data>";
 
         #endregion
         #region Additional test attributes
@@ -95,11 +91,10 @@ namespace RandomNumberGenerator.Test
         #region Initialization and cleanup
 
         /// <summary>
-        /// Cleans up after each rwar runs to ensure we always start with a clean file
+        /// Cleans up after each test runs to ensure we always start with a clean file
         /// </summary>
         [TestCleanup]
-        [DeploymentItem(m_sTEST_FILE_PATH)]
-        public static void Cleanup()
+        public void Cleanup()
         {
             // Delete the test file if created
             if (File.Exists(m_sTEST_FILE_PATH))
@@ -185,6 +180,9 @@ namespace RandomNumberGenerator.Test
             // Create the expected result
             string sEXPECTED_RESULT = sEXPECTED_DATA_POINT_ENTRY;
 
+            // Create the XML writer
+            XmlWriter xmlWriter = XmlWriter.Create(m_sTEST_FILE_PATH);
+
             // Create the object under test
             XMLDataPoint xmlDataPoint = new XMLDataPoint(m_sSESSION_DATA_TIME, m_fDATA_POINT);
 
@@ -193,7 +191,10 @@ namespace RandomNumberGenerator.Test
             //**************************************************************//
 
             // Write the data point to the file
-            bool bStatus = xmlDataPoint.WriteDataPoint(m_xmlWriter);
+            bool bStatus = xmlDataPoint.WriteDataPoint(xmlWriter);
+
+            // Close the file
+            xmlWriter.Close();
 
             //**************************************************************//
             // Assert
@@ -206,7 +207,8 @@ namespace RandomNumberGenerator.Test
             Assert.IsTrue(File.Exists(m_sTEST_FILE_PATH));
 
             // Verify the file contains the expected result
-            Assert.IsTrue(File.ReadAllText(m_sTEST_FILE_PATH).Contains(sEXPECTED_RESULT));
+            string sResult = File.ReadAllText(m_sTEST_FILE_PATH);
+            StringAssert.Contains(sResult, sEXPECTED_RESULT);
         }
 
         /// <summary>

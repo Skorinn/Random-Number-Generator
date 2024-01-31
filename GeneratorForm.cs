@@ -566,7 +566,7 @@ namespace RandomNumberGenerator
             StopButton_Click(sender, e);
             if (m_DataFile.SessionInProgress)
             {
-                m_DataFile.EndSession(m_Data);
+                m_DataFile.EndSession();
             }
         }
 
@@ -706,7 +706,7 @@ namespace RandomNumberGenerator
                     if (m_DataFile.SessionInProgress)
                     {
                         // End it and start a new session (next time start is clicked
-                        m_DataFile.EndSession(m_Data);
+                        m_DataFile.EndSession();
                     }
                 }
                 // If the user does not accept the change
@@ -776,7 +776,7 @@ namespace RandomNumberGenerator
             {
                 // Flush any pending data and end the session
                 bStatus = FlushPendingData();
-                bStatus &= m_DataFile.EndSession(m_Data);
+                bStatus &= m_DataFile.EndSession();
             }
 
             return bStatus;

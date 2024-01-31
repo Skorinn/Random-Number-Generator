@@ -20,7 +20,7 @@ namespace RandomNumberGenerator
     {
         bool WriteSessionStart(string sStartTime, int iTargetValue);
         bool WriteDataPoint(IXMLDataPoint dataPoint);
-        bool WriteSessionEnd(string sEndtime);
+        bool WriteSessionEnd();
 
         string FilePath { get; set; }
     }
@@ -70,6 +70,17 @@ namespace RandomNumberGenerator
             m_Settings = writerSettings;
         }
 
+        /// <summary>
+        /// Destructor. Ensures the writer is closed.
+        /// </summary>
+        ~RNGXMLWriter()
+        {
+            if (m_Writer != null)
+            {
+                m_Writer.Close();
+            }
+        }
+
         #endregion
         #region Methods
 
@@ -97,8 +108,8 @@ namespace RandomNumberGenerator
                     // <Session TargetValue="0" />
                     m_Writer.WriteStartDocument();
                     m_Writer.WriteStartElement("Session");
-                    m_Writer.WriteAttributeString("StartTime", sStartTime);
-                    m_Writer.WriteAttributeString("TargetValue", iTargetValue.ToString());
+                    m_Writer.WriteAttributeString("Start", sStartTime);
+                    m_Writer.WriteAttributeString("Target", iTargetValue.ToString());
                 }
             }
 
@@ -129,9 +140,8 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Ends the current session and closes the file
         /// </summary>
-        /// <param name="sEndtime">IN - End time for the session</param>
         /// <returns>true if successful; otherwise false</returns>
-        public bool WriteSessionEnd(string sEndtime)
+        public bool WriteSessionEnd()
         {
             // Default status to failure
             bool bStatus = false;
@@ -139,14 +149,16 @@ namespace RandomNumberGenerator
             // Limit access to the file to one thread at a time
             lock (this)
             {
+                // Create (or recreate) the writer
+                if (null == m_Writer)
+                {
+                    m_Writer = XmlWriter.Create(m_sFilePath, m_Settings);
+                }
                 bStatus = (m_Writer != null);
 
                 // If the writer was created, write the session start tag
                 if (bStatus)
                 {
-                    // Write the end time tag
-                    m_Writer.WriteElementString("EndTime", sEndtime);
-
                     // Close the session tag
                     m_Writer.WriteEndElement();
 

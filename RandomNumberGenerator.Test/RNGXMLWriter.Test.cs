@@ -13,10 +13,32 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System.IO;
+using System.Runtime;
 using System.Xml;
 
 namespace RandomNumberGenerator.Test
 {
+    /// <summary
+    /// Mock implementation of the IXMLDataPoint interface
+    /// <\summary>
+    public class MockXMLDataPoint : IXMLDataPoint
+    {
+        /// <summary>
+        /// Mock implementation of the WriteDataPoint method that writes an empty node
+        /// </summary>
+        /// <param name="writer"></param>
+        /// <returns></returns>
+        public bool WriteDataPoint(XmlWriter writer)
+        {
+            // Write an empty node and return true
+            writer.WriteElementString("DataPoint", "");
+            return true;
+        }
+
+        public string SessionTime { get; set; }
+        public double DataPoint { get; set; } = 0.0;
+    }
+
     /// <summary>
     /// Unit tests for the RNGXMLWriter class
     /// </summary>
@@ -30,7 +52,11 @@ namespace RandomNumberGenerator.Test
         /// </summary>
         public RNGXMLWriterTests()
         {
-            // Nothing to do
+            // Initialize the XML writer settings
+            m_writerSettings = new XmlWriterSettings();
+            m_writerSettings.Indent = true;
+            m_writerSettings.IndentChars = "\t";
+            m_writerSettings.ConformanceLevel = ConformanceLevel.Auto;
         }
 
         /// <summary>
@@ -55,13 +81,15 @@ namespace RandomNumberGenerator.Test
         // Information about the current test context
         private TestContext testContextInstance;
 
+        // XML writer settings to use for testing
+        private XmlWriterSettings m_writerSettings;
+
         // Paths for files used for testing
-        private const string m_sTEST_FILE_PATH = "TestSessionDataFile.xml";
+        private const string m_sTEST_FILE_PATH = "TestSessionDataFile.RNGXMLWriterTests.xml";
 
         // Session time to use for testing
         private const string m_sSESSION_START_TIME = "01:00:00";
         private const string m_sSESSION_DATA_TIME = "01:54:21";
-        private const string m_sSESSION_END_TIME = "22:11:03";
 
         // Target value to use for testing
         private const int m_iTARGET_VALUE = 1;
@@ -70,9 +98,10 @@ namespace RandomNumberGenerator.Test
         private const double m_fDATA_POINT = 9.1;
 
         // Define the expected XML entries here as they depend on the time, target, and data values above
-        private const string sEXPECTED_SESSION_START_ENTRY = "<Session StartTime=\"01:00:00\" TargetValue=\"1\">";
-        private const string sEXPECTED_DATA_POINT_ENTRY = "<DataPoint SessionTime=\"01:54:21\" Value=\"9.1\" />";
-        private const string sEXPECTED_SESSION_END_ENTRY = "<Session EndTime=\"22:11:03\" />";
+        private const string sEXPECTED_SESSION_START_ENTRY = "<Session Start=\"01:00:00\" Target=\"1\">";
+        private const string sEXPECTED_DATA_POINT_ENTRY = "<DataPoint Time=\"01:54:21\" Value=\"9.1\" />";
+        private const string sEXPECTED_SESSION_END_ENTRY = "</Session>";
+        private const string sEXPECTED_SESSION_END_ENTRY_NO_DATA = "<Session Start=\"01:00:00\" Target=\"1\" />";
 
         #endregion
         #region Additional test attributes
@@ -103,7 +132,7 @@ namespace RandomNumberGenerator.Test
         /// </summary>
         [TestCleanup]
         [DeploymentItem(m_sTEST_FILE_PATH)]
-        public static void Cleanup()
+        public void Cleanup()
         {
             // Delete the test file if created
             if (File.Exists(m_sTEST_FILE_PATH))
@@ -160,12 +189,21 @@ namespace RandomNumberGenerator.Test
             // Create the object under test and set the file path
             RNGXMLWriter xmlWriter = new RNGXMLWriter(m_sTEST_FILE_PATH);
 
+            // Create the custom mock of the data point class
+            MockXMLDataPoint mockDataPoint = new MockXMLDataPoint();
+
             //**************************************************************//
             // Act
             //**************************************************************//
 
-            // Write the session start
+            // Write the session start and record the result
             bool bStatus = xmlWriter.WriteSessionStart(m_sSESSION_START_TIME, m_iTARGET_VALUE);
+
+            // Write a data point to the file using the custom mock
+            xmlWriter.WriteDataPoint(mockDataPoint);
+
+            // Write the session end (no need to record the return from session end as it is tested separately)
+            xmlWriter.WriteSessionEnd();
 
             //**************************************************************//
             // Assert
@@ -178,7 +216,8 @@ namespace RandomNumberGenerator.Test
             Assert.IsTrue(File.Exists(xmlWriter.FilePath));
 
             // Verify the file contains the expected result
-            Assert.IsTrue(File.ReadAllText(xmlWriter.FilePath).Contains(sEXPECTED_RESULT));
+            string sResult = File.ReadAllText(xmlWriter.FilePath);
+            StringAssert.Contains(sResult, sEXPECTED_RESULT);
         }
 
         /// <summary>
@@ -192,11 +231,8 @@ namespace RandomNumberGenerator.Test
             // Arrange
             //**************************************************************//
 
-            // Create the expected result
-            string sEXPECTED_RESULT = sEXPECTED_DATA_POINT_ENTRY;
-
             // Create the object under test and set the file path
-            RNGXMLWriter xmlWriter = new RNGXMLWriter(m_sTEST_FILE_PATH);
+            RNGXMLWriter xmlWriter = new RNGXMLWriter(m_sTEST_FILE_PATH, m_writerSettings);
 
             // Mock the data point class
             Mock<IXMLDataPoint> mockDataPoint = new Mock<IXMLDataPoint>();
@@ -207,6 +243,8 @@ namespace RandomNumberGenerator.Test
             //**************************************************************//
 
             // Write the data point
+            // This will call the mock object's WriteDataPoint method so no need to verify the file contents here
+            // or to write the session start and end.
             bool bStatus = xmlWriter.WriteDataPoint(mockDataPoint.Object);
 
             //**************************************************************//
@@ -220,8 +258,8 @@ namespace RandomNumberGenerator.Test
         }
 
         /// <summary>
-        /// Tests WriteSessionEnd() method works correctly
-        /// <\summary>
+        /// Tests WriteSessionEnd() method works correctly when data points have been written
+        /// </summary>
         [TestMethod]
         [DeploymentItem(m_sTEST_FILE_PATH)]
         public void WriteSessionEnd_Valid()
@@ -234,14 +272,23 @@ namespace RandomNumberGenerator.Test
             string sEXPECTED_RESULT = sEXPECTED_SESSION_END_ENTRY;
 
             // Create the object under test and set the file path
-            RNGXMLWriter xmlWriter = new RNGXMLWriter(m_sTEST_FILE_PATH);
+            RNGXMLWriter xmlWriter = new RNGXMLWriter(m_sTEST_FILE_PATH, m_writerSettings);
+
+            // Create the custom mock of the data point class
+            MockXMLDataPoint mockDataPoint = new MockXMLDataPoint();
 
             //**************************************************************//
             // Act
             //**************************************************************//
 
-            // Write the session end
-            bool bStatus = xmlWriter.WriteSessionEnd(m_sSESSION_END_TIME);
+            // Write the session start (no need to record the return from session start as it is tested separately)
+            xmlWriter.WriteSessionStart(m_sSESSION_START_TIME, m_iTARGET_VALUE);
+
+            // Write a data point to the file using the custom mock
+            xmlWriter.WriteDataPoint(mockDataPoint);
+
+            // Write the session end and record the result
+            bool bStatus = xmlWriter.WriteSessionEnd();
 
             //**************************************************************//
             // Assert
@@ -254,7 +301,48 @@ namespace RandomNumberGenerator.Test
             Assert.IsTrue(File.Exists(xmlWriter.FilePath));
 
             // Verify the file contains the expected result
-            Assert.IsTrue(File.ReadAllText(xmlWriter.FilePath).Contains(sEXPECTED_RESULT));
+            string sResult = File.ReadAllText(xmlWriter.FilePath);
+            StringAssert.Contains(sResult, sEXPECTED_RESULT);
+        }
+
+        /// <summary>
+        /// Tests WriteSessionEnd() method works correctly when no data points have been written
+        /// <\summary>
+        [TestMethod]
+        [DeploymentItem(m_sTEST_FILE_PATH)]
+        public void WriteSessionEnd_NoData_Valid()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Create the expected result
+            string sEXPECTED_RESULT = sEXPECTED_SESSION_END_ENTRY_NO_DATA;
+
+            // Create the object under test and set the file path
+            RNGXMLWriter xmlWriter = new RNGXMLWriter(m_sTEST_FILE_PATH, m_writerSettings);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Write the session start and end (no need to record the return from session start as it is tested separately)
+            xmlWriter.WriteSessionStart(m_sSESSION_START_TIME, m_iTARGET_VALUE);
+            bool bStatus = xmlWriter.WriteSessionEnd();
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the write was successful
+            Assert.IsTrue(bStatus);
+
+            // Verify the file was created
+            Assert.IsTrue(File.Exists(xmlWriter.FilePath));
+
+            // Verify the file contains the expected result
+            string sResult = File.ReadAllText(xmlWriter.FilePath);
+            StringAssert.Contains(sResult, sEXPECTED_RESULT);
         }
 
         /// <summary>

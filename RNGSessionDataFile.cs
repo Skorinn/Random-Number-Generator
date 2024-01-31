@@ -20,7 +20,7 @@ namespace RandomNumberGenerator
     {
         bool StartSession(IRNGSessionData sessionData);
         bool WriteDataPoint(IRNGSessionData sessionData);
-        bool EndSession(IRNGSessionData sessionData);
+        bool EndSession();
 
         string FilePath { get; set; }
         bool Valid { get; }
@@ -91,9 +91,8 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Writes the session end and closes the file
         /// </summary>
-        /// <param name="sessionData">IN - The data for the session</param>
         /// <returns>true if successful; otherwise, false</returns>
-        public bool EndSession(IRNGSessionData sessionData)
+        public bool EndSession()
         {
             // Default the status to failure
             bool bStatus = false;
@@ -103,7 +102,7 @@ namespace RandomNumberGenerator
             {
                 // Write the session end
                 m_bSessionInProgress = false;
-                bStatus = m_Writer.WriteSessionEnd(sessionData.SessionTime);
+                bStatus = m_Writer.WriteSessionEnd();
             }
 
             return bStatus;
