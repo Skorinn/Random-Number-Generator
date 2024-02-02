@@ -41,8 +41,11 @@ namespace RandomNumberGenerator
             RNGXMLWriter writer = new RNGXMLWriter(writerSettings);
             RNGSessionDataFile sessionDataFile = new RNGSessionDataFile(writer);
 
+            // Create the session timer object
+            RNGSessionTimer sessionTimer = new RNGSessionTimer(sessionData);
+
             // Create and run the form
-            GeneratorForm generatorForm = new GeneratorForm(sessionData, sessionDataFile);
+            GeneratorForm generatorForm = new GeneratorForm(sessionData, sessionDataFile, sessionTimer);
             Application.Run(generatorForm);
         }
     }

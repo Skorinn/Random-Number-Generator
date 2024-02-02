@@ -12,6 +12,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TruRNGpro", "TruRNGpro\TruR
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RandomNumberGenerator.Test", "RandomNumberGenerator.Test\RandomNumberGenerator.Test.csproj", "{0507DC94-C63E-4C0A-8659-B18BC37DDE25}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{6CD28B7C-DA39-4B05-80E5-25F802AFEB43}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -61,6 +63,9 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{0507DC94-C63E-4C0A-8659-B18BC37DDE25} = {6CD28B7C-DA39-4B05-80E5-25F802AFEB43}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {77B1B962-D3E9-4CC0-A6D5-A372BE314C22}

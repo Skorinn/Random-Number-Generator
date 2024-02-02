@@ -15,6 +15,7 @@
 // Enable to dump the USB device information
 //#define DUMP_DEVICES
 
+using DeviceInterfaces;
 using System;
 using System.ComponentModel;
 using System.Drawing;
@@ -24,8 +25,6 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
 using System.Windows.Forms.DataVisualization.Charting;
-
-using DeviceInterfaces;
 
 namespace RandomNumberGenerator
 {
@@ -68,11 +67,12 @@ namespace RandomNumberGenerator
         /// </summary>
         /// <param name="sessionData">IN - The session data object</param>
         /// <param name="sessionDataFile">IN - The session data file object</param>
-        public GeneratorForm(IRNGSessionData sessionData, IRNGSessionDataFile sessionDataFile)
+        public GeneratorForm(IRNGSessionData sessionData, IRNGSessionDataFile sessionDataFile, IRNGSessionTimer sessionTimer)
         {
-            // Record the data and file objects
+            // Record the session object provided
             m_Data = sessionData;
             m_DataFile = sessionDataFile;
+            m_SessionTimer = sessionTimer;
 
             // Dump USB devices if debugging and defined
 #if DUMP_DEVICES && DEBUG
@@ -113,9 +113,8 @@ namespace RandomNumberGenerator
             m_TargetComboBox.Items.AddRange((object[])TargetValues.TargetStrings.Clone());
             m_TargetComboBox.SelectedIndex = 0;
 
-            // Setup the session timer
-            SessionTimer.Interval = 1000;
-            SessionTimer.Elapsed += this.SessionTimer_Tick;
+            // Set the timer text box in the timer object
+            m_SessionTimer.TimerTextBox = m_SessionTimerTextBox;
         }
 
         #endregion
@@ -149,33 +148,6 @@ namespace RandomNumberGenerator
             }
         }
             
-        /// <summary>
-        /// Event handler for the tick of the session timer
-        /// </summary>
-        /// <param name="sender">IN - Sender of the event (not used)</param>
-        /// <param name="e">IN - The event arguments (not used)</param>
-        private void SessionTimer_Tick(object sender, EventArgs e)
-        {
-            // Discard unused parameters
-            _ = sender;
-            _ = e;
-
-            string sTimerText;
-
-            // Executes in a thread so protect against collision when updating members
-            lock (this)
-            {
-                // Update the timer value
-                m_Data.TickSessionTimer((int)SessionTimer.Interval);
-
-                // Create a copy of the session timer string
-                sTimerText = (string)m_Data.SessionTime.Clone();
-            }
-
-            // Update the control
-            UpdateTimerText(sTimerText);
-        }
-
         /// <summary>
         /// Event handler for tick of the timer to read data
         /// </summary>
@@ -277,12 +249,6 @@ namespace RandomNumberGenerator
             // Check if the target number has changed
             CheckTargetChanged();
 
-            // If the interface is not initialized, attempt to initialize it
-            if (false == m_bInterfaceInitialized)
-            {
-                InitializeInterface();
-            }
-
             // Update button statuses
             m_StartButton.Enabled = false;
             m_StopButton.Enabled = true;
@@ -290,14 +256,6 @@ namespace RandomNumberGenerator
 
             // Start a new session (will continue existing session if already in progress)
             StartSession();
-
-            // Start the timers
-            m_ReadTimer.Start();
-            SessionTimer.Start();
-
-            // Update the info box
-            m_StatusTextBox.Text = RunningMessage;
-            this.m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
         }
 
         /// <summary>
@@ -322,7 +280,7 @@ namespace RandomNumberGenerator
 
                 // Re-enable the timers
                 m_ReadTimer.Enabled = true;
-                SessionTimer.Enabled = true;
+                m_SessionTimer.Enabled = true;
 
                 // Update the info box message
                 m_StatusTextBox.Text = m_sIDLE_MESSAGE;
@@ -337,7 +295,7 @@ namespace RandomNumberGenerator
 
                 // Disable the timers
                 m_ReadTimer.Enabled = false;
-                SessionTimer.Enabled = false;
+                m_SessionTimer.Enabled = false;
 
                 // Update the info box message
                 m_StatusTextBox.Text = m_sPAUSED_MESSAGE;
@@ -358,9 +316,8 @@ namespace RandomNumberGenerator
             _ = sender;
             _ = e;
 
-            // Stop the timers
-            m_ReadTimer.Stop();
-            SessionTimer.Stop();
+            // End the current session
+            EndSession();
 
             // Update the button statuses
             m_StartButton.Enabled = true;
@@ -655,23 +612,6 @@ namespace RandomNumberGenerator
         }
 
         /// <summary>
-        /// Updates the session timer text box control
-        /// </summary>
-        /// <param name="sTimerText">IN - The text to set in the text box</param>
-        private void UpdateTimerText(string sTimerText)
-        {
-            // Executes in a thread, so need to invoke in the main GUI thread
-            if (true == m_SessionTimerTextBox.InvokeRequired)
-            {
-                m_SessionTimerTextBox.Invoke((MethodInvoker)delegate { UpdateTimerText(sTimerText); });
-            }
-            else
-            {
-                m_SessionTimerTextBox.Text = sTimerText;
-            }
-        }
-
-        /// <summary>
         /// Checks for an notifies the user if the target value has changed
         /// </summary>
         /// <returns>true if the target has changed; otherwise, false</returns>
@@ -750,14 +690,27 @@ namespace RandomNumberGenerator
         /// <returns>true if successful; otherwise, false</returns>
         private bool StartSession()
         {
-            // Default to true as the call is successful if nothings needs to be done
             bool bStatus = true;
+
+            // If the interface is not initialized, attempt to initialize it
+            if (false == m_bInterfaceInitialized)
+            {
+                InitializeInterface();
+            }
+
+            // Update the info box
+            m_StatusTextBox.Text = RunningMessage;
+            this.m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
 
             // Write the session start if a file has been selected and session is not currently in progress
             if (m_DataFile.Valid && (false == m_DataFile.SessionInProgress))
             {
                 bStatus = m_DataFile.StartSession(m_Data);
             }
+
+            // Start the timers
+            m_ReadTimer.Start();
+            m_SessionTimer.Start();
 
             return bStatus;
         }
@@ -770,6 +723,14 @@ namespace RandomNumberGenerator
         {
             // Default to true as the call is successful if nothings needs to be done
             bool bStatus = true;
+
+            // Stop the timers if running
+            m_ReadTimer.Stop();
+
+            if (m_SessionTimer.InProgress)
+            {
+                m_SessionTimer.Stop();
+            }
 
             // Only need to write to the file if a session is in progress
             if (m_DataFile.SessionInProgress)
@@ -992,7 +953,7 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Whether a session is currently running
         /// </summary>
-        public bool Running { get => SessionTimer.Enabled; }
+        public bool Running { get => m_SessionTimer.Running; }
 
         /// <summary>
         /// Binding list of devices used to populate the port combo box list
@@ -1055,7 +1016,7 @@ namespace RandomNumberGenerator
         private const uint m_iWRITE_FILE_INTERVAL = 1000;
 
         // Session timer
-        private System.Timers.Timer SessionTimer = new System.Timers.Timer(); // Use system timer instead of forms timer for threading, so the update is reliable
+        IRNGSessionTimer m_SessionTimer = null;
         private bool m_bPaused = false;
 
         // Chart
