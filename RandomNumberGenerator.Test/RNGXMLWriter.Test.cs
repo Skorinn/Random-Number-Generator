@@ -7,13 +7,11 @@
 //
 // Revision History: 
 //====================================================================================================================
-// 01/21/2024 - Mike Pullen - Original implementation.
+// 2024/01/21 - Mike Pullen - Original implementation.
 //*********************************************************************************************************************
-
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System.IO;
-using System.Runtime;
 using System.Xml;
 
 namespace RandomNumberGenerator.Test
@@ -131,7 +129,6 @@ namespace RandomNumberGenerator.Test
         /// Cleans up after each rwar runs to ensure we always start with a clean file
         /// </summary>
         [TestCleanup]
-        [DeploymentItem(m_sTEST_FILE_PATH)]
         public void Cleanup()
         {
             // Delete the test file if created
@@ -148,6 +145,7 @@ namespace RandomNumberGenerator.Test
         /// Tests properties are set correctly using the default constructor
         /// </summary>
         [TestMethod]
+        [TestCategory("Component")]
         public void Constructor_Default_Properties()
         {
             //**************************************************************//
@@ -176,7 +174,7 @@ namespace RandomNumberGenerator.Test
         /// Tests WriteSessionStart() method works correctly
         /// <\summary>
         [TestMethod]
-        [DeploymentItem(m_sTEST_FILE_PATH)]
+        [TestCategory("Component")]
         public void WriteSessionStart_Valid()
         {
             //**************************************************************//
@@ -224,7 +222,7 @@ namespace RandomNumberGenerator.Test
         /// Tests WriteDataPoint() method works correctly
         /// <\summary>
         [TestMethod]
-        [DeploymentItem(m_sTEST_FILE_PATH)]
+        [TestCategory("Component")]
         public void WriteDataPoint_Valid()
         {
             //**************************************************************//
@@ -261,7 +259,7 @@ namespace RandomNumberGenerator.Test
         /// Tests WriteSessionEnd() method works correctly when data points have been written
         /// </summary>
         [TestMethod]
-        [DeploymentItem(m_sTEST_FILE_PATH)]
+        [TestCategory("Component")]
         public void WriteSessionEnd_Valid()
         {
             //**************************************************************//
@@ -309,7 +307,7 @@ namespace RandomNumberGenerator.Test
         /// Tests WriteSessionEnd() method works correctly when no data points have been written
         /// <\summary>
         [TestMethod]
-        [DeploymentItem(m_sTEST_FILE_PATH)]
+        [TestCategory("Component")]
         public void WriteSessionEnd_NoData_Valid()
         {
             //**************************************************************//
@@ -349,11 +347,12 @@ namespace RandomNumberGenerator.Test
         /// Test the FilePath property works correctly
         /// <\summary>
         [TestMethod]
+        [TestCategory("Component")]
         public void FilePath_SetProperty_PropertiesCorrect()
         {
             //**************************************************************//
             // Arrange
-            //**************************************************************//
+            //*******************************************************1409 Catalina*******//
 
             // Create the expected result
             string sEXPECTED_RESULT = m_sTEST_FILE_PATH;

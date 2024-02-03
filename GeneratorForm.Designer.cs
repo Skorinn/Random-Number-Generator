@@ -43,22 +43,17 @@ namespace RandomNumberGenerator
         private void InitializeComponent()
         {
             this.components = new System.ComponentModel.Container();
-            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea1 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
-            System.Windows.Forms.DataVisualization.Charting.Legend legend1 = new System.Windows.Forms.DataVisualization.Charting.Legend();
-            System.Windows.Forms.DataVisualization.Charting.Series series1 = new System.Windows.Forms.DataVisualization.Charting.Series();
-            System.Windows.Forms.DataVisualization.Charting.Series series2 = new System.Windows.Forms.DataVisualization.Charting.Series();
             this.m_CurrentAverageLabel = new System.Windows.Forms.Label();
             this.m_CurrentAverageTextBox = new System.Windows.Forms.TextBox();
             this.m_SessionTimerTextBox = new System.Windows.Forms.TextBox();
             this.m_SessionTimerLabel = new System.Windows.Forms.Label();
             this.m_ClearButton = new System.Windows.Forms.Button();
-            this.m_ReadTimer = new System.Windows.Forms.Timer(this.components);
             this.m_StopButton = new System.Windows.Forms.Button();
             this.m_StartButton = new System.Windows.Forms.Button();
             this.m_PortLabel = new System.Windows.Forms.Label();
             this.m_PortComboBox = new System.Windows.Forms.ComboBox();
             this.m_StatusTextBox = new System.Windows.Forms.TextBox();
-            this.m_AverageChart = new System.Windows.Forms.DataVisualization.Charting.Chart();
+            this.m_ResultChart = new RNGChart();
             this.MainTabControl = new System.Windows.Forms.TabControl();
             this.ExecuteTabPage = new System.Windows.Forms.TabPage();
             this.m_SetupGroupBox = new System.Windows.Forms.GroupBox();
@@ -78,7 +73,7 @@ namespace RandomNumberGenerator
             this.m_DataPointsTextBox = new System.Windows.Forms.TextBox();
             this.m_DataPointsLabel = new System.Windows.Forms.Label();
             this.AnalyzeTabPage = new System.Windows.Forms.TabPage();
-            ((System.ComponentModel.ISupportInitialize)(this.m_AverageChart)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.m_ResultChart)).BeginInit();
             this.MainTabControl.SuspendLayout();
             this.ExecuteTabPage.SuspendLayout();
             this.m_SetupGroupBox.SuspendLayout();
@@ -143,11 +138,6 @@ namespace RandomNumberGenerator
             this.m_ClearButton.UseVisualStyleBackColor = true;
             this.m_ClearButton.Click += new System.EventHandler(this.ClearButton_Click);
             // 
-            // m_ReadTimer
-            // 
-            this.m_ReadTimer.Interval = 10;
-            this.m_ReadTimer.Tick += new System.EventHandler(this.ReadTimer_Tick);
-            // 
             // m_StopButton
             // 
             this.m_StopButton.CausesValidation = false;
@@ -209,30 +199,18 @@ namespace RandomNumberGenerator
             this.m_StatusTextBox.TabStop = false;
             this.m_StatusTextBox.WordWrap = false;
             // 
-            // m_AverageChart
+            // m_ResultChart
             // 
-            this.m_AverageChart.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            this.m_ResultChart.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.m_AverageChart.BackColor = System.Drawing.Color.Transparent;
-            chartArea1.Name = "MainChartArea";
-            this.m_AverageChart.ChartAreas.Add(chartArea1);
-            legend1.Name = "MainLegend";
-            this.m_AverageChart.Legends.Add(legend1);
-            this.m_AverageChart.Location = new System.Drawing.Point(6, 202);
-            this.m_AverageChart.Name = "m_AverageChart";
-            series1.ChartArea = "MainChartArea";
-            series1.Legend = "MainLegend";
-            series1.Name = "Data Points";
-            series2.ChartArea = "MainChartArea";
-            series2.Legend = "MainLegend";
-            series2.Name = "Averages";
-            this.m_AverageChart.Series.Add(series1);
-            this.m_AverageChart.Series.Add(series2);
-            this.m_AverageChart.Size = new System.Drawing.Size(748, 463);
-            this.m_AverageChart.TabIndex = 9;
-            this.m_AverageChart.TabStop = false;
-            this.m_AverageChart.Text = "Average of Sample Data";
+            this.m_ResultChart.BackColor = System.Drawing.Color.Transparent;
+            this.m_ResultChart.Location = new System.Drawing.Point(6, 202);
+            this.m_ResultChart.Name = "m_ResultChart";
+            this.m_ResultChart.Size = new System.Drawing.Size(748, 463);
+            this.m_ResultChart.TabIndex = 9;
+            this.m_ResultChart.TabStop = false;
+            this.m_ResultChart.Text = "";
             // 
             // MainTabControl
             // 
@@ -254,7 +232,7 @@ namespace RandomNumberGenerator
             // 
             this.ExecuteTabPage.Controls.Add(this.m_SetupGroupBox);
             this.ExecuteTabPage.Controls.Add(this.m_StatisticsGroupBox);
-            this.ExecuteTabPage.Controls.Add(this.m_AverageChart);
+            this.ExecuteTabPage.Controls.Add(this.m_ResultChart);
             this.ExecuteTabPage.Controls.Add(this.m_StatusTextBox);
             this.ExecuteTabPage.Location = new System.Drawing.Point(4, 25);
             this.ExecuteTabPage.Name = "ExecuteTabPage";
@@ -487,7 +465,7 @@ namespace RandomNumberGenerator
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "Random Number Generator";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.GeneratorForm_FormClosing);
-            ((System.ComponentModel.ISupportInitialize)(this.m_AverageChart)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.m_ResultChart)).EndInit();
             this.MainTabControl.ResumeLayout(false);
             this.ExecuteTabPage.ResumeLayout(false);
             this.ExecuteTabPage.PerformLayout();
@@ -506,13 +484,12 @@ namespace RandomNumberGenerator
         private System.Windows.Forms.TextBox m_SessionTimerTextBox;
         private System.Windows.Forms.Label m_SessionTimerLabel;
         private System.Windows.Forms.Button m_ClearButton;
-        private System.Windows.Forms.Timer m_ReadTimer;
         private System.Windows.Forms.Button m_StopButton;
         private System.Windows.Forms.Button m_StartButton;
         private System.Windows.Forms.Label m_PortLabel;
         private System.Windows.Forms.ComboBox m_PortComboBox;
         private System.Windows.Forms.TextBox m_StatusTextBox;
-        private System.Windows.Forms.DataVisualization.Charting.Chart m_AverageChart;
+        private RNGChart m_ResultChart;
         private System.Windows.Forms.TabControl MainTabControl;
         private System.Windows.Forms.TabPage ExecuteTabPage;
         private System.Windows.Forms.TabPage AnalyzeTabPage;

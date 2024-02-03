@@ -9,6 +9,7 @@
 //====================================================================================================================
 // 2023/12/04 - Mike Pullen - Original implementation.
 //*********************************************************************************************************************
+using System;
 using System.IO;
 
 namespace RandomNumberGenerator
@@ -18,13 +19,13 @@ namespace RandomNumberGenerator
     /// </summary>
     public interface IRNGSessionDataFile
     {
-        bool StartSession(IRNGSessionData sessionData);
-        bool WriteDataPoint(IRNGSessionData sessionData);
-        bool EndSession();
-
         string FilePath { get; set; }
-        bool Valid { get; }
         bool SessionInProgress { get; }
+
+        bool EndSession();
+        bool IsValid();
+        bool StartSession(IRNGSessionData sessionData);
+        bool WriteDataPoint(IXMLDataPoint dataPoint);
     }
 
     /// <summary>
@@ -37,10 +38,27 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Construct with the writer and parent
         /// </summary>
-        /// <param name="writer">IN - The XML writer object to use to for the file</param>
+        /// <param name="writer">IN - The XML writer object to use to for the file (cannot be null)</param>
         public RNGSessionDataFile(IRNGXMLWriter writer)
         {
+            // Writer object provided cannot be null
+            if (null == writer)
+            {
+                throw new ArgumentNullException("Specified writer object cannot be null");
+            }
+
             m_Writer = writer;
+        }
+
+        /// <summary>
+        /// Destructor. Ensures any pending session is ended.
+        /// </summary>
+        ~RNGSessionDataFile()
+        {
+            if (m_bSessionInProgress)
+            {
+                EndSession();
+            }
         }
 
         #endregion
@@ -49,15 +67,22 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Starts a new session in the data file
         /// </summary>
-        /// <param name="sessionData">IN - The data for the new session</param>
+        /// <param name="sessionData">IN - The data for the new session (cannot be null)</param>
         /// <returns>true if successful; otherwise, false</returns>
         public bool StartSession(IRNGSessionData sessionData)
         {
+            // Session data object provided cannot be null
+            if (null == sessionData)
+            {
+                throw new ArgumentNullException("Specified data object cannot be null");
+            }
+
             // Default the status to failure
             bool bStatus = false;
 
             // Check if the writer is valid
-            if (m_Writer != null)
+            bool bValid = IsValid();
+            if (bValid)
             {
                 // Write the session start
                 m_bSessionInProgress = true;
@@ -70,18 +95,24 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Writes a data point to the file
         /// </summary>
-        /// <param name="fDataPoint">IN - The average for the data point to write</param>
+        /// <param name="fDataPoint">IN - The data point object to be written (cannot be null)</param>
         /// <returns>true if successful; otherwise, false</returns>
-        public bool WriteDataPoint(IRNGSessionData sessionData)
+        public bool WriteDataPoint(IXMLDataPoint dataPoint)
         {
+            // Data point object provided cannot be null
+            if (null == dataPoint)
+            {
+                throw new ArgumentNullException("Specified data point object cannot be null");
+            }
+
             // Default the status to failure
             bool bStatus = false;
 
-            // Check if the writer is valid
-            if (m_Writer != null)
+            // Check if the writer is valid and a session has been started
+            bool bValid = IsValid();
+            if (bValid && m_bSessionInProgress)
             {
                 // Write the data point
-                XMLDataPoint dataPoint = new XMLDataPoint(sessionData.SessionTime, sessionData.CurrentAverage);
                 bStatus = m_Writer.WriteDataPoint(dataPoint);
             }
 
@@ -98,34 +129,28 @@ namespace RandomNumberGenerator
             bool bStatus = false;
 
             // Check if the writer is valid
-            if (m_Writer != null)
+            bool bValid = IsValid();
+            if (bValid)
             {
                 // Write the session end
-                m_bSessionInProgress = false;
                 bStatus = m_Writer.WriteSessionEnd();
+                m_bSessionInProgress = false;
             }
 
             return bStatus;
         }
 
-        #endregion
-        #region Properties
-
         /// <summary>
-        /// File path for this file
+        /// Checks that a valid file path has been set
         /// </summary>
-        public string FilePath { get => m_Writer.FilePath; set => m_Writer.FilePath = value; }
-
-        /// <summary>
-        /// Checks the a valid file path has been set
-        /// </summary>
-        public bool Valid
+        public bool IsValid()
         {
-            get
-            {
-                // Default to valid
-                bool bValid = true;
+            // Default to valid
+            bool bValid = true;
 
+            // Only validate the file once
+            if (false == m_bFileValidated)
+            {
                 // Check if a file info object can be created from the writer's file property
                 try
                 {
@@ -137,7 +162,27 @@ namespace RandomNumberGenerator
                     bValid = false;
                 }
 
-                return bValid;
+            }
+            return bValid;
+        }
+
+        #endregion
+        #region Properties
+
+        /// <summary>
+        /// File path for this file
+        /// </summary>
+        public string FilePath
+        {
+            get => (null == m_Writer) ? "" : m_Writer.FilePath;
+            set
+            {
+                if (null != m_Writer)
+                {
+                    // Set the new path and reset the file validation
+                    m_Writer.FilePath = value;
+                    m_bFileValidated = false;
+                }
             }
         }
 
@@ -151,6 +196,7 @@ namespace RandomNumberGenerator
 
         private IRNGXMLWriter m_Writer = null;
         private bool m_bSessionInProgress = false;
+        private bool m_bFileValidated = false;
 
         #endregion
     }

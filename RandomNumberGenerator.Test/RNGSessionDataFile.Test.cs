@@ -7,9 +7,8 @@
 //
 // Revision History: 
 //====================================================================================================================
-// 01/20/2024 - Mike Pullen - Original implementation.
+// 2024/01/20 - Mike Pullen - Original implementation.
 //*********************************************************************************************************************
-
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System.IO;
@@ -101,6 +100,7 @@ namespace RandomNumberGenerator.Test
         /// Tests properties are set correctly using the default constructor
         /// </summary>
         [TestMethod]
+        [TestCategory("Component")]
         public void Constructor_Default_Properties()
         {
             //**************************************************************//
@@ -129,7 +129,7 @@ namespace RandomNumberGenerator.Test
 
             // Verify the property was set correctly using get
             Assert.AreEqual(sEXPECTED_FILE_PATH, sessionDataFile.FilePath);
-            Assert.AreEqual(bEXPECTED_VALID, sessionDataFile.Valid);
+            Assert.AreEqual(bEXPECTED_VALID, sessionDataFile.IsValid());
             Assert.AreEqual(bEXPECTED_SESSION_IN_PROGRESS, sessionDataFile.SessionInProgress);
         }
 
@@ -137,6 +137,7 @@ namespace RandomNumberGenerator.Test
         /// Tests StartSession() method works correctly when the writer is valid
         /// <\summary>
         [TestMethod]
+        [TestCategory("Component")]
         public void StartSession_ValidWriter_Success()
         {
             //**************************************************************//
@@ -173,10 +174,11 @@ namespace RandomNumberGenerator.Test
         }
 
         /// <summary>
-        /// Tests WriteDataPoint() method works correctly when the writer is valid
+        /// Tests WriteDataPoint() method generates an error when the writer is valid but no session was started
         /// <\summary>
         [TestMethod]
-        public void WriteDataPoint_ValidWriter_Success()
+        [TestCategory("Component")]
+        public void WriteDataPoint_ValidWriterNoSession_Failure()
         {
             //**************************************************************//
             // Arrange
@@ -185,36 +187,80 @@ namespace RandomNumberGenerator.Test
             // Mock the IRNGXMLWriter interface
             var xmlWriterMock = new Mock<IRNGXMLWriter>();
             xmlWriterMock.Setup(mock => mock.FilePath).Returns(m_sTEST_FILE_PATH);
-            xmlWriterMock.Setup(mock => mock.WriteDataPoint(It.IsAny<IXMLDataPoint>())).Returns(true);
+            xmlWriterMock.Setup(mock => mock.WriteDataPoint(It.IsAny<IXMLDataPoint>())).Returns(true).Verifiable(); ;
+
+            // Mock the data point interface
+            var dataPointMock = new Mock<IXMLDataPoint>();
 
             // Create the object under test
             RNGSessionDataFile sessionDataFile = new RNGSessionDataFile(xmlWriterMock.Object);
-
-            // Mock the iRNGSessionData interface
-            var sessionDataMock = new Mock<IRNGSessionData>();
-            sessionDataMock.Setup(mock => mock.SessionTime).Returns("00:00:00");
-            sessionDataMock.Setup(mock => mock.CurrentAverage).Returns(0.0);
 
             //**************************************************************//
             // Act
             //**************************************************************//
 
             // Write the data point
-            bool bStatus = sessionDataFile.WriteDataPoint(sessionDataMock.Object);
+            bool bStatus = sessionDataFile.WriteDataPoint(dataPointMock.Object);
 
             //**************************************************************//
             // Assert
             //**************************************************************//
 
-            // Verify the the return value and in progress flags
+            // Verify the the return value
+            Assert.IsFalse(bStatus);
+
+            // Verify no data point was written
+            xmlWriterMock.Verify(mock => mock.WriteDataPoint(dataPointMock.Object), Times.Never);
+        }
+
+        /// <summary>
+        /// Tests WriteDataPoint() method works correctly when the writer is valid and a session is in progress
+        /// <\summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void WriteDataPoint_ValidWriterSession_Success()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Mock the IRNGXMLWriter interface
+            var xmlWriterMock = new Mock<IRNGXMLWriter>();
+            xmlWriterMock.Setup(mock => mock.FilePath).Returns(m_sTEST_FILE_PATH);
+            xmlWriterMock.Setup(mock => mock.WriteDataPoint(It.IsAny<IXMLDataPoint>())).Returns(true).Verifiable(); ;
+
+            // Mock the data point interface
+            var dataPointMock = new Mock<IXMLDataPoint>();
+
+            // Create the object under test
+            RNGSessionDataFile sessionDataFile = new RNGSessionDataFile(xmlWriterMock.Object);
+
+            // Start a session
+            sessionDataFile.StartSession(new Mock<IRNGSessionData>().Object);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Write the data point
+            bool bStatus = sessionDataFile.WriteDataPoint(dataPointMock.Object);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the the return value
             Assert.IsTrue(bStatus);
-            Assert.IsTrue(sessionDataFile.SessionInProgress);
+
+            // Verify no data point was written
+            xmlWriterMock.Verify(mock => mock.WriteDataPoint(dataPointMock.Object), Times.Once);
         }
 
         /// <summary>
         /// Tests EndSession() method works correctly when the writer is valid
         /// <\summary>
         [TestMethod]
+        [TestCategory("Component")]
         public void EndSession_ValidWriter_Success()
         {
             //**************************************************************//
@@ -249,6 +295,7 @@ namespace RandomNumberGenerator.Test
         /// Tests the FileProperty property works correctly
         /// <\summary>
         [TestMethod]
+        [TestCategory("Component")]
         public void FileProperty_SetProperty_PropertiesCorrect()
         {
             //**************************************************************//
@@ -284,6 +331,7 @@ namespace RandomNumberGenerator.Test
         /// Tests the valid property when the file path is not valid
         /// <\summary>
         [TestMethod]
+        [TestCategory("Component")]
         public void Valid_InvalidFilePath_False()
         {
             //**************************************************************//
@@ -312,7 +360,7 @@ namespace RandomNumberGenerator.Test
             //**************************************************************//
 
             // Verify the the property was set correctly
-            Assert.IsFalse(sessionDataFile.Valid);
+            Assert.IsFalse(sessionDataFile.IsValid());
         }
 
         #endregion

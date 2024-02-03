@@ -7,10 +7,11 @@
 //
 // Revision History: 
 //====================================================================================================================
-// 01/20/2024 - Mike Pullen - Original implementation.
+// 2024/01/20 - Mike Pullen - Original implementation.
 //*********************************************************************************************************************
-
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Moq;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -84,21 +85,6 @@ namespace RandomNumberGenerator.Test
         }
 
         /// <summary>
-        /// Simulates the timer ticks for the specified interval and number of ticks
-        /// <\summary>
-        /// <param name="sessionData">INOUT - The session data to which to add the data</param>
-        /// <param name="iInterval">IN - The interval for each tick</param>
-        /// <param name="iNumTicks">IN - The number of ticks to simulate</param>
-        private void SimulateTimer(IRNGSessionData sessionData, int iInterval, uint iNumTicks)
-        {
-            // Simulate the timer ticks
-            for (uint iTickIndex = 0; iNumTicks > iTickIndex; ++iTickIndex)
-            {
-                sessionData.TickSessionTimer(iInterval);
-            }
-        }
-
-        /// <summary>
         /// Gets or sets the test context which provides
         /// information about and functionality for the current test run.
         /// </summary>
@@ -165,27 +151,31 @@ namespace RandomNumberGenerator.Test
         /// Tests properties are set correctly using the default constructor
         /// </summary>
         [TestMethod]
+        [TestCategory("Component")]
         public void Constructor_Default_Properties()
         {
             //**************************************************************//
             // Arrange
             //**************************************************************//
 
-            // Nothing to do. Expected values set as constant members.
+            // Mock the data file object
+            var mockDataFile = new Mock<IRNGSessionDataFile>();
+
+            // Mock the session timer object
+            var mockSessionTimer = new Mock<IRNGSessionTimer>();
 
             //**************************************************************//
             // Act
             //**************************************************************//
 
             // Create the object under test
-            RNGSessionData sessionData = new RNGSessionData();
+            RNGSessionData sessionData = new RNGSessionData(mockDataFile.Object, mockSessionTimer.Object);
 
             //**************************************************************//
             // Assert
             //**************************************************************//
 
             // Verify the property was set correctly using get
-            Assert.AreEqual(m_sDEFAULT_SESSION_TIME, sessionData.SessionTime);
             Assert.AreEqual(m_fDEFAULT_AVERAGE, sessionData.CurrentAverage);
             Assert.AreEqual(m_iDEFAULT_DATA_POINTS_SIZE, sessionData.DataPoints.Count);
             Assert.AreEqual(m_iDEFAULT_DATA_WINDOWS_SIZE, sessionData.DataWindowSize);
@@ -197,14 +187,22 @@ namespace RandomNumberGenerator.Test
         /// Tests the statistics are updated correctly when building a set of data
         /// </summary>
         [TestMethod]
+        [TestCategory("Component")]
         public void AddDataPoint_BuildDataSet_StatisticsCorrect()
         {
             //**************************************************************//
             // Arrange
             //**************************************************************//
 
+            // Mock the data file object
+            var mockDataFile = new Mock<IRNGSessionDataFile>();
+            mockDataFile.Setup(mock => mock.WriteDataPoint(It.IsAny<IXMLDataPoint>())).Returns(true).Verifiable(); ;
+
+            // Mock the session timer object
+            var mockSessionTimer = new Mock<IRNGSessionTimer>();
+
             // Create the object under test
-            RNGSessionData sessionData = new RNGSessionData();
+            RNGSessionData sessionData = new RNGSessionData(mockDataFile.Object, mockSessionTimer.Object);
 
             //**************************************************************//
             // Act
@@ -217,6 +215,14 @@ namespace RandomNumberGenerator.Test
             // Assert
             //**************************************************************//
 
+            // Verify the number of data points
+            int iExpectedDataCount = Math.Min(m_iDEFAULT_DATA_WINDOWS_SIZE, m_iSIMULATED_DATA_SIZE);
+            Assert.AreEqual(iExpectedDataCount, sessionData.DataPoints.Count);
+
+            // Verify the correct number of writes occured
+            int iExpectedWriteCount = m_iSIMULATED_DATA_SIZE / (int)sessionData.WriteFileInterval;
+            mockDataFile.Verify(mock => mock.WriteDataPoint(It.IsAny<IXMLDataPoint>()), Times.Exactly(iExpectedWriteCount));
+
             // Verify the statistics calcluated correctly
             Assert.AreEqual(m_fSimulatedAverage, sessionData.CurrentAverage);
             Assert.AreEqual(m_fSimulatedMax, sessionData.MaxPoint);
@@ -224,160 +230,32 @@ namespace RandomNumberGenerator.Test
         }
 
         /// <summary>
-        /// Tests the session time is updated correctly using the tick timer
-        /// <\summary>
-        [TestMethod]
-        public void TickSessionTimer_TickInterval_SessionTimeCorrect()
-        {
-            //**************************************************************//
-            // Arrange
-            //**************************************************************//
-
-            // The interval, number of tick, and expected result
-            const int iINTERVAL = 100;
-            const uint iNUM_TICKS = (uint)1e6;
-            const string sEXPECTED_RESULT = "27:46:40";
-
-            // Create the object under test
-            RNGSessionData sessionData = new RNGSessionData();
-
-            //**************************************************************//
-            // Act
-            //**************************************************************//
-
-            // Tick the session timer
-            SimulateTimer(sessionData, iINTERVAL, iNUM_TICKS);
-
-            //**************************************************************//
-            // Assert
-            //**************************************************************//
-
-            // Verify the statistics calcluated correctly
-            Assert.AreEqual(sEXPECTED_RESULT, sessionData.SessionTime);
-        }
-
-        /// <summary>
-        /// Tests the session timer generates an exception if the interval is less than 1
-        /// <\summary>
-        [TestMethod]
-        [ExpectedException(typeof(System.ArgumentOutOfRangeException))]
-        public void TickSessionTimer_IntervalLessThanOne_Exception()
-        {
-            //**************************************************************//
-            // Arrange
-            //**************************************************************//
-
-            // The interval, number of tick, and expected result
-            const int iINTERVAL = 0;
-            const uint iNUM_TICKS = (uint)1e6;
-
-            // Create the object under test
-            RNGSessionData sessionData = new RNGSessionData();
-
-            //**************************************************************//
-            // Act
-            //**************************************************************//
-
-            // Tick the session timer
-            SimulateTimer(sessionData, iINTERVAL, iNUM_TICKS);
-
-            //**************************************************************//
-            // Assert
-            //**************************************************************//
-
-            // Nothing to do. Expected exception.
-        }
-
-        /// <summary>
-        /// Tests the session timer generates an expection if the interval is greater than 1000
-        /// <\summary>
-        [TestMethod]
-        [ExpectedException(typeof(System.ArgumentOutOfRangeException))]
-        public void TickSessionTimer_IntervalGreaterThanOneThousand_Exception()
-        {
-            //**************************************************************//
-            // Arrange
-            //**************************************************************//
-
-            // The interval, number of tick, and expected result
-            const int iINTERVAL = 1001;
-            const uint iNUN_TICKS = (uint)1e6;
-
-            // Create the object under test
-            RNGSessionData sessionData = new RNGSessionData();
-
-            //**************************************************************//
-            // Act
-            //**************************************************************//
-
-            // Tick the session timer
-            SimulateTimer(sessionData, iINTERVAL, iNUN_TICKS);
-
-            //**************************************************************//
-            // Assert
-            //**************************************************************//
-
-            // Nothing to do. Expected exception.
-        }
-
-        /// <summary>
         /// Tests resetting the session timer
         /// <\summary>
         [TestMethod]
+        [TestCategory("Component")]
         public void ResetSessionTimings_SessionTimerReset_SessionTimeCorrect()
         {
             //**************************************************************//
             // Arrange
             //**************************************************************//
 
-            // The interval, number of tick, and expected result
-            const int iINTERVAL = 100;
-            const uint iNUM_TICKS = (uint)1e6;
-            const string sEXPECTED_RESULT = "00:00:00";
+            // Mock the data file object
+            var mockDataFile = new Mock<IRNGSessionDataFile>();
+            mockDataFile.Setup(mock => mock.WriteDataPoint(It.IsAny<IXMLDataPoint>())).Returns(true);
+
+            // Mock the session timer object
+            var mockSessionTimer = new Mock<IRNGSessionTimer>();
+            mockSessionTimer.Setup(mock => mock.Reset()).Verifiable();
 
             // Create the object under test
-            RNGSessionData sessionData = new RNGSessionData();
+            RNGSessionData sessionData = new RNGSessionData(mockDataFile.Object, mockSessionTimer.Object);
 
-            // Tick the session timer
-            SimulateTimer(sessionData, iINTERVAL, iNUM_TICKS);
-
-            //**************************************************************//
-            // Act
-            //**************************************************************//
-
-            // Reset the session timer
-            sessionData.ResetSessionTimings();
-
-            //**************************************************************//
-            // Assert
-            //**************************************************************//
-
-            // Verify the statistics calcluated correctly
-            Assert.AreEqual(sEXPECTED_RESULT, sessionData.SessionTime);
-        }
-
-        /// <summary>
-        /// Tests resetting the entire sesssion data object
-        /// <\summary>
-        [TestMethod]
-        public void ResetSessionData_SessionDataReset_PropertiesCorrect()
-        {
-            //**************************************************************//
-            // Arrange
-            //**************************************************************//
-
-            // The interval and number of tick for the session timer
-            const int iINTERVAL = 100;
-            const uint iNUM_TICKS = (uint)1e6;
-
-            // Create the object under test
-            RNGSessionData sessionData = new RNGSessionData();
-
-            // Tick the session timer
-            SimulateTimer(sessionData, iINTERVAL, iNUM_TICKS);
-
-            // Add the simulated data tp the session
+            // Add data to the session
             AddSimulatedDataPoints(sessionData);
+
+            // Set a target value
+            sessionData.TargetValue = 1;
 
             //**************************************************************//
             // Act
@@ -390,19 +268,21 @@ namespace RandomNumberGenerator.Test
             // Assert
             //**************************************************************//
 
-            // Verify the properties are all reset to defaults
-            Assert.AreEqual(m_sDEFAULT_SESSION_TIME, sessionData.SessionTime);
-            Assert.AreEqual(m_fDEFAULT_AVERAGE, sessionData.CurrentAverage);
-            Assert.AreEqual(m_iDEFAULT_DATA_POINTS_SIZE, sessionData.DataPoints.Count);
-            Assert.AreEqual(m_iDEFAULT_DATA_WINDOWS_SIZE, sessionData.DataWindowSize);
-            Assert.AreEqual(m_iDEFAULT_TARGET, sessionData.TargetValue);
-            Assert.AreEqual(m_bDEFAULT_SIMULATED, sessionData.Simulated);
+            // Verify the session time was reset
+            mockSessionTimer.Verify(mock => mock.Reset(), Times.Once);
+
+            // Verify the data was reset
+            Assert.AreEqual(0, sessionData.DataPoints.Count);
+
+            // Verify the running average was reset
+            Assert.AreEqual(0.0, sessionData.CurrentAverage);
         }
 
         /// <summary>
         /// Tests setting the DataPoints property
         /// <\summary>
         [TestMethod]
+        [TestCategory("Component")]
         public void DataPoints_SetProperty_PropertiesCorrect()
         {
             //**************************************************************//
@@ -418,8 +298,14 @@ namespace RandomNumberGenerator.Test
                 dataPoints.Enqueue(fDataPoint);
             }
 
+            // Mock the data file object
+            var mockDataFile = new Mock<IRNGSessionDataFile>();
+
+            // Mock the session timer object
+            var mockSessionTimer = new Mock<IRNGSessionTimer>();
+
             // Create the object under test
-            RNGSessionData sessionData = new RNGSessionData();
+            RNGSessionData sessionData = new RNGSessionData(mockDataFile.Object, mockSessionTimer.Object);
 
             //**************************************************************//
             // Act
@@ -446,6 +332,7 @@ namespace RandomNumberGenerator.Test
         /// Tests setting the DataWindowSize property
         /// <\summary>
         [TestMethod]
+        [TestCategory("Component")]
         public void DataWindowSize_SetProperty_PropertiesCorrect()
         {
             //**************************************************************//
@@ -455,8 +342,14 @@ namespace RandomNumberGenerator.Test
             // The expected data window size to use
             const int iEXPECTED_DATA_WINDOW_SIZE = m_iDEFAULT_DATA_WINDOWS_SIZE / 2;
 
+            // Mock the data file object
+            var mockDataFile = new Mock<IRNGSessionDataFile>();
+
+            // Mock the session timer object
+            var mockSessionTimer = new Mock<IRNGSessionTimer>();
+
             // Create the object under test
-            RNGSessionData sessionData = new RNGSessionData();
+            RNGSessionData sessionData = new RNGSessionData(mockDataFile.Object, mockSessionTimer.Object);
 
             //**************************************************************//
             // Act
@@ -477,6 +370,7 @@ namespace RandomNumberGenerator.Test
         /// Tests setting the TargetValue property
         /// <\summary>
         [TestMethod]
+        [TestCategory("Component")]
         public void TargetValue_SetProperty_PropertiesCorrect()
         {
             //**************************************************************//
@@ -486,8 +380,14 @@ namespace RandomNumberGenerator.Test
             // The expected target value to use
             const int iEXPECTED_TARGET_VALUE = 1;
 
+            // Mock the data file object
+            var mockDataFile = new Mock<IRNGSessionDataFile>();
+
+            // Mock the session timer object
+            var mockSessionTimer = new Mock<IRNGSessionTimer>();
+
             // Create the object under test
-            RNGSessionData sessionData = new RNGSessionData();
+            RNGSessionData sessionData = new RNGSessionData(mockDataFile.Object, mockSessionTimer.Object);
 
             //**************************************************************//
             // Act
@@ -508,6 +408,7 @@ namespace RandomNumberGenerator.Test
         /// Tests setting the Simulated property true
         /// <\summary>
         [TestMethod]
+        [TestCategory("Component")]
         public void Simulated_SetProperty_True()
         {
             //**************************************************************//
@@ -517,8 +418,14 @@ namespace RandomNumberGenerator.Test
             // The expected simulated value to use
             const bool bEXPECTED_SIMULATED = true;
 
+            // Mock the data file object
+            var mockDataFile = new Mock<IRNGSessionDataFile>();
+
+            // Mock the session timer object
+            var mockSessionTimer = new Mock<IRNGSessionTimer>();
+
             // Create the object under test
-            RNGSessionData sessionData = new RNGSessionData();
+            RNGSessionData sessionData = new RNGSessionData(mockDataFile.Object, mockSessionTimer.Object);
 
             //**************************************************************//
             // Act
@@ -539,6 +446,7 @@ namespace RandomNumberGenerator.Test
         /// Tests setting the Simulated property false
         /// <\summary>
         [TestMethod]
+        [TestCategory("Component")]
         public void Simulated_SetProperty_False()
         {
             //**************************************************************//
@@ -548,8 +456,14 @@ namespace RandomNumberGenerator.Test
             // The expected simulated value to use
             const bool bEXPECTED_SIMULATED = false;
 
+            // Mock the data file object
+            var mockDataFile = new Mock<IRNGSessionDataFile>();
+
+            // Mock the session timer object
+            var mockSessionTimer = new Mock<IRNGSessionTimer>();
+
             // Create the object under test
-            RNGSessionData sessionData = new RNGSessionData();
+            RNGSessionData sessionData = new RNGSessionData(mockDataFile.Object, mockSessionTimer.Object);
 
             //**************************************************************//
             // Act

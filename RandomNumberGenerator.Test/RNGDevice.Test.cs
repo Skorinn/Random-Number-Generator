@@ -7,9 +7,8 @@
 //
 // Revision History: 
 //====================================================================================================================
-// 01/20/2024 - Mike Pullen - Original implementation.
+// 2024/01/20 - Mike Pullen - Original implementation.
 //*********************************************************************************************************************
-
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace RandomNumberGenerator.Test
@@ -76,6 +75,7 @@ namespace RandomNumberGenerator.Test
         /// Tests properties are set correctly using the default constructor
         /// </summary>
         [TestMethod]
+        [TestCategory("Component")]
         public void Constructor_Default_Properties()
         {
             //**************************************************************//
@@ -106,6 +106,7 @@ namespace RandomNumberGenerator.Test
         /// Tests properties are set correctly using the initializing constructor
         /// </summary>
         [TestMethod]
+        [TestCategory("Component")]
         public void Constructor_Initializing_Properties()
         {
             //**************************************************************//
@@ -136,6 +137,7 @@ namespace RandomNumberGenerator.Test
         /// Tests set and get for the description and port properties
         /// </summary>
         [TestMethod]
+        [TestCategory("Component")]
         public void DescriptionAndPort_SetProperty_PropertiesCorrect()
         {
             //**************************************************************//

@@ -7,10 +7,10 @@
 //
 // Revision History: 
 //====================================================================================================================
-// 01/20/2024 - Mike Pullen - Original implementation.
+// 2024/01/20 - Mike Pullen - Original implementation.
 //*********************************************************************************************************************
-
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Moq;
 using System.Drawing;
 using System.Xml;
 
@@ -77,74 +77,83 @@ namespace RandomNumberGenerator.Test
         // Test for get and set for the Busy property using true
         // <\summary>
         [TestMethod]
+        [TestCategory("Component")]
         public void Busy_SetProperty_True()
         {
             //**************************************************************//
             // Arrange
             //**************************************************************//
 
-            // Create the dependant data object not under test
-            RNGSessionData sessionData = new RNGSessionData();
-            XmlWriterSettings writerSettings = new XmlWriterSettings();
-            RNGXMLWriter writer = new RNGXMLWriter(writerSettings);
-            RNGSessionDataFile sessionDataFile = new RNGSessionDataFile(writer);
+            // Mock the session timer and setup the properties
+            Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
+            mockSessionTimer.SetupAllProperties();
+
+            // Mock the session data and device interface timer 
+            Mock<IRNGSessionData> mockSessionData = new Mock<IRNGSessionData>();
+            mockSessionData.Setup(mock => mock.Timer).Returns(mockSessionTimer.Object);
+            Mock<IRNGDeviceTimer> mockDeviceTimer = new Mock<IRNGDeviceTimer>();
 
             // Create the object under test
-            GeneratorForm generatorForm = new GeneratorForm(sessionData, sessionDataFile);
+            GeneratorForm generatorForm = new GeneratorForm(mockSessionData.Object, mockDeviceTimer.Object);
 
             //**************************************************************//
             // Act
             //**************************************************************//
 
             // Set the property under test
-            generatorForm.Busy = true;
+            generatorForm.FileBrowseActive = true;
 
             //**************************************************************//
             // Assert
             //**************************************************************//
 
             // Verify the property was set correctly using get
-            Assert.IsTrue(generatorForm.Busy);
+            Assert.IsTrue(generatorForm.FileBrowseActive);
         }
 
         // <summary>
         // Test for get and set for the Busy property using false
         // <\summary>
         [TestMethod]
+        [TestCategory("Component")]
         public void Busy_SetProperty_False()
         {
             //**************************************************************//
             // Arrange
             //**************************************************************//
 
-            // Create the dependant data object not under test
-            RNGSessionData sessionData = new RNGSessionData();
-            XmlWriterSettings writerSettings = new XmlWriterSettings();
-            RNGXMLWriter writer = new RNGXMLWriter(writerSettings);
-            RNGSessionDataFile sessionDataFile = new RNGSessionDataFile(writer);
+            // Mock the session timer and setup the properties
+            Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
+            mockSessionTimer.SetupAllProperties();
+
+            // Mock the session data and device interface timer 
+            Mock<IRNGSessionData> mockSessionData = new Mock<IRNGSessionData>();
+            mockSessionData.Setup(mock => mock.Timer).Returns(mockSessionTimer.Object);
+            Mock<IRNGDeviceTimer> mockDeviceTimer = new Mock<IRNGDeviceTimer>();
 
             // Create the object under test
-            GeneratorForm generatorForm = new GeneratorForm(sessionData, sessionDataFile);
+            GeneratorForm generatorForm = new GeneratorForm(mockSessionData.Object, mockDeviceTimer.Object);
 
             //**************************************************************//
             // Act
             //**************************************************************//
 
             // Set the property under test
-            generatorForm.Busy = false;
+            generatorForm.FileBrowseActive = false;
 
             //**************************************************************//
             // Assert
             //**************************************************************//
 
             // Verify the property was set correctly using get
-            Assert.IsFalse(generatorForm.Busy);
+            Assert.IsFalse(generatorForm.FileBrowseActive);
         }
 
         // <summary>
         // Test for get and set for the StatusBoxText property
         // <\summary>
         [TestMethod]
+        [TestCategory("Component")]
         public void StatusBoxText_SetProperty_PropertiesCorrect()
         {
             //**************************************************************//
@@ -154,14 +163,17 @@ namespace RandomNumberGenerator.Test
             // Create the expected values
             const string sEXPECTED_TEXT = "Expected String";
 
-            // Create the dependant data object not under test
-            RNGSessionData sessionData = new RNGSessionData();
-            XmlWriterSettings writerSettings = new XmlWriterSettings();
-            RNGXMLWriter writer = new RNGXMLWriter(writerSettings);
-            RNGSessionDataFile sessionDataFile = new RNGSessionDataFile(writer);
+            // Mock the session timer and setup the properties
+            Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
+            mockSessionTimer.SetupAllProperties();
+
+            // Mock the session data and device interface timer 
+            Mock<IRNGSessionData> mockSessionData = new Mock<IRNGSessionData>();
+            mockSessionData.Setup(mock => mock.Timer).Returns(mockSessionTimer.Object);
+            Mock<IRNGDeviceTimer> mockDeviceTimer = new Mock<IRNGDeviceTimer>();
 
             // Create the object under test
-            GeneratorForm generatorForm = new GeneratorForm(sessionData, sessionDataFile);
+            GeneratorForm generatorForm = new GeneratorForm(mockSessionData.Object, mockDeviceTimer.Object);
 
             //**************************************************************//
             // Act
@@ -182,6 +194,7 @@ namespace RandomNumberGenerator.Test
         // Test for get and set for the StatusBoxTextColor property
         // <\summary>
         [TestMethod]
+        [TestCategory("Component")]
         public void StatusBoxTextColor_SetProperty_PropertiesCorrect()
         {
             //**************************************************************//
@@ -191,14 +204,17 @@ namespace RandomNumberGenerator.Test
             // Create the expected values
             Color expectedTextColor = Color.MediumPurple;
 
-            // Create the dependant data object not under test
-            RNGSessionData sessionData = new RNGSessionData();
-            XmlWriterSettings writerSettings = new XmlWriterSettings();
-            RNGXMLWriter writer = new RNGXMLWriter(writerSettings);
-            RNGSessionDataFile sessionDataFile = new RNGSessionDataFile(writer);
+            // Mock the session timer and setup the properties
+            Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
+            mockSessionTimer.SetupAllProperties();
+
+            // Mock the session data and device interface timer 
+            Mock<IRNGSessionData> mockSessionData = new Mock<IRNGSessionData>();
+            mockSessionData.Setup(mock => mock.Timer).Returns(mockSessionTimer.Object);
+            Mock<IRNGDeviceTimer> mockDeviceTimer = new Mock<IRNGDeviceTimer>();
 
             // Create the object under test
-            GeneratorForm generatorForm = new GeneratorForm(sessionData, sessionDataFile);
+            GeneratorForm generatorForm = new GeneratorForm(mockSessionData.Object, mockDeviceTimer.Object);
 
             //**************************************************************//
             // Act
@@ -219,6 +235,7 @@ namespace RandomNumberGenerator.Test
         // Test for get and set for the StatusBoxBackColor property
         // <\summary>
         [TestMethod]
+        [TestCategory("Component")]
         public void StatusBoxBackColor_SetProperty_PropertiesCorrect()
         {
             //**************************************************************//
@@ -228,14 +245,17 @@ namespace RandomNumberGenerator.Test
             // Create the expected values
             Color expectedBackColor = Color.MediumPurple;
 
-            // Create the dependant data object not under test
-            RNGSessionData sessionData = new RNGSessionData();
-            XmlWriterSettings writerSettings = new XmlWriterSettings();
-            RNGXMLWriter writer = new RNGXMLWriter(writerSettings);
-            RNGSessionDataFile sessionDataFile = new RNGSessionDataFile(writer);
+            // Mock the session timer and setup the properties
+            Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
+            mockSessionTimer.SetupAllProperties();
+
+            // Mock the session data and device interface timer 
+            Mock<IRNGSessionData> mockSessionData = new Mock<IRNGSessionData>();
+            mockSessionData.Setup(mock => mock.Timer).Returns(mockSessionTimer.Object);
+            Mock<IRNGDeviceTimer> mockDeviceTimer = new Mock<IRNGDeviceTimer>();
 
             // Create the object under test
-            GeneratorForm generatorForm = new GeneratorForm(sessionData, sessionDataFile);
+            GeneratorForm generatorForm = new GeneratorForm(mockSessionData.Object, mockDeviceTimer.Object);
 
             //**************************************************************//
             // Act

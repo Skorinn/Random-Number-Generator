@@ -19,9 +19,10 @@ namespace RandomNumberGenerator
     /// </summary>
     public interface IXMLDataPoint
     {
-        bool WriteDataPoint(XmlWriter writer);
-        string SessionTime { get; set; }
         double DataPoint { get; set; }
+        string SessionTime { get; set; }
+
+        bool WriteDataPoint(XmlWriter writer);
     }
 
     /// <summary>
@@ -29,6 +30,8 @@ namespace RandomNumberGenerator
     /// </summary>
     public class XMLDataPoint : IXMLDataPoint
     {
+        #region Constructors
+
         /// <summary>
         /// Default constructor
         /// </summary>
@@ -44,6 +47,9 @@ namespace RandomNumberGenerator
             m_sSessionTime = sSessionTime;
             m_fDataPoint = fDataPoint;
         }
+
+        #endregion
+        #region Methods
 
         /// <summary>
         /// Writes the data point to the XML file
@@ -73,17 +79,25 @@ namespace RandomNumberGenerator
             return bStatus;
         }
 
-        /// <summary>
-        /// Session time for the data point
-        /// </summary>
-        public string SessionTime { get => m_sSessionTime; set => m_sSessionTime = value; }
+        #endregion
+        #region Properties
 
         /// <summary>
         /// Average value for the data point
         /// </summary>
         public double DataPoint { get => m_fDataPoint; set => m_fDataPoint = value; }
 
+        /// <summary>
+        /// Session time for the data point
+        /// </summary>
+        public string SessionTime { get => m_sSessionTime; set => m_sSessionTime = value; }
+
+        #endregion
+        #region Data Members
+
         private string m_sSessionTime = "";
         private double m_fDataPoint = 0.0;
+
+        #endregion
     }
 }

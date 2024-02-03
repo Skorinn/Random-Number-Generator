@@ -10,25 +10,22 @@
 // 2024/02/03 - Mike Pullen - Original implementation.
 //*********************************************************************************************************************
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Timers;
 using System.Windows.Forms;
-using System.Xml.Linq;
 
 namespace RandomNumberGenerator
 {
     public interface IRNGSessionTimer
     {
+        bool Enabled { get; set; }
+        bool InProgress { get; }
+        int Interval { get; set; }
+        string SessionTime { get; }
+        TextBox TimerTextBox { set; }
+
+        void Reset();
         void Start();
         void Stop();
         void Tick();
-
-        bool Enabled { get; set; }
-        double Interval { get; set; }
-        TextBox TimerTextBox { set; }
     }
 
     /// <summary>
@@ -39,10 +36,9 @@ namespace RandomNumberGenerator
         #region Constructors
 
         /// <summary>
-        /// Initializing constructor
+        /// Default constructor
         /// </summary>
-        /// <param name="sessionData">INOUT - Session data object</param>
-        public RNGSessionTimer(IRNGSessionData sessionData) : this(sessionData, null)
+        public RNGSessionTimer() : this(null)
         {
             // Nothing to do
         }
@@ -50,14 +46,15 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Initializing constructor
         /// </summary>
-        /// <param name="sessionData">INOUT - Session data object</param>
-        /// <param name="timerTextBox">INOUT - Text box for displaying the timer</param>
-        public RNGSessionTimer(IRNGSessionData sessionData, TextBox timerTextBox)
+        /// <param name="timerTextBox">IN - Text box for displaying the timer</param>
+        public RNGSessionTimer(TextBox timerTextBox)
         {
-            m_Data = sessionData;
-            m_TimerTextBox = timerTextBox;
+            // Initialize the timer
             m_Timer.Interval = 1000; // Default interval to 1 second
             m_Timer.Elapsed += this.SessionTimer_Tick;
+
+            // Set the text box for the timer
+            m_TimerTextBox = timerTextBox;
         }
 
         /// <summary>
@@ -114,27 +111,62 @@ namespace RandomNumberGenerator
         /// </summary>
         public void Tick()
         {
-            string sTimerText;
-
-            // Executes in a thread so protect against collision when updating members
-            lock (m_Data)
-            {
-                // Update the timer value
-                m_Data.TickSessionTimer((int)Interval);
-
-                // Create a copy of the session timer string
-                sTimerText = (string)m_Data.SessionTime.Clone();
-            }
+            // Update the timer value
+            TickSessionTimer();
 
             // Update the control
-            UpdateTimerText(sTimerText);
+            UpdateTimerText();
+        }
+
+        /// <summary>
+        /// Resets the session time to 0
+        /// </summary>
+        public void Reset()
+        {
+            // Use of the session time is exclusive
+            lock (m_TimerLock)
+            {
+                m_iSessionMilliseconds = 0;
+                m_iSessionSeconds = 0;
+                m_iSessionMinutes = 0;
+                m_iSessionHours = 0;
+            }
+        }
+
+        /// <summary>
+        /// Increments the session counter
+        /// </summary>
+        private void TickSessionTimer()
+        {
+            // Use of the session time is exclusive
+            lock (m_TimerLock)
+            {
+                // Update the millisecond counter then check for rollovers
+                m_iSessionMilliseconds += Interval;
+                if (m_iSessionMilliseconds >= 1000)
+                {
+                    ++m_iSessionSeconds;
+                    m_iSessionMilliseconds -= 1000;
+                }
+
+                if (m_iSessionSeconds > 60)
+                {
+                    ++m_iSessionMinutes;
+                    m_iSessionSeconds -= 60;
+                }
+
+                if (m_iSessionMinutes > 60)
+                {
+                    ++m_iSessionHours;
+                    m_iSessionMinutes -= 60;
+                }
+            }
         }
 
         /// <summary>
         /// Updates the session timer text box control (if set)
         /// </summary>
-        /// <param name="sTimerText">IN - The text to set in the text box</param>
-        private void UpdateTimerText(string sTimerText)
+        private void UpdateTimerText()
         {
             // Only update if the text box is set
             if (null != m_TimerTextBox)
@@ -142,11 +174,11 @@ namespace RandomNumberGenerator
                 // Executes in a thread, so need to invoke in the main GUI thread
                 if (true == m_TimerTextBox.InvokeRequired)
                 {
-                    m_TimerTextBox.Invoke((MethodInvoker)delegate { UpdateTimerText(sTimerText); });
+                    m_TimerTextBox.Invoke((MethodInvoker)delegate { UpdateTimerText(); });
                 }
                 else
                 {
-                    m_TimerTextBox.Text = sTimerText;
+                    m_TimerTextBox.Text = SessionTime;
                 }
             }
         }
@@ -154,19 +186,81 @@ namespace RandomNumberGenerator
         #endregion
         #region Properties
 
+        /// <summary>
+        /// Whether the timer is actively running
+        /// </summary>
         public bool Enabled { get => m_Timer.Enabled; set => m_Timer.Enabled = value; }
-        public double Interval { get => m_Timer.Interval; set => m_Timer.Interval = value; }
+
+        /// <summary>
+        /// Whether the timer has been started (read-only)
+        /// </summary>
+        public bool InProgress { get => m_bInProgress; }
+
+        /// <summary>
+        /// Timer interval in milliseconds. Valid values are 1-1000.
+        /// </summary>
+        public int Interval
+        {
+            get => (int)m_Timer.Interval;
+            set
+            {
+                // Validate the interval
+                if (0 >= value)
+                {
+                    throw new ArgumentOutOfRangeException("Interval must be greater than 0");
+                }
+                else if (1000 < value)
+                {
+                    throw new ArgumentOutOfRangeException("Interval cannot be greater than 1000");
+                }
+
+                m_Timer.Interval = value;
+            }
+        }
+
+        /// <summary>
+        /// Formated session time string (read-only)
+        /// </summary>
+        public string SessionTime
+        {
+            get
+            {
+                string sTimerText;
+
+                // Use of the session time is exclusive
+                lock (m_TimerLock)
+                {
+                    // Build and return the formatted string representation of the updated session time
+                    sTimerText = m_iSessionHours.ToString("00") + ":" + m_iSessionMinutes.ToString("00") + ":" + m_iSessionSeconds.ToString("00");
+                }
+
+                return sTimerText;
+            }
+        }
+
+        /// <summary>
+        /// Text box for displaying the timer (write-only)
+        /// </summary>
         public TextBox TimerTextBox { set => m_TimerTextBox = value; }
-        public bool InProgress { get => m_bInProgress; set => m_bInProgress = value; }
 
         #endregion
         #region Data Members
 
+        // The actual timer
         private System.Timers.Timer m_Timer = new System.Timers.Timer(); // Use system timer instead of forms timer for threading, so the update is reliable
+
+        // Records when the timer has been started
         private bool m_bInProgress = false;
-        private IRNGSessionData m_Data = null;
+
+        // Text box for displaying the timer
         private TextBox m_TimerTextBox = null;
 
+        // Session timer counters
+        private object m_TimerLock = new object();
+        private int m_iSessionMilliseconds = 0;
+        private int m_iSessionSeconds = 0;
+        private int m_iSessionMinutes = 0;
+        private int m_iSessionHours = 0;
         #endregion
     }
 }

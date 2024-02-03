@@ -1,40 +1,68 @@
 ﻿//*********************************************************************************************************************
-// File Name:      XMLDataPoint.Test.cs
-// Description:    Unit tests for the XMLDataPoint class
+// File Name:      RNGDeviceTimer.Test.cs
+// Description:    Unit tests for the RNGDeviceTimer class
 //
 // Copyright (C) 2024 Mike Pullen. All Rights Reserved.
 // Confidential and Proprietary
 //
 // Revision History: 
 //====================================================================================================================
-// 2024/01/21 - Mike Pullen - Original implementation.
+// 2024/02/04 - Mike Pullen - Original implementation.
 //*********************************************************************************************************************
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System.IO;
-using System.Xml;
+using Moq;
+using System.Threading;
 
 namespace RandomNumberGenerator.Test
 {
     /// <summary>
-    /// Unit tests for the XMLDataPoint class
+    /// Summary description for RNGDeviceTimer
     /// </summary>
     [TestClass]
-    public class XMLDataPointTests
+    public class RNGDeviceTimerTests
     {
         #region Infrastructure
 
         /// <summary>
         /// Default constructor
         /// </summary>
-        public XMLDataPointTests()
+        public RNGDeviceTimerTests()
         {
             // Nothing to do
         }
 
         /// <summary>
-        /// Gets or sets the test context which provides
-        /// information about and functionality for the current test run.
+        /// Read result callback function to use for testing
         /// </summary>
+        public void RecordReadResult(double fResult)
+        {
+            // Protect as this is executed from a thread
+            lock (this)
+            {
+                // Validate the result and increment the call counter
+                if ((0 > fResult) || (1 < fResult))
+                {
+                    ++m_iInvalidCallbackCalls;
+                }
+                ++m_iReadCallbackCalls;
+            }
+        }
+
+        #endregion
+        #region Data Members
+
+        // Counter for tracking calls to the read callback
+        private uint m_iReadCallbackCalls = 0;
+
+        // Tracks any invalid values passed to the read callback
+        private uint m_iInvalidCallbackCalls = 0;
+
+        private TestContext testContextInstance;
+
+        /// <summary>
+        ///Gets or sets the test context which provides
+        ///information about and functionality for the current test run.
+        ///</summary>
         public TestContext TestContext
         {
             get
@@ -46,24 +74,6 @@ namespace RandomNumberGenerator.Test
                 testContextInstance = value;
             }
         }
-
-        #endregion
-        #region Data Members
-
-        // Information about the current test context
-        private TestContext testContextInstance;
-
-        // Paths for files used for testing
-        private const string m_sTEST_FILE_PATH = "TestSessionDataFile.XMLDataPointTests.xml";
-
-        // Session time to use for testing
-        private const string m_sSESSION_DATA_TIME = "01:54:21";
-
-        // Data point to use for testing
-        private const double m_fDATA_POINT = 9.1;
-
-        // Define the expected XML entries here as they depend on the time, target, and data values above
-        private const string sEXPECTED_DATA_POINT_ENTRY = "<Data Time=\"01:54:21\">9.1</Data>";
 
         #endregion
         #region Additional test attributes
@@ -87,225 +97,224 @@ namespace RandomNumberGenerator.Test
         // public void MyTestCleanup() { }
         //
         #endregion
-        #region Initialization and cleanup
-
-        /// <summary>
-        /// Cleans up after each test runs to ensure we always start with a clean file
-        /// </summary>
-        [TestCleanup]
-        public void Cleanup()
-        {
-            // Delete the test file if created
-            if (File.Exists(m_sTEST_FILE_PATH))
-            {
-                File.Delete(m_sTEST_FILE_PATH);
-            }
-        }
-
-        #endregion
         #region Tests
 
         /// <summary>
-        /// Tests properties are set correctly using the default constructor
+        /// Tests the default property values
         /// </summary>
         [TestMethod]
         [TestCategory("Component")]
-        public void Constructor_Default_Properties()
+        public void DefaultConstructor_Properites_DefaultValues()
         {
             //**************************************************************//
             // Arrange
             //**************************************************************//
 
             // Expected default values
-            const string sEXPECTED_TIME = "";
-            const double fEXPECTED_DATA = 0.0;
+            const int iEXPECTED_INTERVAL = 10;
 
             //**************************************************************//
             // Act
             //**************************************************************//
 
-            // Create the object under test
-            XMLDataPoint xmlDataPoint = new XMLDataPoint();
+            // Create the object under test using the default constructor
+            RNGDeviceTimer timer = new RNGDeviceTimer();
 
             //**************************************************************//
             // Assert
             //**************************************************************//
 
-            // Verify the property was set correctly using get
-            Assert.AreEqual(sEXPECTED_TIME, xmlDataPoint.SessionTime);
-            Assert.AreEqual(fEXPECTED_DATA, xmlDataPoint.DataPoint);
+            // Verify the default values for the properties
+            Assert.IsFalse(timer.Enabled);
+            Assert.IsFalse(timer.Initialized);
+            Assert.AreEqual(iEXPECTED_INTERVAL, timer.Interval);
         }
 
         /// <summary>
-        /// Tests the properties are set correctly using the initializing constructor
-        /// <\summary>
+        /// Tests InitializeDevice with valid parameters returns true
+        /// </summary>
         [TestMethod]
-        [TestCategory("Component")]
-        public void Constructor_Initializing_Properties()
+        [TestCategory("Integration")]
+        public void InitializeDevice_Valid_ReturnsTrue()
         {
             //**************************************************************//
             // Arrange
             //**************************************************************//
 
-            // Expected values
-            const string sEXPECTED_TIME = m_sSESSION_DATA_TIME;
-            const double fEXPECTED_DATA = m_fDATA_POINT;
+            // Create the object under test 
+            RNGDeviceTimer timer = new RNGDeviceTimer();
 
             //**************************************************************//
             // Act
             //**************************************************************//
 
-            // Create the object under test
-            XMLDataPoint xmlDataPoint = new XMLDataPoint(sEXPECTED_TIME, fEXPECTED_DATA);
+            // Use InitializeDevice to initialize a simulator
+            const int iSEED = 0;
+            const bool bSIMULATE = true;
+            bool bReturn = timer.InitializeDevice(iSEED, bSIMULATE);
 
             //**************************************************************//
             // Assert
             //**************************************************************//
 
-            // Verify the property was set correctly using get
-            Assert.AreEqual(sEXPECTED_TIME, xmlDataPoint.SessionTime);
-            Assert.AreEqual(fEXPECTED_DATA, xmlDataPoint.DataPoint);
+            // Verify the function return and the initilized property values
+            Assert.IsTrue(bReturn);
+            Assert.IsTrue(timer.Initialized);
         }
 
         /// <summary>
-        /// Tests WriteDataPoint with a valid writer
-        /// <\summary>
+        /// Tests the read callback is executed when the timer ticks
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Integration")]
+        public void SetReadCallback_Valid_ExecutedByTick()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Set the number of ticks to simulate
+            const uint iNUM_TICKS = 100;
+
+            // Reset the callback counters
+            m_iReadCallbackCalls = 0;
+            m_iInvalidCallbackCalls = 0;
+
+            // Create the object under test 
+            RNGDeviceTimer timer = new RNGDeviceTimer();
+
+            // Initialize the simulator
+            const int iSEED = 0;
+            const bool bSIMULATE = true;
+            bool bReturn = timer.InitializeDevice(iSEED, bSIMULATE);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Set the callback and simulate the timer ticking
+            timer.SetReadCallback(RecordReadResult);
+            timer.Start();
+            for (uint iTickCount = 0; iNUM_TICKS > iTickCount; ++iTickCount)
+            {
+                timer.TriggerTick();
+            }
+            timer.Stop();
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the callback was executed
+            bool bCallbackExecuted = (iNUM_TICKS == m_iReadCallbackCalls);
+            Assert.IsTrue(bCallbackExecuted);
+            m_iReadCallbackCalls = 0;
+
+            // Verify no invalid results were passed to the callback
+            bool bInvalidResult = (0 < m_iInvalidCallbackCalls);
+            Assert.IsFalse(bInvalidResult);
+            m_iInvalidCallbackCalls = 0;
+        }
+
+        /// <summary>
+        /// Tests that Start sets the Enabled property to true
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Integration")]
+        public void Start_Enabled_IsTrue()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Create the object under test 
+            RNGDeviceTimer timer = new RNGDeviceTimer();
+
+            // Initialize the simulator
+            const int iSEED = 0;
+            const bool bSIMULATE = true;
+            bool bReturn = timer.InitializeDevice(iSEED, bSIMULATE);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Start the timer and record the state of the enabled flag
+            timer.Start();
+            bool bEnabled = timer.Enabled;
+
+            // Stop the timer
+            timer.Stop();
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+            Assert.IsTrue(bEnabled);
+        }
+
+        /// <summary>
+        /// Tests that Stop sets the Enabled property to false
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Integration")]
+        public void Stop_Enabled_IsFalse()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Create the object under test 
+            RNGDeviceTimer timer = new RNGDeviceTimer();
+
+            // Initialize the simulator
+            const int iSEED = 0;
+            const bool bSIMULATE = true;
+            bool bReturn = timer.InitializeDevice(iSEED, bSIMULATE);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Start then stop the timer
+            timer.Start();
+            timer.Stop();
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+            Assert.IsFalse(timer.Enabled);
+        }
+
+        /// <summary>
+        /// Tests get and set for the Interval property
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
-        public void WriteDataPoint_ValidWriter_Success()
+        public void Interval_SetValid_PropertiesCorrect()
         {
             //**************************************************************//
             // Arrange
             //**************************************************************//
 
             // Create the expected result
-            string sEXPECTED_RESULT = sEXPECTED_DATA_POINT_ENTRY;
-
-            // Create the XML writer
-            XmlWriter xmlWriter = XmlWriter.Create(m_sTEST_FILE_PATH);
+            int iVALID_INTERVAL = 978;
 
             // Create the object under test
-            XMLDataPoint xmlDataPoint = new XMLDataPoint(m_sSESSION_DATA_TIME, m_fDATA_POINT);
+            RNGDeviceTimer timer = new RNGDeviceTimer();
 
             //**************************************************************//
             // Act
             //**************************************************************//
 
-            // Write the data point to the file
-            bool bStatus = xmlDataPoint.WriteDataPoint(xmlWriter);
-
-            // Close the file
-            xmlWriter.Close();
-
-            //**************************************************************//
-            // Assert
-            //**************************************************************//
-
-            // Verify the write was successful
-            Assert.IsTrue(bStatus);
-
-            // Verify the file was created
-            Assert.IsTrue(File.Exists(m_sTEST_FILE_PATH));
-
-            // Verify the file contains the expected result
-            string sResult = File.ReadAllText(m_sTEST_FILE_PATH);
-            StringAssert.Contains(sResult, sEXPECTED_RESULT);
-        }
-
-        /// <summary>
-        /// Tests WriteDataPoint with a null writer
-        /// <\summary>
-        [TestMethod]
-        [TestCategory("Component")]
-        public void WriteDataPoint_NullWriter_Failure()
-        {
-            //**************************************************************//
-            // Arrange
-            //**************************************************************//
-
-            // Create the object under test
-            XMLDataPoint xmlDataPoint = new XMLDataPoint(m_sSESSION_DATA_TIME, m_fDATA_POINT);
-
-            //**************************************************************//
-            // Act
-            //**************************************************************//
-
-            // Write the data point to the file
-            bool bStatus = xmlDataPoint.WriteDataPoint(null);
-
-            //**************************************************************//
-            // Assert
-            //**************************************************************//
-
-            // Verify the write failed
-            Assert.IsFalse(bStatus);
-
-            // Verify the file was not created
-            Assert.IsFalse(File.Exists(m_sTEST_FILE_PATH));
-        }
-
-        /// <summary>
-        /// Tests the SessionTime property
-        /// <\summary>
-        [TestMethod]
-        [TestCategory("Component")]
-        public void SessionTime_SetProperty_PropertiesCorrect()
-        {
-            //**************************************************************//
-            // Arrange
-            //**************************************************************//
-
-            // Expected values
-            const string sEXPECTED_TIME = m_sSESSION_DATA_TIME;
-
-            // Create the object under test
-            XMLDataPoint xmlDataPoint = new XMLDataPoint();
-
-            //**************************************************************//
-            // Act
-            //**************************************************************//
-
-            // Set the property
-            xmlDataPoint.SessionTime = sEXPECTED_TIME;
+            // Set the interval to the valid value
+            timer.Interval = iVALID_INTERVAL;
 
             //**************************************************************//
             // Assert
             //**************************************************************//
 
             // Verify the property was set correctly using get
-            Assert.AreEqual(sEXPECTED_TIME, xmlDataPoint.SessionTime);
-        }
-
-        /// <summary>
-        /// Tests the DataPoint property
-        /// <\summary>
-        [TestMethod]
-        [TestCategory("Component")]
-        public void DataPoint_SetProperty_PropertiesCorrect()
-        {
-            //**************************************************************//
-            // Arrange
-            //**************************************************************//
-
-            // Expected values
-            const double fEXPECTED_DATA = m_fDATA_POINT;
-
-            // Create the object under test
-            XMLDataPoint xmlDataPoint = new XMLDataPoint();
-
-            //**************************************************************//
-            // Act
-            //**************************************************************//
-
-            // Set the property
-            xmlDataPoint.DataPoint = fEXPECTED_DATA;
-
-            //**************************************************************//
-            // Assert
-            //**************************************************************//
-
-            // Verify the property was set correctly using get
-            Assert.AreEqual(fEXPECTED_DATA, xmlDataPoint.DataPoint);
+            Assert.AreEqual(iVALID_INTERVAL, timer.Interval);
         }
 
         #endregion

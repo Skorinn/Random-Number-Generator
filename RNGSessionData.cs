@@ -21,20 +21,26 @@ namespace RandomNumberGenerator
     /// </summary>
     public interface IRNGSessionData
     {
-        void Reset();
-        void TickSessionTimer(int iInterval);
-        void ResetSessionTimings();
-        void AddDataPoint(double fDataPoint);
-
-
-        string SessionTime { get; }
         double CurrentAverage { get; }
-        double MaxPoint { get; }
-        double MinPoint { get; }
         ConcurrentQueue<double> DataPoints { get; set; }
         int DataWindowSize { get; set; }
-        int TargetValue { get; set; }
+        string FilePath { get; set; }
+        bool InProgress { get; }
+        double MaxPoint { get; }
+        double MinPoint { get; }
+        string SessionTime { get; }
         bool Simulated { get; set; }
+        int TargetValue { get; set; }
+        IRNGSessionTimer Timer { get; }
+        uint WriteFileInterval { get; }
+
+        bool AddDataPoint(double fDataPoint);
+        void EndSession();
+        void PauseSession();
+        void Reset();
+        void ResumeSession();
+        bool StartSession();
+        bool WritePendingData(bool bFlush = false);
     }
 
     /// <summary>
@@ -48,88 +54,106 @@ namespace RandomNumberGenerator
             None = 0,
             Zero = 1,
             One = 2,
-            TARGETS_SIZE = 3 // Keep at end
+            TARGETS_SIZE // Keep at end
         }
         #endregion
         #region Constructors
 
         /// <summary>
-        /// Default constructor
-        /// </summary>
-        public RNGSessionData() { }
+        /// Initializing constructor
+        /// <\summary>
+        /// <param name="dataFile">IN - File to which to write the data (cannot be null)</param>
+        /// <param name="timer">IN - Timer for the session (cannot be null)</param>
+        public RNGSessionData(IRNGSessionDataFile dataFile, IRNGSessionTimer timer)
+        {
+            // Data file object provided cannot be null
+            if (null == dataFile)
+            {
+                throw new ArgumentNullException("Specified data file object cannot be null");
+            }
+
+            // Timer object provided cannot be null
+            if (null == timer)
+            {
+                throw new ArgumentNullException("Specified timer object cannot be null");
+            }
+
+            m_DataFile = dataFile;
+            m_Timer = timer;
+        }
 
         #endregion
         #region Methods
 
         /// <summary>
-        /// Resets the data to start a a new session
+        /// Starts a new data session
         /// </summary>
-        public void Reset()
+        /// <returns>true if successful; otherwise, false</returns>
+        public bool StartSession()
         {
-            // Reset the timer
-            ResetSessionTimings();
+            // End any session currently in progress
+            EndSession();
 
-            // Clear cannot be done atomically so just create new queues
-            m_DataPoints = new ConcurrentQueue<double>();
+            // Start a new session
+            bool bStatus = (null == m_DataFile);
+            if (bStatus)
+            {
+                bStatus = m_DataFile.StartSession(this);
+            }
 
-            // Clear the set target value and average
-            m_iTargetValue = TargetValues.NO_VALUE_SET;
-            Interlocked.Exchange(ref m_fCurrentAverage, 0.0);
+            // Then start the timer
+            bStatus = (null != m_Timer);
+            if (bStatus)
+            {
+                m_Timer.Start();
+            }
+
+            return bStatus;
+
         }
 
         /// <summary>
-        /// Increments the session counter
+        /// Pauses the current data session
         /// </summary>
-        /// <param name="iInterval">IN - Amount to add to the timer</param>
-        public void TickSessionTimer(int iInterval)
+        public void PauseSession()
         {
-            // Validate the interval
-            if (0 >= iInterval)
+            // If timer is valid and session is in progress
+            if ((null != m_Timer) && FileSessionInProgress)
             {
-                throw new ArgumentOutOfRangeException("Interval must be greater than 0");
-            }
-            else if (1000 < iInterval)
-            {
-                throw new ArgumentOutOfRangeException("Interval cannot be greater than 1000");
-            }
-
-            // Use of the session time is exclusive
-            lock (m_TimerLock)
-            {
-                // Update the millisecond counter then check for rollovers
-                m_iSessionMilliseconds += iInterval;
-                if (m_iSessionMilliseconds >= 1000)
-                {
-                    ++m_iSessionSeconds;
-                    m_iSessionMilliseconds -= 1000;
-                }
-
-                if (m_iSessionSeconds > 60)
-                {
-                    ++m_iSessionMinutes;
-                    m_iSessionSeconds -= 60;
-                }
-
-                if (m_iSessionMinutes > 60)
-                {
-                    ++m_iSessionHours;
-                    m_iSessionMinutes -= 60;
-                }
+                // Pause the timer
+                m_Timer.Enabled = false;
             }
         }
 
         /// <summary>
-        /// Resets the session time to 0
+        /// Resumes the current data session
         /// </summary>
-        public void ResetSessionTimings()
+        public void ResumeSession()
         {
-            // Use of the session time is exclusive
-            lock (m_TimerLock)
+            // If timer is valid and session is in progress
+            if ((null != m_Timer) && FileSessionInProgress)
             {
-                m_iSessionMilliseconds = 0;
-                m_iSessionSeconds = 0;
-                m_iSessionMinutes = 0;
-                m_iSessionHours = 0;
+                // Resume the timer
+                m_Timer.Enabled = true;
+            }
+        }
+
+        /// <summary>
+        /// Ends the current data session
+        /// </summary>
+        public void EndSession()
+        {
+            // If there is pending data
+            if (0 < m_iPendingDataPointCounter)
+            {
+                // Flush the pending data
+                WritePendingData(true);
+            }
+
+            // Close out any session in progress
+            if ((null != m_DataFile) && FileSessionInProgress)
+            {
+                m_DataFile.EndSession();
             }
         }
 
@@ -137,7 +161,8 @@ namespace RandomNumberGenerator
         /// Adds a new data point to the data sets
         /// </summary>
         /// <param name="fDataPoint">IN - The new data point</param>
-        public void AddDataPoint(double fDataPoint)
+        /// <returns>true, if successful; otherwise false</returns>
+        public bool AddDataPoint(double fDataPoint)
         {
             // Check if the data set is full
             if (m_DataPoints.Count >= m_iDataWindowSize)
@@ -151,45 +176,73 @@ namespace RandomNumberGenerator
 
             // Update the current average
             Interlocked.Exchange(ref m_fCurrentAverage, m_DataPoints.Average());
+
+            // Record a new data point exists and Write the data to the file (if interval reached)
+            ++m_iPendingDataPointCounter;
+            bool bStatus = WritePendingData();
+
+            return bStatus;
+        }
+
+        /// <summary>
+        /// Write a data point to the file if the data interval has been reached
+        /// </summary>
+        /// <param name="bFlush">IN - Whether to force a write (default = false)</param>
+        /// <returns>true, if successful; otherwise false</returns>
+        public bool WritePendingData(bool bFlush = false)
+        {
+            // Default to true as the call is successful if nothings needs to be done
+            bool bStatus = true;
+
+            // If flushing and unwritten data exists
+            bool bFlushUnwritten = (bFlush && (0 < m_iPendingDataPointCounter));
+
+            // if the data point interval has been reached
+            bool bWritePending = (WRITE_FILE_INTERVAL <= m_iPendingDataPointCounter);
+
+            // Write the data point if either condition is met
+            if (bFlushUnwritten || bWritePending)
+            {
+                // Write the data point and reset the counter
+                XMLDataPoint dataPoint = new XMLDataPoint(SessionTime, CurrentAverage);
+                bStatus = (m_DataFile != null);
+                if (bStatus)
+                {
+                    bStatus = m_DataFile.WriteDataPoint(dataPoint);
+                }
+
+                m_iPendingDataPointCounter = 0;
+            }
+
+            return bStatus;
+        }
+
+        /// <summary>
+        /// Resets the data to start a a new session
+        /// </summary>
+        public void Reset()
+        {
+            // Reset the timer
+            if (null != m_Timer)
+            {
+                m_Timer.Reset();
+            }
+
+            // Clear cannot be done atomically so just create new queues
+            m_DataPoints = new ConcurrentQueue<double>();
+
+            // Clear the set target value and average
+            m_iTargetValue = TargetValues.NO_VALUE_SET;
+            Interlocked.Exchange(ref m_fCurrentAverage, 0.0);
         }
 
         #endregion
         #region Properties
 
         /// <summary>
-        /// Formated session time string
-        /// </summary>
-        public string SessionTime
-        {
-            get
-            {
-                string sTimerText;
-
-                // Use of the session time is exclusive
-                lock (m_TimerLock)
-                {
-                    // Build and return the formatted string representation of the updated session time
-                    sTimerText = m_iSessionHours.ToString("00") + ":" + m_iSessionMinutes.ToString("00") + ":" + m_iSessionSeconds.ToString("00");
-                }
-
-                return sTimerText;
-            }
-        }
-
-        /// <summary>
-        /// The current average of the data points
+        /// The current average of the data points (read-only)
         /// </summary>
         public double CurrentAverage { get => m_fCurrentAverage; }
-
-        /// <summary>
-        /// Gets the maximum data value
-        /// </summary>
-        public double MaxPoint { get => m_DataPoints.Max(); }
-
-        /// <summary>
-        /// Gets the minimum data value
-        /// </summary>
-        public double MinPoint { get => m_DataPoints.Min(); }
 
         /// <summary>
         /// Full data point set
@@ -202,9 +255,43 @@ namespace RandomNumberGenerator
         public int DataWindowSize { get => m_iDataWindowSize; set => Interlocked.Exchange(ref m_iDataWindowSize, value); }
 
         /// <summary>
-        /// The selected target value for the session
+        /// The path to the session data file (empty string if no file object set)
         /// </summary>
-        public int TargetValue { get => m_iTargetValue; set => Interlocked.Exchange(ref m_iTargetValue, value); }
+        public string FilePath
+        {
+            get
+            {
+                return (null == m_DataFile) ? "" : m_DataFile.FilePath;
+            }
+
+            set
+            {
+                if (null != m_DataFile)
+                {
+                    m_DataFile.FilePath = value;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Whether or not the session is currently in progress (read-only)
+        /// </summary>
+        public bool InProgress { get => (null == m_Timer) ? false : m_Timer.InProgress; }
+
+        /// <summary>
+        /// Gets the maximum data value (read-only)
+        /// </summary>
+        public double MaxPoint { get => (null == m_DataPoints) ? int.MaxValue : m_DataPoints.Max(); }
+
+        /// <summary>
+        /// Gets the minimum data value (read-only)
+        /// </summary>
+        public double MinPoint { get => (null == m_DataPoints) ? int.MinValue : m_DataPoints.Min(); }
+
+        /// <summary>
+        /// Formated session time string (read-only)
+        /// </summary>
+        public string SessionTime { get => (null == m_Timer) ? "" : m_Timer.SessionTime; }
 
         /// <summary>
         /// Whether the data is simulated or from a real RNG device
@@ -222,15 +309,47 @@ namespace RandomNumberGenerator
             set => Interlocked.Exchange(ref m_iSimulated, (value ? m_iTRUE : m_iFALSE));
         }
 
+        /// <summary>
+        /// The selected target value for the session. Ends any session in progress.
+        /// </summary>
+        public int TargetValue
+        {
+            get => m_iTargetValue;
+            set
+            {
+                // End any session currently in progress
+                EndSession();
+
+                // Record the change
+                Interlocked.Exchange(ref m_iTargetValue, value);
+            }
+        }
+
+        /// <summary>
+        /// The timer object for the data session (read-only)
+        /// </summary>
+        public IRNGSessionTimer Timer { get => m_Timer; }
+
+        /// <summary>
+        /// Interval at which data points should be written to the data file (read-only)
+        /// </summary>
+        public uint WriteFileInterval { get => WRITE_FILE_INTERVAL; }
+
+        /// <summary>
+        /// Whether or not a session is open in the cooresponding data file (read-only)
+        /// </summary>
+        private bool FileSessionInProgress { get => (null == m_DataFile) ? false : m_DataFile.SessionInProgress; }
+
+        #endregion
+        #region Constants
+
+        /// <summary>
+        /// Interval at which data should be record to the file (if used)
+        /// </summary>
+        private const uint WRITE_FILE_INTERVAL = 1000;
+
         #endregion
         #region Data Members
-
-        // Session timer
-        private object m_TimerLock = new object();
-        private int m_iSessionMilliseconds = 0;
-        private int m_iSessionSeconds = 0;
-        private int m_iSessionMinutes = 0;
-        private int m_iSessionHours = 0;
 
         // RNG Data
         private double m_fCurrentAverage = 0.0;
@@ -244,6 +363,13 @@ namespace RandomNumberGenerator
         private int m_iSimulated = m_iFALSE;
         private const int m_iTRUE = 1;
         private const int m_iFALSE = 0;
+
+        // File and trackers for recording results to the file
+        private uint m_iPendingDataPointCounter = 0;
+        private IRNGSessionDataFile m_DataFile = null;
+
+        // Session timer
+        private IRNGSessionTimer m_Timer = null;
 
         #endregion
     }

@@ -31,9 +31,6 @@ namespace RandomNumberGenerator
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
-            // Create the session data object
-            RNGSessionData sessionData = new RNGSessionData();
-
             // Create the XML writer and session data file objects
             XmlWriterSettings writerSettings = new XmlWriterSettings();
             writerSettings.Indent = true;
@@ -42,10 +39,16 @@ namespace RandomNumberGenerator
             RNGSessionDataFile sessionDataFile = new RNGSessionDataFile(writer);
 
             // Create the session timer object
-            RNGSessionTimer sessionTimer = new RNGSessionTimer(sessionData);
+            RNGSessionTimer sessionTimer = new RNGSessionTimer();
+
+            // Create the session data object
+            RNGSessionData sessionData = new RNGSessionData(sessionDataFile, sessionTimer);
+
+            // Create the device interface timer
+            RNGDeviceTimer deviceTimer = new RNGDeviceTimer();
 
             // Create and run the form
-            GeneratorForm generatorForm = new GeneratorForm(sessionData, sessionDataFile, sessionTimer);
+            GeneratorForm generatorForm = new GeneratorForm(sessionData, deviceTimer);
             Application.Run(generatorForm);
         }
     }

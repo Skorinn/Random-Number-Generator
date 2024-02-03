@@ -7,12 +7,10 @@
 //
 // Revision History: 
 //====================================================================================================================
-// 02/03/2024 - Mike Pullen - Original implementation.
+// 2024/02/03 - Mike Pullen - Original implementation.
 //*********************************************************************************************************************
-
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
-using System;
 using System.Windows.Forms;
 
 namespace RandomNumberGenerator.Test
@@ -21,9 +19,28 @@ namespace RandomNumberGenerator.Test
     public class RNGSessionTimerTests
     {
         /// <summary>
+        /// Simulates the timer ticks for the specified interval and number of ticks
+        /// <\summary>
+        /// <param name="sessionTimer">INOUT - The session timer to simulate ticks</param>
+        /// <param name="iInterval">IN - The interval for each tick</param>
+        /// <param name="iNumTicks">IN - The number of ticks to simulate</param>
+        private void SimulateTimer(IRNGSessionTimer sessionTimer, int iInterval, uint iNumTicks)
+        {
+            // Set the interval on the timer
+            sessionTimer.Interval = iInterval;
+
+            // Simulate the timer ticks
+            for (uint iTickIndex = 0; iNumTicks > iTickIndex; ++iTickIndex)
+            {
+                sessionTimer.Tick();
+            }
+        }
+
+        /// <summary>
         /// Tests the Start method sets the Enabled and InProgress properties to true
         /// <\summary>
         [TestMethod]
+        [TestCategory("Component")]
         public void Start_EnabledandInProgressPropertiesAreTrue()
         {
             //**************************************************************//
@@ -32,14 +49,12 @@ namespace RandomNumberGenerator.Test
 
             // Mock the session data
             Mock<IRNGSessionData> mockSessionData = new Mock<IRNGSessionData>();
-            mockSessionData.Setup(mock => mock.TickSessionTimer(It.IsAny<int>()));
-            mockSessionData.SetupProperty(mock => mock.SessionTime, "00:00:00");
 
             // Create the text box for the timer
             TextBox timerTextBox = new TextBox();
 
             // Create the session timer
-            IRNGSessionTimer timer = new RNGSessionTimer(mockSessionData.Object, timerTextBox);
+            IRNGSessionTimer timer = new RNGSessionTimer(timerTextBox);
 
             //**************************************************************//
             // Act
@@ -57,22 +72,18 @@ namespace RandomNumberGenerator.Test
         /// Tests the Stop method sets the Enabled and InProgress properties to false
         /// <\summary>
         [TestMethod]
+        [TestCategory("Component")]
         public void Stop_RunningPropertyIsFalse()
         {
             //**************************************************************//
             // Arrange
             //**************************************************************//
 
-            // Mock the session data
-            Mock<IRNGSessionData> mockSessionData = new Mock<IRNGSessionData>();
-            mockSessionData.Setup(mock => mock.TickSessionTimer(It.IsAny<int>()));
-            mockSessionData.SetupProperty(mock => mock.SessionTime, "00:00:00");
-
             // Create the text box for the timer
             TextBox timerTextBox = new TextBox();
 
             // Create the session timer
-            IRNGSessionTimer timer = new RNGSessionTimer(mockSessionData.Object, timerTextBox);
+            IRNGSessionTimer timer = new RNGSessionTimer(timerTextBox);
 
             //**************************************************************//
             // Act
@@ -88,29 +99,25 @@ namespace RandomNumberGenerator.Test
         }
 
         /// <summary>
-        /// Tests the Tick method updates the timer text and ticks the data
+        /// Tests the Tick method updates the session timer using the default interval
         /// <\summary>
         [TestMethod]
-        public void Tick_DataAndTextAreUpdated()
+        [TestCategory("Component")]
+        public void Tick_DefaultInterval_SessionTimeUpdated()
         {
             //**************************************************************//
             // Arrange
             //**************************************************************//
 
-            // Set the expected value
+            // Set the expected value (single tick with default interval of 1s)
             const string sEXPECTED_VALUE = "00:00:01";
-
-            // Mock the session data and set the session time to the expected value
-            Mock<IRNGSessionData> mockSessionData = new Mock<IRNGSessionData>();
-            mockSessionData.Setup(mock => mock.TickSessionTimer(It.IsAny<int>()));
-            mockSessionData.SetupProperty(mock => mock.SessionTime, sEXPECTED_VALUE);
 
             // Create the text box for the timer and set the text
             TextBox timerTextBox = new TextBox();
             timerTextBox.Text = "Initial Value";
 
             // Create the session timer
-            IRNGSessionTimer timer = new RNGSessionTimer(mockSessionData.Object, timerTextBox);
+            IRNGSessionTimer timer = new RNGSessionTimer(timerTextBox);
 
             //**************************************************************//
             // Act
@@ -123,28 +130,21 @@ namespace RandomNumberGenerator.Test
 
             // Verify the timer text was updated
             Assert.AreEqual(sEXPECTED_VALUE, timerTextBox.Text);
-
-            // Verify the data was updated
-            mockSessionData.Verify(mock => mock.TickSessionTimer(It.IsAny<int>()), Times.Once);
         }
 
         /// <summary>
         /// Tests the Enabled property doesn't affect the InProgress property when set to false
         /// </summary>
         [TestMethod]
+        [TestCategory("Component")]
         public void Enabled_PropertyDoesNotAffectInProgressProperty()
         {
             //**************************************************************//
             // Arrange
             //**************************************************************//
 
-            // Mock the session data
-            Mock<IRNGSessionData> mockSessionData = new Mock<IRNGSessionData>();
-            mockSessionData.Setup(mock => mock.TickSessionTimer(It.IsAny<int>()));
-            mockSessionData.SetupProperty(mock => mock.SessionTime, "00:00:00");
-
             // Create the session timer
-            IRNGSessionTimer timer = new RNGSessionTimer(mockSessionData.Object);
+            IRNGSessionTimer timer = new RNGSessionTimer();
 
             //**************************************************************//
             // Act
@@ -163,24 +163,21 @@ namespace RandomNumberGenerator.Test
         }
 
         /// <summary>
-        /// Verify the Interval property
+        /// Verify the Interval property cna be set and read back
         /// <\summary>
         [TestMethod]
+        [TestCategory("Component")]
         public void Interval_PropertyIsSet()
         {
             //**************************************************************//
             // Arrange
             //**************************************************************//
 
-            // Set the expected value to a random number
-            Random rand = new Random();
-            int iExpectedValue = rand.Next();
-
-            // Mock the session data
-            Mock<IRNGSessionData> mockSessionData = new Mock<IRNGSessionData>();
+            // Set the expected value to somethign different from the default (1s)
+            int iExpectedValue = 59;
 
             // Create the session timer
-            IRNGSessionTimer timer = new RNGSessionTimer(mockSessionData.Object);
+            IRNGSessionTimer timer = new RNGSessionTimer();
 
             //**************************************************************//
             // Act
@@ -197,6 +194,7 @@ namespace RandomNumberGenerator.Test
         /// Test setting the TimerTextBox property
         /// <\summary>
         [TestMethod]
+        [TestCategory("Component")]
         public void TimerTextBox_PropertyIsSet()
         {
             //**************************************************************//
@@ -206,17 +204,12 @@ namespace RandomNumberGenerator.Test
             // Set the expected value
             const string sEXPECTED_VALUE = "00:00:01";
 
-            // Mock the session data and set the session time to the expected value
-            Mock<IRNGSessionData> mockSessionData = new Mock<IRNGSessionData>();
-            mockSessionData.Setup(mock => mock.TickSessionTimer(It.IsAny<int>()));
-            mockSessionData.SetupProperty(mock => mock.SessionTime, sEXPECTED_VALUE);
-
             // Create the text box for the timer and set the text
             TextBox timerTextBox = new TextBox();
             timerTextBox.Text = "Initial Value";
 
             // Create the session timer
-            IRNGSessionTimer timer = new RNGSessionTimer(mockSessionData.Object);
+            IRNGSessionTimer timer = new RNGSessionTimer();
 
             //**************************************************************//
             // Act

@@ -94,14 +94,14 @@ namespace RandomNumberGenerator
         }
 
         /// <summary>
-        /// Constant used when no value has been set
-        /// </summary>
-        public const int NO_VALUE_SET = -2;
-
-        /// <summary>
         /// The list of string representations of the possible values set
         /// </summary>
         public static string[] TargetStrings { get; } = { "None", "0", "1" }; // string respresentation of possible targets
+
+        /// <summary>
+        /// Constant used when no value has been set
+        /// </summary>
+        public const int NO_VALUE_SET = -2;
 
         private static readonly int[] m_sTargetValues = { -1, 0, 1 }; // Possible target values
     }

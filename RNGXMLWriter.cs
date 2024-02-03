@@ -18,11 +18,11 @@ namespace RandomNumberGenerator
     /// </summary>
     public interface IRNGXMLWriter
     {
-        bool WriteSessionStart(string sStartTime, int iTargetValue);
+        string FilePath { get; set; }
+
         bool WriteDataPoint(IXMLDataPoint dataPoint);
         bool WriteSessionEnd();
-
-        string FilePath { get; set; }
+        bool WriteSessionStart(string sStartTime, int iTargetValue);
     }
 
     /// <summary>

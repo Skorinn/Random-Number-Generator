@@ -21,10 +21,8 @@ using System.ComponentModel;
 using System.Drawing;
 using System.IO;
 using System.Management;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
-using System.Windows.Forms.DataVisualization.Charting;
 
 namespace RandomNumberGenerator
 {
@@ -33,16 +31,15 @@ namespace RandomNumberGenerator
     /// <\summary>
     public interface IGeneratorForm : ISynchronizeInvoke
     {
-        bool Busy { get; set; }
-        bool Running { get; }
         BindingList<IRNGDevice> DeviceList { set; }
-
+        bool FileBrowseActive { get; set; }
+        bool Running { get; }
+        Color StatusBoxBackColor { get; set; }
         string StatusBoxText { get; set; }
         Color StatusBoxTextColor { get; set; }
-        Color StatusBoxBackColor { get; set; }
 
-        // Action version of Invoke not included in ISynchronizeInvoke
         object Invoke(Action method);
+        void RecordReadResult(double fResult);
     }
 
     /// <summary>
@@ -50,29 +47,42 @@ namespace RandomNumberGenerator
     /// </summary>
     public partial class GeneratorForm : Form, IGeneratorForm
     {
-        #region Imports
+        #region Type definitions
 
-        [DllImport("TruRNGpro.dll", CallingConvention = CallingConvention.Winapi)]
-        internal static extern bool Initialize(int iPort, bool bSimulate);
-
-        [DllImport("TruRNGpro.dll", CallingConvention = CallingConvention.Cdecl)]
-        internal static extern bool GetRandomBitAverage(ref double fResult);
+        private enum RngGuiStates
+        {
+            Idle = 0,
+            Running = 1,
+            Paused = 2,
+            RNG_GUI_STATES_SIZE // Keep at end
+        };
 
         #endregion
-
         #region Constructors
 
         /// <summary>
         /// Default constructor
         /// </summary>
-        /// <param name="sessionData">IN - The session data object</param>
-        /// <param name="sessionDataFile">IN - The session data file object</param>
-        public GeneratorForm(IRNGSessionData sessionData, IRNGSessionDataFile sessionDataFile, IRNGSessionTimer sessionTimer)
+        /// <param name="sessionData">IN - The session data object (cannot be null)</param>
+        /// <param name="timer">IN - The timer object (cannot be null)</param>
+        public GeneratorForm(IRNGSessionData sessionData, IRNGDeviceTimer timer)
         {
-            // Record the session object provided
+            if (null == sessionData)
+            {
+                throw new ArgumentNullException("Specified data object cannot be null");
+            }
+
+            if (null == timer)
+            {
+                throw new ArgumentNullException("Specified timer object cannot be null");
+            }
+
+            // Record the session and timer objects provided
             m_Data = sessionData;
-            m_DataFile = sessionDataFile;
-            m_SessionTimer = sessionTimer;
+            m_Timer = timer;
+
+            // Set the status callback for the device timer
+            m_Timer.SetReadCallback(RecordReadResult);
 
             // Dump USB devices if debugging and defined
 #if DUMP_DEVICES && DEBUG
@@ -83,7 +93,6 @@ namespace RandomNumberGenerator
 
             // Initialize GUI
             InitializeComponent();
-            InitPlot();
 
             // Set the info box to idle
             m_StatusTextBox.Text = m_sIDLE_MESSAGE;
@@ -104,7 +113,7 @@ namespace RandomNumberGenerator
 
             // Set the maximumn number of data points and averages to hold in memory
             // NOTE: Should match the window size of the data for the chart
-            m_Data.DataWindowSize = m_iMAX_DATA_SIZE;
+            m_Data.DataWindowSize = m_ResultChart.MaxDataSize;
 
             // Ensure the correct default state of the simulate button
             m_SimulateToggle.Checked = m_Data.Simulated;
@@ -114,7 +123,7 @@ namespace RandomNumberGenerator
             m_TargetComboBox.SelectedIndex = 0;
 
             // Set the timer text box in the timer object
-            m_SessionTimer.TimerTextBox = m_SessionTimerTextBox;
+            m_Data.Timer.TimerTextBox = m_SessionTimerTextBox;
         }
 
         #endregion
@@ -147,46 +156,6 @@ namespace RandomNumberGenerator
                 }
             }
         }
-            
-        /// <summary>
-        /// Event handler for tick of the timer to read data
-        /// </summary>
-        /// <param name="sender">IN - Sender of the event (not used)</param>
-        /// <param name="e">IN - The event arguments (not used)</param>
-        private void ReadTimer_Tick(object sender, EventArgs e)
-        {
-            // Discard unused parameters
-            _ = sender;
-            _ = e;
-
-            // Update the average
-            double fCurrentValue = 0.0;
-            bool bStatus = GetRandomBitAverage(ref fCurrentValue);
-
-            if (false == bStatus)
-            {
-                // Stop so the user can correct the error
-                StopButton_Click(sender, e);
-
-                // Record and display error condition
-                m_bInterfaceInitialized = false;
-                this.m_StatusTextBox.BackColor = System.Drawing.Color.Red;
-                m_StatusTextBox.Text = m_sDEVICE_READ_ERROR;
-            }
-            else // Successfully read from generator
-            {
-                // Record the new data point
-                RecordDataPoint(fCurrentValue);
-
-                // Update the displayed average and add the point to the chart
-                m_CurrentAverageTextBox.Text = CurrentAverage;
-                AddChartPoint(fCurrentValue);
-
-                // Clear any displayed errors 
-                m_StatusTextBox.Text = RunningMessage;
-                this.m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
-            }
-        }
 
         /// <summary>
         /// Event handler for the simulate toggle
@@ -203,11 +172,8 @@ namespace RandomNumberGenerator
             m_Data.Simulated = !(m_Data.Simulated);
             m_SimulateToggle.Checked = m_Data.Simulated;
 
-            // Record the interface requires initialization
-            m_bInterfaceInitialized = false;
-
-            // End any session in progress
-            EndSession();
+            // Record the device interface requires initialization
+            m_Timer.Initialized = false;
 
             // If simulating
             if (m_Data.Simulated)
@@ -239,23 +205,8 @@ namespace RandomNumberGenerator
             _ = sender;
             _ = e;
 
-            // Disable the interface controls
-            m_SimulateToggle.Enabled = false;
-            m_PortComboBox.Enabled = false;
-
-            // Disable the target number field
-            m_TargetComboBox.Enabled = false;
-
-            // Check if the target number has changed
-            CheckTargetChanged();
-
-            // Update button statuses
-            m_StartButton.Enabled = false;
-            m_StopButton.Enabled = true;
-            m_PauseButton.Enabled = true;
-
-            // Start a new session (will continue existing session if already in progress)
-            StartSession();
+            // Transition to the running state
+            SetRunningState();
         }
 
         /// <summary>
@@ -270,39 +221,19 @@ namespace RandomNumberGenerator
             _ = e;
 
             // Check if pausing or resuming
-            if (m_bPaused)
+            if (RngGuiStates.Paused == m_State)
             {
-                // Resume
-                m_bPaused = false;
-
-                // Change the button back to pause
-                m_PauseButton.Text = m_sPAUSE_BUTTON;
-
-                // Re-enable the timers
-                m_ReadTimer.Enabled = true;
-                m_SessionTimer.Enabled = true;
-
-                // Update the info box message
-                m_StatusTextBox.Text = m_sIDLE_MESSAGE;
+                SetResumedState();
+            }
+            else if (RngGuiStates.Running == m_State)
+            {
+                // Ttansition to the paused state
+                SetPausedState();
             }
             else
             {
-                // Pause
-                m_bPaused = true;
-
-                // Change the button to resume
-                m_PauseButton.Text = m_sRESUME_BUTTON;
-
-                // Disable the timers
-                m_ReadTimer.Enabled = false;
-                m_SessionTimer.Enabled = false;
-
-                // Update the info box message
-                m_StatusTextBox.Text = m_sPAUSED_MESSAGE;
+                // Nothing to do if not in the paused or running states
             }
-
-            // Reset the background color of the info box
-            this.m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
         }
 
         /// <summary>
@@ -316,28 +247,8 @@ namespace RandomNumberGenerator
             _ = sender;
             _ = e;
 
-            // End the current session
-            EndSession();
-
-            // Update the button statuses
-            m_StartButton.Enabled = true;
-            m_StopButton.Enabled = false;
-            m_PauseButton.Enabled = false;
-
-            // Reset the pause button
-            m_PauseButton.Text = m_sPAUSE_BUTTON;
-            m_bPaused = false;
-
-            // Enable the target number field
-            m_TargetComboBox.Enabled = true;
-
-            // Enable the interface controls
-            m_SimulateToggle.Enabled = true;
-            m_PortComboBox.Enabled = true;
-
-            // Update the info box
-            m_StatusTextBox.Text = m_sIDLE_MESSAGE;
-            this.m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
+            // Transition to the idle state
+            SetIdleState();
         }
 
         /// <summary>
@@ -351,9 +262,6 @@ namespace RandomNumberGenerator
             _ = sender;
             _ = e;
 
-            /// !!! mpullen - TODO !!!
-            // Warn the user that resetting will clear the currently selected file
-
             // Reset the session data
             m_Data.Reset();
 
@@ -361,16 +269,7 @@ namespace RandomNumberGenerator
             m_TargetComboBox.SelectedIndex = 0;
 
             // Clear the chart data and add a point so the area is displayed
-            Series DataPointSeries = m_AverageChart.Series[(int)SeriesIndex.DataPointSeries];
-            DataPointSeries.Points.Clear();
-            DataPointSeries.Points.AddY(0.5);
-            Series AverageSeries = m_AverageChart.Series[(int)SeriesIndex.AverageSeries];
-            AverageSeries.Points.Clear();
-
-            // Reset the Y-Axis
-            Axis AverageChartYAxis = m_AverageChart.ChartAreas[0].AxisY;
-            AverageChartYAxis.Maximum = 0.5 + m_fYAXIS_INCREMENT;
-            AverageChartYAxis.Minimum = 0.5 - m_fYAXIS_INCREMENT;
+            m_ResultChart.Clear();
 
             // Update the timer and average displayed
             m_SessionTimerTextBox.Text = m_Data.SessionTime;
@@ -389,7 +288,7 @@ namespace RandomNumberGenerator
             _ = e;
 
             // Invalidate the device interface
-            m_bInterfaceInitialized = false;
+            m_Timer.Initialized = false;
         }
 
         /// <summary>
@@ -444,7 +343,7 @@ namespace RandomNumberGenerator
             _ = e;
 
             // Do not allow a new session while processing action
-            Busy = true;
+            FileBrowseActive = true;
 
             // Prompt the user to select a file
             string sSelectedFile = null;
@@ -469,23 +368,20 @@ namespace RandomNumberGenerator
             //!!! mpullen - need to verify if it is possible to go from having a file selected to not having one !!!
 
             // Check if the selection will have any effect
-            Busy = (false == String.IsNullOrEmpty(sSelectedFile));
-            if (Busy)
+            FileBrowseActive = (false == String.IsNullOrEmpty(sSelectedFile));
+            if (FileBrowseActive)
             {
-                Busy = (sSelectedFile != m_DataFile.FilePath); 
+                FileBrowseActive = (sSelectedFile != m_Data.FilePath);
             }
 
             // If the file is being changed
-            if (Busy)
+            if (FileBrowseActive)
             {
-                // Close any open session
-                EndSession();
-
                 // Check if the file exists
                 bool bFileExists = File.Exists(sSelectedFile);
                 if (bFileExists)
                 {
-                    //!!! mpullen - TBD load file
+                    //!!! mpullen - TBD load file !!!
 
                     // Leave busy flag set until the file has been loaded (updated by thread)
                 }
@@ -503,7 +399,7 @@ namespace RandomNumberGenerator
                     }
 
                     // Either way we can re-enable session actions
-                    Busy = false;
+                    FileBrowseActive = false;
                 }
             }
         }
@@ -521,10 +417,6 @@ namespace RandomNumberGenerator
 
             // Make sure any running session is stoped
             StopButton_Click(sender, e);
-            if (m_DataFile.SessionInProgress)
-            {
-                m_DataFile.EndSession();
-            }
         }
 
         #endregion
@@ -536,6 +428,44 @@ namespace RandomNumberGenerator
         public object Invoke(Action method)
         {
             return base.Invoke(method);
+        }
+
+        /// <summary>
+        /// Updates the status box based on the device read status
+        /// </summary>
+        /// <param name="fResult">IN - The result of the read (double max indicates error)</param>
+        public void RecordReadResult(double fResult)
+        {
+            // Lock the status box object
+            lock (m_StatusTextBox)
+            {
+                // If there was a read error
+                if (double.MaxValue == fResult)
+                {
+                    // Abort the current run
+                    SetIdleState();
+
+                    // Set the status box text and color based on the status
+                    m_StatusTextBox.Text = m_sDEVICE_READ_ERROR;
+                    m_StatusTextBox.ForeColor = System.Drawing.Color.Black;
+                    m_StatusTextBox.BackColor = System.Drawing.Color.Red;
+                }
+                // Read was successful
+                else
+                {
+                    // Record the new data point
+                    RecordDataPoint(fResult);
+
+                    // Update the displayed average and add the point to the chart
+                    m_CurrentAverageTextBox.Text = CurrentAverage;
+                    m_ResultChart.AddPoint(fResult, m_Data.CurrentAverage);
+
+                    // Clear any displayed errors 
+                    m_StatusTextBox.Text = RunningMessage;
+                    m_StatusTextBox.ForeColor = System.Drawing.Color.Black;
+                    m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
+                }
+            }
         }
 
         /// <summary>
@@ -557,35 +487,6 @@ namespace RandomNumberGenerator
         }
 
         /// <summary>
-        /// Initializes the plot of the results
-        /// </summary>
-        private void InitPlot()
-        {
-            // Disable the X-Axis
-            Axis AverageChartXAxis = m_AverageChart.ChartAreas[0].AxisX;
-            AverageChartXAxis.Enabled = AxisEnabled.False;
-
-            // Setup the Y-Axis
-            Axis AverageChartYAxis = m_AverageChart.ChartAreas[0].AxisY;
-            AverageChartYAxis.Maximum = 0.5 + m_fYAXIS_INCREMENT;
-            AverageChartYAxis.Minimum = 0.5 - m_fYAXIS_INCREMENT;
-            AverageChartYAxis.Interval = 0.005;
-
-            // Setup the data point series and add a single point to force display
-            Series DataPointSeries = m_AverageChart.Series[(int)SeriesIndex.DataPointSeries];
-            DataPointSeries.IsVisibleInLegend = false;
-            DataPointSeries.ChartType = SeriesChartType.Line;
-            DataPointSeries.Color = Color.Blue;
-            DataPointSeries.Points.AddY(0.5);
-
-            // Setup the average series (no need to add initial point as data point series will display the chart)
-            Series AverageSeries = m_AverageChart.Series[(int)SeriesIndex.AverageSeries];
-            AverageSeries.IsVisibleInLegend = false;
-            AverageSeries.ChartType = SeriesChartType.Line;
-            AverageSeries.Color = Color.Red;
-        }
-
-        /// <summary>
         /// Initializes the interface to the device
         /// NOTE1: Port number data member must be set before calling.
         /// NOTE2: Success can be determined using initialized data member
@@ -594,10 +495,10 @@ namespace RandomNumberGenerator
         {
             // Attempt to initialize the interface
             int iPort = GetSelectedPort();
-            m_bInterfaceInitialized = Initialize(iPort, m_Data.Simulated);
+            bool bDeviceInitialized = m_Timer.InitializeDevice(iPort, m_Data.Simulated);
 
             // Initialization failed
-            if (false == m_bInterfaceInitialized)
+            if (false == bDeviceInitialized)
             {
                 // Most likely issue is that the device is not at the specified port number
                 this.m_StatusTextBox.BackColor = System.Drawing.Color.Red;
@@ -641,13 +542,6 @@ namespace RandomNumberGenerator
                     // Record the change
                     bTargetChanged = true;
                     m_Data.TargetValue = SelectedTarget;
-
-                    // If a session is currently in progress
-                    if (m_DataFile.SessionInProgress)
-                    {
-                        // End it and start a new session (next time start is clicked
-                        m_DataFile.EndSession();
-                    }
                 }
                 // If the user does not accept the change
                 else
@@ -685,6 +579,114 @@ namespace RandomNumberGenerator
         }
 
         /// <summary>
+        /// Sets the GUI to the session running state
+        /// </summary>
+        private void SetRunningState()
+        {
+            // Set the state
+            m_State = RngGuiStates.Running;
+
+            // Disable the interface controls
+            m_SimulateToggle.Enabled = false;
+            m_PortComboBox.Enabled = false;
+
+            // Disable the target number field
+            m_TargetComboBox.Enabled = false;
+
+            // Disable the file browser
+            m_FileBrowseButton.Enabled = false;
+
+            // Check if the target number has changed
+            CheckTargetChanged();
+
+            // Update button statuses
+            m_StartButton.Enabled = false;
+            m_StopButton.Enabled = true;
+            m_PauseButton.Enabled = true;
+
+            // Start a new session (will continue existing session if already in progress)
+            StartSession();
+        }
+
+        /// <summary>
+        /// Sets the GUI to the idle state
+        /// </summary>
+        private void SetIdleState()
+        {
+            // Set the state
+            m_State = RngGuiStates.Idle;
+
+            // End the current session
+            EndSession();
+
+            // Update the button statuses
+            m_StartButton.Enabled = true;
+            m_StopButton.Enabled = false;
+            m_PauseButton.Enabled = false;
+
+            // Reset the pause button
+            m_PauseButton.Text = m_sPAUSE_BUTTON;
+
+            // Enable the file browser
+            m_FileBrowseButton.Enabled = true;
+
+            // Enable the target number field
+            m_TargetComboBox.Enabled = true;
+
+            // Enable the interface controls
+            m_SimulateToggle.Enabled = true;
+            m_PortComboBox.Enabled = true;
+
+            // Update the info box
+            m_StatusTextBox.Text = m_sIDLE_MESSAGE;
+            this.m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
+        }
+
+        /// <summary>
+        /// Sets the GUI to the paused state
+        /// </summary>
+        private void SetPausedState()
+        {
+            // Set the state
+            m_State = RngGuiStates.Paused;
+
+            // Change the button to resume
+            m_PauseButton.Text = m_sRESUME_BUTTON;
+
+            // Disable the timers
+            m_Timer.Enabled = false;
+            m_Data.PauseSession();
+
+            // Update the info box message
+            m_StatusTextBox.Text = m_sPAUSED_MESSAGE;
+
+            // Reset the background color of the info box
+            this.m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
+        }
+
+        /// <summary>
+        /// Sets the GUI to the resumed state
+        /// </summary>
+        private void SetResumedState()
+        {
+            // Set the state
+            m_State = RngGuiStates.Running;
+
+            // Change the button back to pause
+            m_PauseButton.Text = m_sPAUSE_BUTTON;
+
+            // Re-enable the timers
+            m_Timer.Enabled = true;
+            m_Data.ResumeSession();
+
+            // Update the info box message
+            m_StatusTextBox.Text = m_sIDLE_MESSAGE;
+
+            // Reset the background color of the info box
+            this.m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
+        }
+
+        /// <summary>
         /// Start a new session if one is not already in progress
         /// </summary>
         /// <returns>true if successful; otherwise, false</returns>
@@ -692,25 +694,22 @@ namespace RandomNumberGenerator
         {
             bool bStatus = true;
 
-            // If the interface is not initialized, attempt to initialize it
-            if (false == m_bInterfaceInitialized)
+            // If the device has not been initialized
+            if (false == m_Timer.Initialized)
             {
+                // Initialize the device interface
                 InitializeInterface();
             }
 
-            // Update the info box
+            // Update the info box after initializing the device, which updates the status box as well
             m_StatusTextBox.Text = RunningMessage;
             this.m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
 
-            // Write the session start if a file has been selected and session is not currently in progress
-            if (m_DataFile.Valid && (false == m_DataFile.SessionInProgress))
-            {
-                bStatus = m_DataFile.StartSession(m_Data);
-            }
+            // Start a new data session
+            bStatus = m_Data.StartSession();
 
-            // Start the timers
-            m_ReadTimer.Start();
-            m_SessionTimer.Start();
+            // Start the read timer
+            m_Timer.Start();
 
             return bStatus;
         }
@@ -724,78 +723,13 @@ namespace RandomNumberGenerator
             // Default to true as the call is successful if nothings needs to be done
             bool bStatus = true;
 
-            // Stop the timers if running
-            m_ReadTimer.Stop();
+            // Stop the read timer if running
+            m_Timer.Stop();
 
-            if (m_SessionTimer.InProgress)
-            {
-                m_SessionTimer.Stop();
-            }
-
-            // Only need to write to the file if a session is in progress
-            if (m_DataFile.SessionInProgress)
-            {
-                // Flush any pending data and end the session
-                bStatus = FlushPendingData();
-                bStatus &= m_DataFile.EndSession();
-            }
+            // End the current session
+            m_Data.EndSession();
 
             return bStatus;
-        }
-
-        /// <summary>
-        /// Adds a data point to the chart
-        /// </summary>
-        /// <param name="fDataPoint">IN - Data point to be added</param>
-        private void AddChartPoint(double fDataPoint)
-        {
-            // Update the data points on the chart
-            DataPointCollection DataPoints = m_AverageChart.Series[(int)SeriesIndex.DataPointSeries].Points;
-            if (DataPoints.Count >= m_iMAX_DATA_SIZE)
-            {
-                DataPoints.RemoveAt(0);
-            }
-            DataPoints.AddY(fDataPoint);
-
-            // Update the averages on the chart
-            DataPointCollection AveragePoints = m_AverageChart.Series[(int)SeriesIndex.AverageSeries].Points;
-            if (AveragePoints.Count >= m_iMAX_DATA_SIZE)
-            {
-                AveragePoints.RemoveAt(0);
-            }
-            AveragePoints.AddY(m_Data.CurrentAverage);
-
-            // Find the min and max values on the chart
-            double fMax = m_Data.MaxPoint;
-            double fMin = m_Data.MinPoint;
-
-            // Check if the limits need to be tightened
-            Axis AverageChartYAxis = m_AverageChart.ChartAreas[0].AxisY;
-            bool bMaxTooWide = ((AverageChartYAxis.Maximum - m_fYAXIS_INCREMENT) > fMax);
-            bool bMinTooWide = ((AverageChartYAxis.Minimum + m_fYAXIS_INCREMENT) < fMin);
-            if (bMaxTooWide && bMinTooWide)
-            {
-                // Tighten the limits
-                while (bMaxTooWide && bMinTooWide)
-                {
-                    // Adjust them symetrically to maintain center
-                    AverageChartYAxis.Maximum += m_fYAXIS_INCREMENT;
-                    AverageChartYAxis.Minimum -= m_fYAXIS_INCREMENT;
-
-                    bMaxTooWide = ((AverageChartYAxis.Maximum - m_fYAXIS_INCREMENT) > fMax);
-                    bMinTooWide = ((AverageChartYAxis.Minimum + m_fYAXIS_INCREMENT) < fMin);
-                }
-            }
-            else
-            {
-                // Widen the limits as needed
-                while ((fMax >= AverageChartYAxis.Maximum) || (fMin <= AverageChartYAxis.Minimum))
-                {
-                    // Adjust them symetrically to maintain center
-                    AverageChartYAxis.Maximum += m_fYAXIS_INCREMENT;
-                    AverageChartYAxis.Minimum -= m_fYAXIS_INCREMENT;
-                }
-            }
         }
 
         /// <summary>
@@ -806,47 +740,7 @@ namespace RandomNumberGenerator
         private bool RecordDataPoint(double fDataPoint)
         {
             // Record the data point and check for write
-            m_Data.AddDataPoint(fDataPoint);
-            bool bStatus = WritePendingData();
-
-            return bStatus;
-        }
-
-        /// <summary>
-        /// Write a datap point to the file if the data interval has beenr reached
-        /// </summary>
-        /// <returns>true, if successful; otherwise false</returns>
-        private bool WritePendingData()
-        {
-            // Default to true as the call is successful if nothings needs to be done
-            bool bStatus = true;
-
-            // If the data point interval has been reached
-            if (m_iWRITE_FILE_INTERVAL <= ++m_iPendingDataPointCounter)
-            {
-                // Write the data point and reset the counter
-                bStatus = m_DataFile.WriteDataPoint(m_Data);
-                m_iPendingDataPointCounter = 0;
-            }
-
-            return bStatus;
-        }
-
-        /// <summary>
-        /// Flushes the data point to the file if one is pending
-        /// </summary>
-        /// <returns>true, if successful; otherwise false</returns>
-        private bool FlushPendingData()
-        {
-            // Default to true as the call is successful if nothings needs to be done
-            bool bStatus = true;
-
-            // Write the data point if one is pending and reset the counter
-            if (0 < m_iPendingDataPointCounter)
-            {
-                bStatus = m_DataFile.WriteDataPoint(m_Data);
-                m_iPendingDataPointCounter = 0;
-            }
+            bool bStatus = m_Data.AddDataPoint(fDataPoint);
 
             return bStatus;
         }
@@ -915,23 +809,23 @@ namespace RandomNumberGenerator
         /// Whether the system is busy processing a change and should prevent session changes.
         /// NOTE: Exception is thrown by set if a session is currently running.
         /// </summary>
-        public bool Busy
-        { 
-            get => m_bBusy;
+        public bool FileBrowseActive
+        {
+            get => m_bFileBrowseActive;
             set
             {
                 // Do not allow changes while a session is running
                 if (Running)
                 {
-                    throw new Exception(m_sBUSY_CHANGE_WHILE_RUNNING_EXCEPTION);
+                    throw new InvalidOperationException("Busy property cannot be changed while a session is running.");
                 }
                 else
                 {
                     // Record the state change
-                    m_bBusy = value;
+                    m_bFileBrowseActive = value;
 
                     // If setting as busy
-                    if (m_bBusy)
+                    if (m_bFileBrowseActive)
                     {
                         // Disable the browse, start, and clear buttons
                         m_FileBrowseButton.Enabled = false;
@@ -951,15 +845,10 @@ namespace RandomNumberGenerator
         }
 
         /// <summary>
-        /// Whether a session is currently running
-        /// </summary>
-        public bool Running { get => m_SessionTimer.Running; }
-
-        /// <summary>
-        /// Binding list of devices used to populate the port combo box list
+        /// Binding list of devices used to populate the port combo box list (write-only)
         /// </summary>
         public BindingList<IRNGDevice> DeviceList
-        { 
+        {
             set
             {
                 // Update and rebind the list
@@ -967,6 +856,16 @@ namespace RandomNumberGenerator
                 m_PortComboBox.DataSource = m_DeviceBindingSource.DataSource;
             }
         }
+
+        /// <summary>
+        /// Whether a session is currently running (read-only)
+        /// </summary>
+        public bool Running { get => m_Data.InProgress; }
+
+        /// <summary>
+        /// Background color of the status box
+        /// </summary>
+        public Color StatusBoxBackColor { get => m_StatusTextBox.BackColor; set => m_StatusTextBox.BackColor = value; }
 
         /// <summary>
         /// Text displayed in the statatus box
@@ -979,9 +878,17 @@ namespace RandomNumberGenerator
         public Color StatusBoxTextColor { get => m_StatusTextBox.ForeColor; set => m_StatusTextBox.ForeColor = value; }
 
         /// <summary>
-        /// Background color of the status box
+        /// Current average string (read-only)
         /// </summary>
-        public Color StatusBoxBackColor { get => m_StatusTextBox.BackColor; set => m_StatusTextBox.BackColor = value; }
+        private string CurrentAverage { get => m_Data.CurrentAverage.ToString(m_sAVERAGE_FORMAT); }
+
+        /// <summary>
+        /// Message to display in the info box while a session is running (read-only)
+        /// </summary>
+        private string RunningMessage
+        {
+            get { return $"Running with Target = {m_TargetComboBox.SelectedItem}..."; }
+        }
 
         /// <summary>
         /// Selected target value
@@ -992,41 +899,21 @@ namespace RandomNumberGenerator
             set { m_TargetComboBox.SelectedItem = TargetValues.ToString(value); }
         }
 
-        /// <summary>
-        /// Message to display in the info box while a session is running
-        /// </summary>
-        private string RunningMessage
-        {
-            get { return $"Running with Target = {m_TargetComboBox.SelectedItem}..."; }
-        }
-
-        /// <summary>
-        /// Current average string
-        /// </summary>
-        private string CurrentAverage { get => m_Data.CurrentAverage.ToString(m_sAVERAGE_FORMAT); }
-
         #endregion
         #region Data Members
 
         // Form status and session data
-        private bool m_bBusy = false;
+        private bool m_bFileBrowseActive = false;
         private IRNGSessionData m_Data = null;
-        private IRNGSessionDataFile m_DataFile = null;
-        private uint m_iPendingDataPointCounter = 0;
-        private const uint m_iWRITE_FILE_INTERVAL = 1000;
 
-        // Session timer
-        IRNGSessionTimer m_SessionTimer = null;
-        private bool m_bPaused = false;
+        // Device timer
+        private IRNGDeviceTimer m_Timer = null;
 
-        // Chart
-        private int m_iMAX_DATA_SIZE = 1000 * 1024; // 1000 * 1024 * 4  = 4 MB
-        private double m_fYAXIS_INCREMENT = 0.01;
-        private enum SeriesIndex { DataPointSeries, AverageSeries, };
+        // Current state of the GUI
+        private RngGuiStates m_State = RngGuiStates.Idle;
 
         // Device settings
         private int m_iSeed = 0;
-        private bool m_bInterfaceInitialized = false;
         private BindingSource m_DeviceBindingSource;
 
         // Display settings
@@ -1035,7 +922,7 @@ namespace RandomNumberGenerator
         // Button text
         internal const string m_sPAUSE_BUTTON = "PAUSE";
         internal const string m_sRESUME_BUTTON = "RESUME";
-        
+
         // Status and error messages for the info box
         private const string m_sINVALID_SEED_ERROR = " Specified seed is not valid. Must be positive integer. Reset to last valid value.";
         private const string m_sDEVICE_INIT_ERROR = " Error initializing TruRNGpro. Please verify device is connected and correct COM port is selected.";
@@ -1043,9 +930,6 @@ namespace RandomNumberGenerator
         private const string m_sINIT_MESSAGE = " Initialized";
         private const string m_sIDLE_MESSAGE = " Idle";
         private const string m_sPAUSED_MESSAGE = " Paused";
-
-        // Other error messages
-        private const string m_sBUSY_CHANGE_WHILE_RUNNING_EXCEPTION = "Busy property cannot be changed while a session is running.";
 
         #endregion
     }
