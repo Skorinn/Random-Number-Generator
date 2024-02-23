@@ -272,6 +272,101 @@ namespace RandomNumberGenerator.Test
             Assert.AreEqual(expectedBackColor, generatorForm.StatusBoxBackColor);
         }
 
+        [TestMethod]
+        [TestCategory("Component")]
+        public void RecordReadResult_Valid_RunningAndRecorded()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Create the expected values
+            const string sEXPECTED_TEXT = "Running with Target = ";
+            Color expectedTextColor = System.Drawing.Color.Black;
+            Color expectedBackColor = System.Drawing.SystemColors.Info;
+
+            // Mock the session timer and setup the properties
+            Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
+            mockSessionTimer.SetupAllProperties();
+
+            // Mock the session data and device interface timer 
+            Mock<IRNGSessionData> mockSessionData = new Mock<IRNGSessionData>();
+            mockSessionData.Setup(mock => mock.RecordDataPoint(It.IsAny<double>())).Returns(true).Verifiable();
+            Mock<IRNGDeviceTimer> mockDeviceTimer = new Mock<IRNGDeviceTimer>();
+
+            // Create the object under test
+            GeneratorForm generatorForm = new GeneratorForm(mockSessionData.Object, mockDeviceTimer.Object);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Execute record with a valid result
+            double fValidResult = 0.0;
+            generatorForm.RecordReadResult(fValidResult);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the status box was updated correctly
+            Assert.AreEqual(generatorForm.StatusBoxTextColor, expectedTextColor);
+            Assert.AreEqual(generatorForm.StatusBoxBackColor, expectedBackColor);
+            StringAssert.Contains(generatorForm.StatusBoxText, sEXPECTED_TEXT);
+
+            // Verify the data point was recorded
+            mockSessionData.Verify(mock => mock.RecordDataPoint(fValidResult), Times.Once);
+        }
+
+        /// <summary>
+        /// Tests the RecordReadResult method with an invalid result
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void RecordReadResult_Invalid_IdleAndError()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Create the expected values
+            const string sEXPECTED_TEXT = "Error reading from TruRNGpro.";
+            Color expectedTextColor = System.Drawing.Color.Black;
+            Color expectedBackColor = System.Drawing.Color.Red;
+
+            // Mock the session timer and setup the properties
+            Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
+            mockSessionTimer.SetupAllProperties();
+
+            // Mock the session data and device interface timer 
+            Mock<IRNGSessionData> mockSessionData = new Mock<IRNGSessionData>();
+            mockSessionData.Setup(mock => mock.RecordDataPoint(It.IsAny<double>())).Returns(true).Verifiable();
+            Mock<IRNGDeviceTimer> mockDeviceTimer = new Mock<IRNGDeviceTimer>();
+
+            // Create the object under test
+            GeneratorForm generatorForm = new GeneratorForm(mockSessionData.Object, mockDeviceTimer.Object);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Execute record with a valid result
+            double fValidResult = 0.0;
+            generatorForm.RecordReadResult(fValidResult);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the status box was updated correctly
+            Assert.AreEqual(expectedTextColor, generatorForm.StatusBoxTextColor);
+            Assert.AreEqual(expectedBackColor, generatorForm.StatusBoxBackColor);
+            StringAssert.Contains(generatorForm.StatusBoxText, sEXPECTED_TEXT);
+
+            // Verify the data point was recorded
+            mockSessionData.Verify(mock => mock.RecordDataPoint(fValidResult), Times.Once);
+        }
+
         #endregion
     }
 }

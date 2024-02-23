@@ -196,7 +196,7 @@ namespace RandomNumberGenerator.Test
 
             // Mock the data file object
             var mockDataFile = new Mock<IRNGSessionDataFile>();
-            mockDataFile.Setup(mock => mock.WriteDataPoint(It.IsAny<IXMLDataPoint>())).Returns(true).Verifiable(); ;
+            mockDataFile.Setup(mock => mock.WriteDataPoint(It.IsAny<IXMLDataPoint>())).Returns(true).Verifiable();
 
             // Mock the session timer object
             var mockSessionTimer = new Mock<IRNGSessionTimer>();
