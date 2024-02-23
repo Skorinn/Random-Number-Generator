@@ -352,7 +352,7 @@ namespace RandomNumberGenerator.Test
         {
             //**************************************************************//
             // Arrange
-            //*******************************************************1409 Catalina*******//
+            //**************************************************************//
 
             // Create the expected result
             string sEXPECTED_RESULT = m_sTEST_FILE_PATH;
