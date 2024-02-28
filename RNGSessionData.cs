@@ -95,7 +95,7 @@ namespace RandomNumberGenerator
             EndSession();
 
             // Start a new session
-            bool bStatus = (null == m_DataFile);
+            bool bStatus = (null != m_DataFile);
             if (bStatus)
             {
                 bStatus = m_DataFile.StartSession(this);
