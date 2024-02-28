@@ -272,6 +272,9 @@ namespace RandomNumberGenerator.Test
             Assert.AreEqual(expectedBackColor, generatorForm.StatusBoxBackColor);
         }
 
+        /// <summary>
+        /// Tests the RecordReadResult method with an valid result
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void RecordReadResult_Valid_RunningAndRecorded()
@@ -281,7 +284,7 @@ namespace RandomNumberGenerator.Test
             //**************************************************************//
 
             // Create the expected values
-            const string sEXPECTED_TEXT = "Running with Target = ";
+            const string sEXPECTED_TEXT = "Running";
             Color expectedTextColor = System.Drawing.Color.Black;
             Color expectedBackColor = System.Drawing.SystemColors.Info;
 
@@ -291,7 +294,7 @@ namespace RandomNumberGenerator.Test
 
             // Mock the session data and device interface timer 
             Mock<IRNGSessionData> mockSessionData = new Mock<IRNGSessionData>();
-            mockSessionData.Setup(mock => mock.RecordDataPoint(It.IsAny<double>())).Returns(true).Verifiable();
+            mockSessionData.Setup(mock => mock.AddDataPoint(It.IsAny<double>())).Returns(true).Verifiable();
             Mock<IRNGDeviceTimer> mockDeviceTimer = new Mock<IRNGDeviceTimer>();
 
             // Create the object under test
@@ -315,7 +318,7 @@ namespace RandomNumberGenerator.Test
             StringAssert.Contains(generatorForm.StatusBoxText, sEXPECTED_TEXT);
 
             // Verify the data point was recorded
-            mockSessionData.Verify(mock => mock.RecordDataPoint(fValidResult), Times.Once);
+            mockSessionData.Verify(mock => mock.AddDataPoint(fValidResult), Times.Once);
         }
 
         /// <summary>
@@ -330,7 +333,7 @@ namespace RandomNumberGenerator.Test
             //**************************************************************//
 
             // Create the expected values
-            const string sEXPECTED_TEXT = "Error reading from TruRNGpro.";
+            const string sEXPECTED_TEXT = "Error reading";
             Color expectedTextColor = System.Drawing.Color.Black;
             Color expectedBackColor = System.Drawing.Color.Red;
 
@@ -340,7 +343,7 @@ namespace RandomNumberGenerator.Test
 
             // Mock the session data and device interface timer 
             Mock<IRNGSessionData> mockSessionData = new Mock<IRNGSessionData>();
-            mockSessionData.Setup(mock => mock.RecordDataPoint(It.IsAny<double>())).Returns(true).Verifiable();
+            mockSessionData.Setup(mock => mock.AddDataPoint(It.IsAny<double>())).Returns(true).Verifiable();
             Mock<IRNGDeviceTimer> mockDeviceTimer = new Mock<IRNGDeviceTimer>();
 
             // Create the object under test
@@ -364,7 +367,7 @@ namespace RandomNumberGenerator.Test
             StringAssert.Contains(generatorForm.StatusBoxText, sEXPECTED_TEXT);
 
             // Verify the data point was recorded
-            mockSessionData.Verify(mock => mock.RecordDataPoint(fValidResult), Times.Once);
+            mockSessionData.Verify(mock => mock.AddDataPoint(fValidResult), Times.Once);
         }
 
         #endregion
