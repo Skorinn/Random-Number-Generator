@@ -131,6 +131,9 @@ namespace RandomNumberGenerator
                 m_iSessionMinutes = 0;
                 m_iSessionHours = 0;
             }
+
+            // Update the control
+            UpdateTimerText();
         }
 
         /// <summary>

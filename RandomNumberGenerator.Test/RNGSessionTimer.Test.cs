@@ -122,6 +122,8 @@ namespace RandomNumberGenerator.Test
             //**************************************************************//
             // Act
             //**************************************************************//
+
+            // Tick the timer
             timer.Tick();
 
             //**************************************************************//
@@ -132,6 +134,77 @@ namespace RandomNumberGenerator.Test
             Assert.AreEqual(sEXPECTED_VALUE, timerTextBox.Text);
         }
 
+        /// <summary>
+        /// Tests the Tick method updates the session timer using a non-default interval
+        /// <\summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void Tick_NonDefaultInterval_SessionTimeUpdated()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Set the expected value (single tick with non-default interval of 2s)
+            const string sEXPECTED_VALUE = "00:00:02";
+
+            // Create the text box for the timer and set the text
+            TextBox timerTextBox = new TextBox();
+            timerTextBox.Text = "Initial Value";
+
+            // Create the session timer
+            IRNGSessionTimer timer = new RNGSessionTimer(timerTextBox);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Set the interval to 200ms and tick the timer 10 times (2 seconds total)
+            SimulateTimer(timer, 200, 10);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the timer text was updated
+            Assert.AreEqual(sEXPECTED_VALUE, timerTextBox.Text);
+        }
+
+        /// <summary>
+        /// Tests Reset method resets the session timer
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void Reset_SessionTimerIsReset()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Set the expected value
+            const string sEXPECTED_VALUE = "00:00:00";
+
+            // Create the text box for the timer and set the text
+            TextBox timerTextBox = new TextBox();
+            timerTextBox.Text = "Initial Value";
+
+            // Create the session timer and tick it once to update the session timer to non-zero
+            IRNGSessionTimer timer = new RNGSessionTimer(timerTextBox);
+            timer.Tick();
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+            timer.Reset();
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the timer text was updated
+            Assert.AreEqual(sEXPECTED_VALUE, timerTextBox.Text);
+        }
+        
         /// <summary>
         /// Tests the Enabled property doesn't affect the InProgress property when set to false
         /// </summary>

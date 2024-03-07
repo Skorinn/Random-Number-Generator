@@ -20,7 +20,7 @@ namespace RandomNumberGenerator
     public interface IRNGSessionDataFile
     {
         string FilePath { get; set; }
-        bool SessionInProgress { get; }
+        bool SessionInProgress { get; set; }
 
         bool EndSession();
         bool IsValid();
@@ -189,7 +189,7 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Specifies if a session is in progress (start has been written but not end)
         /// </summary>
-        public bool SessionInProgress { get => m_bSessionInProgress; }
+        public bool SessionInProgress { get => m_bSessionInProgress; set => m_bSessionInProgress = value; }
 
         #endregion
         #region Data Members

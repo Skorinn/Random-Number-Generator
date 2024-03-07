@@ -294,6 +294,7 @@ namespace RandomNumberGenerator.Test
 
             // Mock the session data and device interface timer 
             Mock<IRNGSessionData> mockSessionData = new Mock<IRNGSessionData>();
+            mockSessionData.Setup(mock => mock.Timer).Returns(mockSessionTimer.Object);
             mockSessionData.Setup(mock => mock.AddDataPoint(It.IsAny<double>())).Returns(true).Verifiable();
             Mock<IRNGDeviceTimer> mockDeviceTimer = new Mock<IRNGDeviceTimer>();
 
@@ -343,6 +344,7 @@ namespace RandomNumberGenerator.Test
 
             // Mock the session data and device interface timer 
             Mock<IRNGSessionData> mockSessionData = new Mock<IRNGSessionData>();
+            mockSessionData.Setup(mock => mock.Timer).Returns(mockSessionTimer.Object);
             mockSessionData.Setup(mock => mock.AddDataPoint(It.IsAny<double>())).Returns(true).Verifiable();
             Mock<IRNGDeviceTimer> mockDeviceTimer = new Mock<IRNGDeviceTimer>();
 
@@ -353,9 +355,9 @@ namespace RandomNumberGenerator.Test
             // Act
             //**************************************************************//
 
-            // Execute record with a valid result
-            double fValidResult = 0.0;
-            generatorForm.RecordReadResult(fValidResult);
+            // Execute record with a invalid result
+            double fInvalidResult = double.MaxValue;
+            generatorForm.RecordReadResult(fInvalidResult);
 
             //**************************************************************//
             // Assert
@@ -366,8 +368,8 @@ namespace RandomNumberGenerator.Test
             Assert.AreEqual(expectedBackColor, generatorForm.StatusBoxBackColor);
             StringAssert.Contains(generatorForm.StatusBoxText, sEXPECTED_TEXT);
 
-            // Verify the data point was recorded
-            mockSessionData.Verify(mock => mock.AddDataPoint(fValidResult), Times.Once);
+            // Verify no data point was recorded
+            mockSessionData.Verify(mock => mock.AddDataPoint(fInvalidResult), Times.Never);
         }
 
         #endregion
