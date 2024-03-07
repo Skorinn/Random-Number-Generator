@@ -143,6 +143,12 @@ namespace RandomNumberGenerator
         /// </summary>
         public void EndSession()
         {
+            // Stop the timer
+            if (null != m_Timer)
+            {
+                m_Timer.Stop();
+            }
+
             // If there is pending data
             if (0 < m_iPendingDataPointCounter)
             {

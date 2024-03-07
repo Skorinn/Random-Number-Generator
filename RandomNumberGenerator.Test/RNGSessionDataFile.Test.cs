@@ -174,6 +174,49 @@ namespace RandomNumberGenerator.Test
         }
 
         /// <summary>
+        /// Tests StartSession() method returns false when the writer is invalid
+        /// <\summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void StartSession_InvalidWriter_Failure()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Use an invalid fiel name for the path (empty string)
+            const string sEMPTY_PATH = "";
+
+            // Mock the IRNGXMLWriter interface
+            var xmlWriterMock = new Mock<IRNGXMLWriter>();
+            xmlWriterMock.Setup(mock => mock.FilePath).Returns(sEMPTY_PATH);
+            xmlWriterMock.Setup(mock => mock.WriteSessionStart(It.IsAny<string>(), It.IsAny<int>())).Returns(false);
+
+            // Create the object under test
+            RNGSessionDataFile sessionDataFile = new RNGSessionDataFile(xmlWriterMock.Object);
+
+            // Mock the iRNGSessionData interface
+            var sessionDataMock = new Mock<IRNGSessionData>();
+            sessionDataMock.Setup(mock => mock.SessionTime).Returns("00:00:00");
+            sessionDataMock.Setup(mock => mock.TargetValue).Returns(0);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Start the session
+            bool bStatus = sessionDataFile.StartSession(sessionDataMock.Object);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the the return value and in progress flags
+            Assert.IsFalse(bStatus);
+            Assert.IsFalse(sessionDataFile.SessionInProgress);
+        }
+
+        /// <summary>
         /// Tests WriteDataPoint() method generates an error when the writer is valid but no session was started
         /// <\summary>
         [TestMethod]
@@ -292,6 +335,44 @@ namespace RandomNumberGenerator.Test
         }
 
         /// <summary>
+        /// Tests EndSession() method returns false when the writer is invalid
+        /// <\summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void EndSession_InvalidWriter_Failure()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Use an invalid fiel name for the path (empty string)
+            const string sEMPTY_PATH = "";
+
+            // Mock the IRNGXMLWriter interface
+            var xmlWriterMock = new Mock<IRNGXMLWriter>();
+            xmlWriterMock.Setup(mock => mock.FilePath).Returns(sEMPTY_PATH);
+            xmlWriterMock.Setup(mock => mock.WriteSessionEnd()).Returns(false);
+
+            // Create the object under test
+            RNGSessionDataFile sessionDataFile = new RNGSessionDataFile(xmlWriterMock.Object);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // End the session
+            bool bStatus = sessionDataFile.EndSession();
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the the return value and in progress flags
+            Assert.IsFalse(bStatus);
+            Assert.IsFalse(sessionDataFile.SessionInProgress);
+        }
+
+        /// <summary>
         /// Tests the FileProperty property works correctly
         /// <\summary>
         [TestMethod]
@@ -325,6 +406,39 @@ namespace RandomNumberGenerator.Test
 
             // Verify the the property was set correctly
             Assert.AreEqual(sEXPECTED_FILE_PATH, sessionDataFile.FilePath);
+        }
+
+        /// <summary>
+        /// Tests the valid property when the file path is valid
+        /// <\summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void Valid_ValidFilePath_True()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Mock the IRNGXMLWriter interface
+            var xmlWriterMock = new Mock<IRNGXMLWriter>();
+            xmlWriterMock.Setup(mock => mock.FilePath).Returns(m_sTEST_FILE_PATH);
+
+            // Create the object under test
+            RNGSessionDataFile sessionDataFile = new RNGSessionDataFile(xmlWriterMock.Object);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Set the file path to a valid value
+            sessionDataFile.FilePath = m_sTEST_FILE_PATH;
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the the property was set correctly
+            Assert.IsTrue(sessionDataFile.IsValid());
         }
 
         /// <summary>

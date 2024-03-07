@@ -219,11 +219,50 @@ namespace RandomNumberGenerator.Test
         }
 
         /// <summary>
-        /// Tests WriteDataPoint() method works correctly
+        /// Tests WriteSessionStart() method works correctly
         /// <\summary>
         [TestMethod]
         [TestCategory("Component")]
-        public void WriteDataPoint_Valid()
+
+        /// <summary>
+        /// Tests WriteSessionStart() method returns false if the writer is not valid
+        /// <\summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void WriteSessionStart_InvalidWriter_Failure()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Use an invalid fiel name for the path (empty string)
+            const string sEMPTY_PATH = "";
+
+            // Create the object under test and set the file path to an invalid value
+            RNGXMLWriter xmlWriter = new RNGXMLWriter(sEMPTY_PATH);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Write the session start and record the result
+            bool bStatus = xmlWriter.WriteSessionStart(m_sSESSION_START_TIME, m_iTARGET_VALUE);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the write was not successful
+            Assert.IsFalse(bStatus);
+        }
+
+
+        /// <summary>
+        /// Tests WriteDataPoint() method returns true if the data point write is successful
+        /// <\summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void WriteDataPoint_Success_ReturnsTrue()
         {
             //**************************************************************//
             // Arrange
@@ -253,6 +292,39 @@ namespace RandomNumberGenerator.Test
             Assert.IsTrue(bStatus);
 
             // File contents verified by XMLDataPointTests
+        }
+
+        /// <summary>
+        /// Tests WriteDataPoint() method returns false if the data point fails to write
+        /// <\summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void WriteDataPoint_Failure_ReturnsFalse()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Create the object under test and set the file path
+            RNGXMLWriter xmlWriter = new RNGXMLWriter(m_sTEST_FILE_PATH, m_writerSettings);
+
+            // Mock the data point class
+            Mock<IXMLDataPoint> mockDataPoint = new Mock<IXMLDataPoint>();
+            mockDataPoint.Setup(mock => mock.WriteDataPoint(It.IsAny<XmlWriter>())).Returns(false);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Write the data point
+            bool bStatus = xmlWriter.WriteDataPoint(mockDataPoint.Object);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the write was not successful
+            Assert.IsFalse(bStatus);
         }
 
         /// <summary>

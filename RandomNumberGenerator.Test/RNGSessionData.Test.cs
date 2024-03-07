@@ -231,11 +231,11 @@ namespace RandomNumberGenerator.Test
         }
 
         /// <summary>
-        /// Tests resetting the session timer
+        /// Tests resetting the session
         /// <\summary>
         [TestMethod]
         [TestCategory("Component")]
-        public void ResetSessionTimings_SessionTimerReset_SessionTimeCorrect()
+        public void Reset_SessionDataReset()
         {
             //**************************************************************//
             // Arrange
@@ -492,28 +492,30 @@ namespace RandomNumberGenerator.Test
             // Arrange
             //**************************************************************//
 
-            // Mock session in progress flag
-            bool bSessionInProgress = false;
-
             // Mock the data file object
             var mockDataFile = new Mock<IRNGSessionDataFile>();
             mockDataFile.Setup(mock => mock.StartSession(It.IsAny<IRNGSessionData>())).Returns(true);
             mockDataFile.Setup(mock => mock.WriteDataPoint(It.IsAny<IXMLDataPoint>())).Returns(true).Verifiable();
             mockDataFile.Setup(mock => mock.EndSession()).Verifiable();
-            mockDataFile.SetupProperty(mock => mock.SessionInProgress, bSessionInProgress);
+            mockDataFile.Setup(mock => mock.SessionInProgress).Returns(false);
 
             // Mock the session timer object
             var mockSessionTimer = new Mock<IRNGSessionTimer>();
+            mockSessionTimer.Setup(mock => mock.Stop()).Verifiable();
 
             // Create the object under test
             RNGSessionData sessionData = new RNGSessionData(mockDataFile.Object, mockSessionTimer.Object);
 
-            // Start the session
+            // Start the session and update the mock for the session in progress property of the data file
             sessionData.StartSession();
-            bSessionInProgress = true;
+            mockDataFile.Setup(mock => mock.SessionInProgress).Returns(true);
 
             // Create a pending data point
             sessionData.AddDataPoint(0.0);
+
+            // Reset the invocations tracker for the data file and timer to clear calls made during the start session
+            mockDataFile.Invocations.Clear();
+            mockSessionTimer.Invocations.Clear();
 
             //**************************************************************//
             // Act
@@ -530,6 +532,9 @@ namespace RandomNumberGenerator.Test
 
             // Verify that write was called
             mockDataFile.Verify(mock => mock.WriteDataPoint(It.IsAny<IXMLDataPoint>()), Times.Once);
+
+            // Verify the timer was stoped
+            mockSessionTimer.Verify(mock => mock.Stop(), Times.Once);
         }
 
         /// <summary>
@@ -543,7 +548,7 @@ namespace RandomNumberGenerator.Test
             // Arrange
             //**************************************************************//
 
-            // Mock the data file object
+            // Mock the data file object and set up as session in progress
             var mockDataFile = new Mock<IRNGSessionDataFile>();
             mockDataFile.Setup(mock => mock.WriteDataPoint(It.IsAny<IXMLDataPoint>())).Returns(true).Verifiable();
             mockDataFile.Setup(mock => mock.EndSession()).Verifiable();
@@ -551,9 +556,18 @@ namespace RandomNumberGenerator.Test
 
             // Mock the session timer object
             var mockSessionTimer = new Mock<IRNGSessionTimer>();
+            mockSessionTimer.Setup(mock => mock.Stop()).Verifiable();
 
-            // Create the object under test
+            // Create the object under test and start the session
             RNGSessionData sessionData = new RNGSessionData(mockDataFile.Object, mockSessionTimer.Object);
+
+            // Start the session and update the mock for the session in progress property of the data file
+            sessionData.StartSession();
+            mockDataFile.Setup(mock => mock.SessionInProgress).Returns(true);
+
+            // Reset the invocations tracker for the data file and timer to clear calls made during the start session
+            mockDataFile.Invocations.Clear();
+            mockSessionTimer.Invocations.Clear();
 
             //**************************************************************//
             // Act
@@ -570,6 +584,9 @@ namespace RandomNumberGenerator.Test
 
             // Verify that write was not called
             mockDataFile.Verify(mock => mock.WriteDataPoint(It.IsAny<IXMLDataPoint>()), Times.Never);
+
+            // Verify the timer was stopped
+            mockSessionTimer.Verify(mock => mock.Stop(), Times.Once);
         }
 
         /// <summary>
@@ -608,16 +625,26 @@ namespace RandomNumberGenerator.Test
             Assert.IsFalse(mockSessionTimer.Object.Enabled);
         }
 
+        /// <summary>
+        /// Tests that ResumeSession resumes the session timer
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
-        public void ResumeSession_SessionResumed_SessionTimeCorrect()
+        public void ResumeSession_TimerResumed()
         {
             //**************************************************************//
             // Arrange
             //**************************************************************//
 
+            // Mock the data file object
             var mockDataFile = new Mock<IRNGSessionDataFile>();
+            mockDataFile.SetupProperty(mock => mock.SessionInProgress, true);
+
+            // Mock the session timer object and  set up the Timer mock to initially return true for the Enabled property
             var mockSessionTimer = new Mock<IRNGSessionTimer>();
+            mockSessionTimer.SetupProperty(timer => timer.Enabled, false);
+
+            // Create the object under test
             RNGSessionData sessionData = new RNGSessionData(mockDataFile.Object, mockSessionTimer.Object);
 
             //**************************************************************//
@@ -630,19 +657,28 @@ namespace RandomNumberGenerator.Test
             // Assert
             //**************************************************************//
 
-            // Verify that the session has resumed and the session time is correct
+            // Verify that the session timer was resumed
+            Assert.IsTrue(mockSessionTimer.Object.Enabled);
         }
 
+        /// <summary>
+        /// Tests StartSession starts a data session and the timer
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
-        public void StartSession_SessionStarted_SessionTimeCorrect()
+        public void StartSession_SessionStarted()
         {
             //**************************************************************//
             // Arrange
             //**************************************************************//
 
+            // Mock the session data file and timer
             var mockDataFile = new Mock<IRNGSessionDataFile>();
+            mockDataFile.Setup(mock => mock.StartSession(It.IsAny<IRNGSessionData>())).Returns(true).Verifiable();
             var mockSessionTimer = new Mock<IRNGSessionTimer>();
+            mockSessionTimer.Setup(mock => mock.Start()).Verifiable();
+
+            // Create the object under test
             RNGSessionData sessionData = new RNGSessionData(mockDataFile.Object, mockSessionTimer.Object);
 
             //**************************************************************//
@@ -655,20 +691,32 @@ namespace RandomNumberGenerator.Test
             // Assert
             //**************************************************************//
 
-            // Verify that the session has started and the session time is correct
+            // Verify that the session and timer have started
+            mockDataFile.Verify(mock => mock.StartSession(It.IsAny<IRNGSessionData>()), Times.Once);
+            mockSessionTimer.Verify(mock => mock.Start(), Times.Once);
         }
 
+        /// <summary>
+        /// Test WritePendingData writes the data point when true is specified
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
-        public void WritePendingData_DataWritten_DataCorrect()
+        public void WritePendingData_True_DataWritten()
         {
             //**************************************************************//
             // Arrange
             //**************************************************************//
 
+            // Mock the session data file and timer
             var mockDataFile = new Mock<IRNGSessionDataFile>();
+            mockDataFile.Setup(mock => mock.WriteDataPoint(It.IsAny<IXMLDataPoint>())).Returns(true).Verifiable();
             var mockSessionTimer = new Mock<IRNGSessionTimer>();
+
+            // Create the object under test
             RNGSessionData sessionData = new RNGSessionData(mockDataFile.Object, mockSessionTimer.Object);
+
+            // Create a pending data point
+            sessionData.AddDataPoint(0.0);
 
             //**************************************************************//
             // Act
@@ -680,7 +728,41 @@ namespace RandomNumberGenerator.Test
             // Assert
             //**************************************************************//
 
-            // Verify that the data has been written correctly
+            // Verify that the data has been written
+            mockDataFile.Verify(mock => mock.WriteDataPoint(It.IsAny<IXMLDataPoint>()), Times.Once);
+        }
+
+        /// <summary>
+        /// Tests WritePendingData does not write if no pending data and false is specified
+        /// <\summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void WritePendingData_False_NoDataWritten()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Mock the session data file and timer
+            var mockDataFile = new Mock<IRNGSessionDataFile>();
+            mockDataFile.Setup(mock => mock.WriteDataPoint(It.IsAny<IXMLDataPoint>())).Returns(true).Verifiable();
+            var mockSessionTimer = new Mock<IRNGSessionTimer>();
+
+            // Create the object under test
+            RNGSessionData sessionData = new RNGSessionData(mockDataFile.Object, mockSessionTimer.Object);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            sessionData.WritePendingData(false);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify that the data has not been written
+            mockDataFile.Verify(mock => mock.WriteDataPoint(It.IsAny<IXMLDataPoint>()), Times.Never);
         }
 
         #endregion
