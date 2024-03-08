@@ -181,7 +181,7 @@ namespace RandomNumberGenerator
             _ = e;
 
             // Update the simulation status and button
-            m_Data.Simulated = true; // !(m_Data.Simulated) - Force simulator mode for example as the TruRNGpro code was removed due to unclear licensing
+            m_Data.Simulated = !(m_Data.Simulated);
             m_SimulateToggle.Checked = m_Data.Simulated;
 
             // Record the device interface requires initialization
@@ -672,7 +672,7 @@ namespace RandomNumberGenerator
             m_TargetComboBox.Enabled = true;
 
             // Enable the interface controls
-            m_SimulateToggle.Enabled = false; // true; - Force simulator mode for example as the TruRNGpro code was removed due to unclear licensing
+            m_SimulateToggle.Enabled = true;
             m_PortComboBox.Enabled = true;
 
             // Update the info box

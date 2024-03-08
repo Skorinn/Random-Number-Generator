@@ -2,16 +2,16 @@
 //* File Name:      TruRNGpro.h
 //* Description:    Interface to the TruRNGPro device
 //*
-//* Copyright (C) 2022-2024 Mike Pullen. All Rights Reserved.
+//* Copyright (C) 2022 Mike Pullen. All Rights Reserved.
 //* Confidential and Proprietary
 //*
 //* Revision History: 
 //=====================================================================================================================
-//* 2022/09/10 - Mike Pullen - Original implementation.
-//* 2022/10/30 - Mike Pullen - Recreated under VS2022 and added ARM64 support.
-//* 2022/03/08 - Mike Pullen - Removed TruRNGpro code for the example for work due to unclear license terms
+//* 09/10/2022 - Mike Pullen - Original implementation.
+//* 10/30/2022 - Mike Pullen - Recreated under VS2022 and added ARM64 support.
 //*********************************************************************************************************************
 #pragma once
+#include "rng.h"
 #include "RNGInterface.h"
 
 #include <cassert>
@@ -34,14 +34,14 @@ namespace RNGInterfaces
     private:
         static const size_t mc_iTRURNGPRO_BUFFER_SIZE = 4096;// Size of buffer used to read from the device. Determines number of bytes per read.
         unsigned char m_Buffer[mc_iTRURNGPRO_BUFFER_SIZE]; // Buffer for reading from the device
+        RandomFromTrueRNG* m_pTruRNGProInterface; // 3rd party interface that wraps the COM port setup and reads
     };
 
     /// <summary>
     /// Default constructor. Note: Must call Initialize before use.
     /// </summary>
-    TruRNGpro::TruRNGpro() : m_Buffer{}
+    TruRNGpro::TruRNGpro() : m_pTruRNGProInterface(nullptr), m_Buffer{}
     {
-        // Redacted
     }
 
     /// <summary>
@@ -50,7 +50,7 @@ namespace RNGInterfaces
     /// <param name="iPortNum">IN - COM port the device is connected through</param>
     TruRNGpro::TruRNGpro(unsigned int iPortNum) : m_Buffer{}
     {
-        // Redacted
+        m_pTruRNGProInterface = new RandomFromTrueRNG(iPortNum);
     }
 
     /// <summary>
@@ -58,7 +58,8 @@ namespace RNGInterfaces
     /// </summary>
     TruRNGpro::~TruRNGpro()
     {
-        // Redacted
+        delete m_pTruRNGProInterface;
+        m_pTruRNGProInterface = nullptr;
     }
 
     /// <summary>
@@ -68,8 +69,15 @@ namespace RNGInterfaces
     /// <returns>true, if the device is ready to use, or false, if there is an error</returns>
     bool TruRNGpro::Initialize(unsigned int iPortNum)
     {
-        // Redacted
-        return false;
+        // Release the existing interface, if it exists, then create a new one
+        if (nullptr != m_pTruRNGProInterface)
+        {
+            delete m_pTruRNGProInterface;
+            m_pTruRNGProInterface = nullptr;
+        }
+        m_pTruRNGProInterface = new RandomFromTrueRNG(iPortNum);
+
+        return !(m_pTruRNGProInterface->bad);
     }
 
     /// <summary>
@@ -79,8 +87,44 @@ namespace RNGInterfaces
     /// <returns>true - if successful, otherwise false</returns>
     bool TruRNGpro::GetBitAverage(double& rfResult)
     {
-        // Redacted
+        // Ensure the interace was initialized
+        bool bStatus = (nullptr != m_pTruRNGProInterface);
         rfResult = 0.0;
-        return false;
+
+        if (true == bStatus)
+        {
+            // Skip and return error if interface is in a bad state
+            bStatus = !(m_pTruRNGProInterface->bad);
+        }
+
+        if (true == bStatus)
+        {
+            // Read the data from the device
+            int iBytesRead = m_pTruRNGProInterface->fill(m_Buffer, mc_iTRURNGPRO_BUFFER_SIZE);
+
+            // Skip and return an error if the number of bytes read doesn't match what was collected
+            bStatus = (iBytesRead == mc_iTRURNGPRO_BUFFER_SIZE);
+        }
+
+        if (true == bStatus)
+        {
+            // Loop through the bytes read from the device
+            INT64 iBitSum = 0;
+            short iOddCount = 0;
+            for (size_t iByteIndex = 0; iByteIndex < mc_iTRURNGPRO_BUFFER_SIZE; ++iByteIndex)
+            {
+                // Add up the value of each individual bit
+                unsigned char& rCurrentByte = m_Buffer[iByteIndex];
+                for (size_t iBitIndex = 0; iBitIndex < 8; ++iBitIndex)
+                {
+                    iBitSum += ((rCurrentByte >> iBitIndex) & 0x01);
+                }
+            }
+
+            // The result is the average of all of the bits
+            rfResult = (static_cast<double>(iBitSum) / (mc_iTRURNGPRO_BUFFER_SIZE * 8));
+        }
+
+        return bStatus;
     }
 }
