@@ -245,6 +245,76 @@ namespace RandomNumberGenerator.Test
         }
 
         /// <summary>
+        /// Tests WriteDataPoint with a writer that throws an exception
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void WriteDataPoint_ExceptionWriter_Failure()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Create the object under test
+            XMLDataPoint xmlDataPoint = new XMLDataPoint(m_sSESSION_DATA_TIME, m_fDATA_POINT);
+
+            // Create the XML writer
+            XmlWriter xmlWriter = XmlWriter.Create(m_sTEST_FILE_PATH);
+
+            // Close the file
+            xmlWriter.Close();
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Write the data point to the file
+            bool bStatus = xmlDataPoint.WriteDataPoint(xmlWriter);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the write failed
+            Assert.IsFalse(bStatus);
+
+            // Verify the file was not created
+            Assert.IsFalse(File.Exists(m_sTEST_FILE_PATH));
+        }
+
+        /// <summary>
+        /// Test WriteDataPoint with a writer with invalid file path
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void WriteDataPoint_NoFilePath_Failure()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Create the object under test
+            XMLDataPoint xmlDataPoint = new XMLDataPoint(m_sSESSION_DATA_TIME, m_fDATA_POINT);
+
+            // Create the XML writer
+            XmlWriter xmlWriter = XmlWriter.Create("");
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Write the data point to the file
+            bool bStatus = xmlDataPoint.WriteDataPoint(xmlWriter);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the write failed
+            Assert.IsFalse(bStatus);
+        }
+
+        /// <summary>
         /// Tests the SessionTime property
         /// <\summary>
         [TestMethod]

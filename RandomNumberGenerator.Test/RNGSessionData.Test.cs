@@ -182,6 +182,65 @@ namespace RandomNumberGenerator.Test
             Assert.AreEqual(m_iDEFAULT_DATA_WINDOWS_SIZE, sessionData.DataWindowSize);
             Assert.AreEqual(m_iDEFAULT_TARGET, sessionData.TargetValue);
             Assert.AreEqual(m_bDEFAULT_SIMULATED, sessionData.Simulated);
+            Assert.AreEqual(m_sDEFAULT_SESSION_TIME, sessionData.SessionTime);
+        }
+
+        /// <summary>
+        /// Test the constructor generates an exception when the data file is null
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        [ExpectedException(typeof(ArgumentNullException))]
+        public void Constructor_NullDataFile_Exception()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Mock the session timer object
+            var mockSessionTimer = new Mock<IRNGSessionTimer>();
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Create the object under test
+            RNGSessionData sessionData = new RNGSessionData(null, mockSessionTimer.Object);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Expecting exception
+        }
+
+        /// <summary>
+        /// Test the constructor generates an exception when the session timer is null
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        [ExpectedException(typeof(ArgumentNullException))]
+        public void Constructor_NullSessionTimer_Exception()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Mock the data file object
+            var mockDataFile = new Mock<IRNGSessionDataFile>();
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Create the object under test
+            RNGSessionData sessionData = new RNGSessionData(mockDataFile.Object, null);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Expecting exception
         }
 
         /// <summary>

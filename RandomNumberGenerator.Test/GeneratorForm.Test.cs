@@ -73,6 +73,64 @@ namespace RandomNumberGenerator.Test
         #endregion
         #region Tests
 
+        /// <summary>
+        /// Tests the constructor generates an exception if the session data is null
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        [ExpectedException(typeof(System.ArgumentNullException))]
+        public void Constructor_NullSessionData_Exception()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Mock the device interface timer
+            Mock<IRNGDeviceTimer> mockDeviceTimer = new Mock<IRNGDeviceTimer>();
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Create the object under test
+            GeneratorForm generatorForm = new GeneratorForm(null, mockDeviceTimer.Object);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // No assert needed
+        }
+
+        /// <summary>
+        /// Tests the constructor generates an exception if the device timer is null
+        /// <\summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        [ExpectedException(typeof(System.ArgumentNullException))]
+        public void Constructor_NullDeviceTimer_Exception()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Mock the session data
+            Mock<IRNGSessionData> mockSessionData = new Mock<IRNGSessionData>();
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Create the object under test
+            GeneratorForm generatorForm = new GeneratorForm(mockSessionData.Object, null);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // No assert needed
+        }
+
         // <summary>
         // Test for get and set for the Busy property using true
         // <\summary>

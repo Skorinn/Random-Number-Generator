@@ -171,11 +171,11 @@ namespace RandomNumberGenerator.Test
         }
 
         /// <summary>
-        /// Tests WriteSessionStart() method works correctly
+        /// Tests WriteSessionStart() method works correctly when the writer is valid
         /// <\summary>
         [TestMethod]
         [TestCategory("Component")]
-        public void WriteSessionStart_Valid()
+        public void WriteSessionStart_Valid_Success()
         {
             //**************************************************************//
             // Arrange
@@ -219,12 +219,6 @@ namespace RandomNumberGenerator.Test
         }
 
         /// <summary>
-        /// Tests WriteSessionStart() method works correctly
-        /// <\summary>
-        [TestMethod]
-        [TestCategory("Component")]
-
-        /// <summary>
         /// Tests WriteSessionStart() method returns false if the writer is not valid
         /// <\summary>
         [TestMethod]
@@ -256,6 +250,34 @@ namespace RandomNumberGenerator.Test
             Assert.IsFalse(bStatus);
         }
 
+        /// <summary>
+        /// Tests WriteSessionStart() method returns false if the writer is NULL
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void WriteSessionStart_NullWriter_Failure()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Create the object under test and set the file path
+            RNGXMLWriter xmlWriter = new RNGXMLWriter();
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Write the session start and record the result
+            bool bStatus = xmlWriter.WriteSessionStart(m_sSESSION_START_TIME, m_iTARGET_VALUE);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the write was not successful
+            Assert.IsFalse(bStatus);
+        }
 
         /// <summary>
         /// Tests WriteDataPoint() method returns true if the data point write is successful
@@ -328,11 +350,73 @@ namespace RandomNumberGenerator.Test
         }
 
         /// <summary>
+        /// Tests WriteDataPoint() method returns false if the writer is NULL
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void WriteDataPoint_NullWriter_Failure()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Create the object under test and set the file path
+            RNGXMLWriter xmlWriter = new RNGXMLWriter();
+
+            // Mock the data point class
+            Mock<IXMLDataPoint> mockDataPoint = new Mock<IXMLDataPoint>();
+            mockDataPoint.Setup(mock => mock.WriteDataPoint(It.IsAny<XmlWriter>())).Returns(true);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Write the data point
+            bool bStatus = xmlWriter.WriteDataPoint(mockDataPoint.Object);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the write was not successful
+            Assert.IsFalse(bStatus);
+        }
+
+        /// <summary>
+        /// Tests WriteDataPoint() method returns false if the data point is NULL
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void WriteDataPoint_NullDataPoint_Failure()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Create the object under test and set the file path
+            RNGXMLWriter xmlWriter = new RNGXMLWriter(m_sTEST_FILE_PATH, m_writerSettings);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Write the data point
+            bool bStatus = xmlWriter.WriteDataPoint(null);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the write was not successful
+            Assert.IsFalse(bStatus);
+        }
+
+        /// <summary>
         /// Tests WriteSessionEnd() method works correctly when data points have been written
         /// </summary>
         [TestMethod]
         [TestCategory("Component")]
-        public void WriteSessionEnd_Valid()
+        public void WriteSessionEnd_Valid_Success()
         {
             //**************************************************************//
             // Arrange
@@ -380,7 +464,7 @@ namespace RandomNumberGenerator.Test
         /// <\summary>
         [TestMethod]
         [TestCategory("Component")]
-        public void WriteSessionEnd_NoData_Valid()
+        public void WriteSessionEnd_NoData_Success()
         {
             //**************************************************************//
             // Arrange
@@ -413,6 +497,35 @@ namespace RandomNumberGenerator.Test
             // Verify the file contains the expected result
             string sResult = File.ReadAllText(xmlWriter.FilePath);
             StringAssert.Contains(sResult, sEXPECTED_RESULT);
+        }
+
+        /// <summary>
+        /// Tests WriteSessionEnd() method returns false if the writer is NULL
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void WriteSessionEnd_NullWriter_Failure()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Create the object under test and set the file path
+            RNGXMLWriter xmlWriter = new RNGXMLWriter();
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Write the session end and record the result
+            bool bStatus = xmlWriter.WriteSessionEnd();
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the write was not successful
+            Assert.IsFalse(bStatus);
         }
 
         /// <summary>

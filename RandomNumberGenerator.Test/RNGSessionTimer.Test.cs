@@ -12,12 +12,39 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System.Windows.Forms;
+using System.Xml;
 
 namespace RandomNumberGenerator.Test
 {
     [TestClass]
     public class RNGSessionTimerTests
     {
+        #region Infrastructure
+
+        /// <summary>
+        /// Default constructor
+        /// </summary>
+        public RNGSessionTimerTests()
+        {
+            // Nothing to do
+        }
+
+        /// <summary>
+        /// Gets or sets the test context which provides
+        /// information about and functionality for the current test run.
+        /// </summary>
+        public TestContext TestContext
+        {
+            get
+            {
+                return testContextInstance;
+            }
+            set
+            {
+                testContextInstance = value;
+            }
+        }
+
         /// <summary>
         /// Simulates the timer ticks for the specified interval and number of ticks
         /// <\summary>
@@ -35,6 +62,37 @@ namespace RandomNumberGenerator.Test
                 sessionTimer.Tick();
             }
         }
+
+        #endregion
+        #region Data Members
+
+        // Information about the current test context
+        private TestContext testContextInstance;
+
+        #endregion
+        #region Additional test attributes
+        //
+        // You can use the following additional attributes as you write your tests:
+        //
+        // Use ClassInitialize to run code before running the first test in the class
+        // [ClassInitialize()]
+        // public static void MyClassInitialize(TestContext testContext) { }
+        //
+        // Use ClassCleanup to run code after all tests in a class have run
+        // [ClassCleanup()]
+        // public static void MyClassCleanup() { }
+        //
+        // Use TestInitialize to run code before running each test 
+        // [TestInitialize()]
+        // public void MyTestInitialize() { }
+        //
+        // Use TestCleanup to run code after each test has run
+        // [TestCleanup()]
+        // public void MyTestCleanup() { }
+        //
+
+        #endregion
+        #region Tests
 
         /// <summary>
         /// Tests the Start method sets the Enabled and InProgress properties to true
@@ -171,6 +229,34 @@ namespace RandomNumberGenerator.Test
         }
 
         /// <summary>
+        /// Tests Tick() does not generate an exception when the TimerTextBox is not set
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void Tick_TimerTextBoxNotSet_NoException()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Create the session timer
+            IRNGSessionTimer timer = new RNGSessionTimer();
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Tick the timer
+            timer.Tick();
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // No exception should be thrown
+        }
+
+        /// <summary>
         /// Tests Reset method resets the session timer
         /// </summary>
         [TestMethod]
@@ -299,5 +385,7 @@ namespace RandomNumberGenerator.Test
             // Verify the timer text object was updated by the timer
             Assert.AreEqual(sEXPECTED_VALUE, timerTextBox.Text);
         }
+
+        #endregion
     }
 }
