@@ -37,6 +37,7 @@ namespace RandomNumberGenerator
         Color StatusBoxBackColor { get; set; }
         string StatusBoxText { get; set; }
         Color StatusBoxTextColor { get; set; }
+        GeneratorForm.RngGuiStates State { get; }
 
         object Invoke(Action method);
         void RecordReadResult(double fResult);
@@ -45,15 +46,16 @@ namespace RandomNumberGenerator
     /// <summary>
     /// Random Number Generator form
     /// </summary>
-    public partial class GeneratorForm : Form, IGeneratorForm
+    public partial class GeneratorForm : Form, IGeneratorForm, IDisposable
     {
         #region Type definitions
 
-        private enum RngGuiStates
+        public enum RngGuiStates
         {
             Idle = 0,
             Running = 1,
             Paused = 2,
+            Terminating = 3,
             RNG_GUI_STATES_SIZE // Keep at end
         };
 
@@ -425,6 +427,9 @@ namespace RandomNumberGenerator
             _ = sender;
             _ = e;
 
+            // Set the state to terminating
+            m_State = RngGuiStates.Terminating;
+
             // Reset the info box to the message state
             m_StatusTextBox.ForeColor = System.Drawing.Color.Black;
             m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
@@ -435,7 +440,6 @@ namespace RandomNumberGenerator
 
             // Signal the device update thread to stop and wait for it to complete (10 second timeout)
             m_StatusTextBox.Text = m_sCLOSE_STOP_DEVICE_UPDATE;
-            DeviceUpdateThread.Terminate = true;
             m_DeviceUpdateComplete.WaitOne(10000);
         }
 
@@ -448,6 +452,16 @@ namespace RandomNumberGenerator
         public object Invoke(Action method)
         {
             return base.Invoke(method);
+        }
+
+        /// <summary>
+        /// Override of the dispose method from Form
+        /// </summary>
+        public new void Dispose()
+        {
+            // Record the GUI is terminating and execute the base class dispose
+            m_State = RngGuiStates.Terminating;
+            base.Dispose();
         }
 
         /// <summary>
@@ -633,8 +647,11 @@ namespace RandomNumberGenerator
         /// </summary>
         private void SetIdleState()
         {
-            // Set the state
-            m_State = RngGuiStates.Idle;
+            // Set the state only if not terminating
+            if (RngGuiStates.Terminating != m_State)
+            {
+                m_State = RngGuiStates.Idle;
+            }
 
             // End the current session
             EndSession();
@@ -898,6 +915,11 @@ namespace RandomNumberGenerator
         /// Text color of the status box
         /// </summary>
         public Color StatusBoxTextColor { get => m_StatusTextBox.ForeColor; set => m_StatusTextBox.ForeColor = value; }
+
+        /// <summary>
+        /// The current state of the GUI (read-only)
+        /// </summary>
+        public RngGuiStates State { get => m_State; }
 
         /// <summary>
         /// Current average string (read-only)
