@@ -10,7 +10,6 @@
 // 2022/09/10 - Mike Pullen - Original implementation.
 // 2022/10/30 - Mike Pullen - Recreated under VS2022 and added ARM64 support.
 // 2023/12/02 - Mike Pullen - Added simulate, pause, and target value
-// 2024/03/08 - Mike Pullen - Forcing simulator mode for the example as the TruRNGpro code was removed due to unclear
 //*********************************************************************************************************************
 
 namespace RandomNumberGenerator
@@ -291,7 +290,6 @@ namespace RandomNumberGenerator
             this.m_SimulateToggle.Size = new System.Drawing.Size(71, 25);
             this.m_SimulateToggle.TabIndex = 4;
             this.m_SimulateToggle.UseVisualStyleBackColor = true;
-            this.m_SimulateToggle.Enabled = false; // Force simulator mode for example as the TruRNGpro code was removed due to unclear licensing
             this.m_SimulateToggle.CheckedChanged += new System.EventHandler(this.SimulateToggle_CheckedChanged);
             // 
             // m_PauseButton

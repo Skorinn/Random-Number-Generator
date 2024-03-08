@@ -2,7 +2,7 @@
 // File Name:      Program.cs
 // Description:    Primary class for the Random Number Generator program
 //
-// Copyright (C) 2022-2024 Mike Pullen. All Rights Reserved.
+// Copyright (C) 2022 Mike Pullen. All Rights Reserved.
 // Confidential and Proprietary
 //
 // Revision History: 
@@ -45,7 +45,6 @@ namespace RandomNumberGenerator
 
             // Create the session data object
             RNGSessionData sessionData = new RNGSessionData(sessionDataFile, sessionTimer);
-            sessionData.Simulated = true; // Force simulator mode for example as the TruRNGpro code was removed due to unclear licensing
 
             // Create the device interface timer
             RNGDeviceTimer deviceTimer = new RNGDeviceTimer();
