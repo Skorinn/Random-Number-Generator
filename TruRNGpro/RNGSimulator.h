@@ -7,8 +7,8 @@
 //*
 //* Revision History: 
 //=====================================================================================================================
-//* 09/10/2022 - Mike Pullen - Original implementation.
-//* 10/30/2022 - Mike Pullen - Recreated under VS2022 and added ARM64 support.
+//* 2022/09/10 - Mike Pullen - Original implementation.
+//* 2022/10/30 - Mike Pullen - Recreated under VS2022 and added ARM64 support.
 //*********************************************************************************************************************
 #pragma once
 #include "RNGInterface.h"
