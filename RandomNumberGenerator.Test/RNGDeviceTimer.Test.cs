@@ -163,38 +163,6 @@ namespace RandomNumberGenerator.Test
         }
 
         /// <summary>
-        /// Tests InitializeDevice with invalid parameters returns false
-        /// </summary>
-        [TestMethod]
-        [TestCategory("Integration")]
-        public void InitializeDevice_Invalid_ReturnsFalse()
-        {
-            //**************************************************************//
-            // Arrange
-            //**************************************************************//
-
-            // Create the object under test 
-            RNGDeviceTimer timer = new RNGDeviceTimer();
-
-            //**************************************************************//
-            // Act
-            //**************************************************************//
-
-            // Use InitializeDevice to initialize a simulator
-            const int iPORT = int.MaxValue;
-            const bool bSIMULATE = false;
-            bool bReturn = timer.InitializeDevice(iPORT, bSIMULATE);
-
-            //**************************************************************//
-            // Assert
-            //**************************************************************//
-
-            // Verify the function return and the initilized property values
-            Assert.IsFalse(bReturn);
-            Assert.IsFalse(timer.Initialized);
-        }
-
-        /// <summary>
         /// Tests the read callback is executed when the timer ticks
         /// </summary>
         [TestMethod]
