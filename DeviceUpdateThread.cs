@@ -39,15 +39,11 @@ namespace RandomNumberGenerator
                 // Update the device list
                 GetDevicePorts();
 
-                // Skip update if the thread was terminated early
-                if (false == m_bTerminate)
-                {
-                    // Update the device list in the parent form
-                    UpdateDeviceList();
+                // Update the device list in the parent form
+                UpdateDeviceList();
 
-                    // Restore the previous info box message
-                    UpdateInfoBox(m_sStatusBoxText, m_StatusBoxTextColor, m_StatusBoxBackColor);
-                }
+                // Restore the previous info box message
+                UpdateInfoBox(m_sStatusBoxText, m_StatusBoxTextColor, m_StatusBoxBackColor);
             }
         }
 
@@ -102,14 +98,14 @@ namespace RandomNumberGenerator
                             } // END: if (null != oName)
 
                             // Break out of the loop if the thread was terminated early
-                            if (m_bTerminate)
+                            if (Terminating)
                             {
                                 break;
                             }
                         } // END: foreach (ManagementBaseObject device in deviceCollection)
 
                         // Break out of the loop if the thread was terminated early
-                        if (m_bTerminate)
+                        if (Terminating)
                         {
                             break;
                         }
@@ -123,8 +119,8 @@ namespace RandomNumberGenerator
         /// </summary>
         private static void UpdateDeviceList()
         {
-            // Check if the parent has been set
-            if (null != m_Parent)
+            // Check if the parent has been set and not terminating early
+            if ((null != m_Parent) && (false == Terminating))
             {
                 // Check if invoke is required (should be)
                 if (m_Parent.InvokeRequired)
@@ -145,16 +141,20 @@ namespace RandomNumberGenerator
         /// </summary>
         private static void BackupInfoBox()
         {
-            // Check if invoke is required (should be)
-            if (m_Parent.InvokeRequired)
+            // Make sure the parent is valid and not terminaating early
+            if ((null != m_Parent) && (false == Terminating))
             {
-                // Invoke the update in the parent thread
-                m_Parent.Invoke(new Action(() => GetInfoBoxState()));
-            }
-            else
-            {
-                // Update here
-                GetInfoBoxState();
+                // Check if invoke is required (should be)
+                if (m_Parent.InvokeRequired)
+                {
+                    // Invoke the update in the parent thread
+                    m_Parent.Invoke(new Action(() => GetInfoBoxState()));
+                }
+                else
+                {
+                    // Update here
+                    GetInfoBoxState();
+                }
             }
         }
 
@@ -166,16 +166,20 @@ namespace RandomNumberGenerator
         /// <param name="backColor">IN - Background color to set for the info box</param>
         private static void UpdateInfoBox(string sText, Color textColor, Color backColor)
         {
-            // Check if invoke is required (should be)
-            if (m_Parent.InvokeRequired)
+            // Make sure the parent is valid and not terminaating early
+            if ((null != m_Parent) && (false == Terminating))
             {
-                // Invoke the update in the parent thread
-                m_Parent.Invoke(new Action(() => SetInfoBoxState(sText, textColor, backColor)));
-            }
-            else
-            {
-                // Update here
-                SetInfoBoxState(sText, textColor, backColor);
+                // Check if invoke is required (should be)
+                if (m_Parent.InvokeRequired)
+                {
+                    // Invoke the update in the parent thread
+                    m_Parent.Invoke(new Action(() => SetInfoBoxState(sText, textColor, backColor)));
+                }
+                else
+                {
+                    // Update here
+                    SetInfoBoxState(sText, textColor, backColor);
+                }
             }
         }
 
@@ -184,9 +188,14 @@ namespace RandomNumberGenerator
         /// </summary>
         private static void GetInfoBoxState()
         {
-            m_sStatusBoxText = m_Parent.StatusBoxText;
-            m_StatusBoxTextColor = m_Parent.StatusBoxTextColor;
-            m_StatusBoxBackColor = m_Parent.StatusBoxBackColor;
+            // Make sure the parent is valid and not terminaating early
+            if ((null != m_Parent) && (false == Terminating))
+            {
+                // Get the current text and color of the info box
+                m_sStatusBoxText = m_Parent.StatusBoxText;
+                m_StatusBoxTextColor = m_Parent.StatusBoxTextColor;
+                m_StatusBoxBackColor = m_Parent.StatusBoxBackColor;
+            }
         }
 
         /// <summary>
@@ -197,9 +206,14 @@ namespace RandomNumberGenerator
         /// <param name="backColor">IN - Background color to set for the info box</param>
         private static void SetInfoBoxState(string sText, Color textColor, Color backColor)
         {
-            m_Parent.StatusBoxText = sText;
-            m_Parent.StatusBoxTextColor = textColor;
-            m_Parent.StatusBoxBackColor = backColor;
+            // Make sure the parent is valid and not terminaating early
+            if ((null != m_Parent) && (false == Terminating))
+            {
+                // Set the text and color of the info box
+                m_Parent.StatusBoxText = sText;
+                m_Parent.StatusBoxTextColor = textColor;
+                m_Parent.StatusBoxBackColor = backColor;
+            }
         }
 
         /// <summary>
@@ -213,13 +227,12 @@ namespace RandomNumberGenerator
         public static IGeneratorForm Parent { get => m_Parent; set => m_Parent = value; }
 
         /// <summary>
-        /// Flag to set to terminate the thread early
+        /// Indicates if the thread is terminating early (read-only)
         /// </summary>
-        public static bool Terminate { get => m_bTerminate; set => m_bTerminate = value; }
+        public static bool Terminating { get => (GeneratorForm.RngGuiStates.Terminating == m_Parent.State); }
 
         // Synchronizaion objects
         private static object m_Lock = new object();
-        private static bool m_bTerminate = false;
 
         // Device list update data members
         private static BindingList<IRNGDevice> m_DeviceList = new BindingList<IRNGDevice>();
