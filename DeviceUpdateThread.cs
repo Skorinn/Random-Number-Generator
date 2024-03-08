@@ -38,10 +38,16 @@ namespace RandomNumberGenerator
 
                 // Update the device list
                 GetDevicePorts();
-                UpdateDeviceList();
 
-                // Restore the previous info box message
-                UpdateInfoBox(m_sStatusBoxText, m_StatusBoxTextColor, m_StatusBoxBackColor);
+                // Skip update if the thread was terminated early
+                if (false == m_bTerminate)
+                {
+                    // Update the device list in the parent form
+                    UpdateDeviceList();
+
+                    // Restore the previous info box message
+                    UpdateInfoBox(m_sStatusBoxText, m_StatusBoxTextColor, m_StatusBoxBackColor);
+                }
             }
         }
 
@@ -55,45 +61,61 @@ namespace RandomNumberGenerator
             m_DeviceList = new BindingList<IRNGDevice>();
 
             // Search for all USB controller devices
-            ManagementObjectSearcher controllerSearcher = new ManagementObjectSearcher(@"Select * From Win32_USBControllerDevice");
-            ManagementObjectCollection controllerCollection = controllerSearcher.Get();
-            foreach (ManagementBaseObject controller in controllerCollection)
+            using (ManagementObjectSearcher controllerSearcher = new ManagementObjectSearcher(@"Select * From Win32_USBControllerDevice"))
             {
-                // Get the ID of the dependent device for the controller
-                string sDependent = (string)controller.GetPropertyValue("Dependent");
-                string[] sDependentSplit = System.Text.RegularExpressions.Regex.Split(sDependent, "DeviceID=");
-                string sDeviceID = sDependentSplit[1];
-
-                // Search all of the USB devices found with this device ID (should only be 1)
-                ManagementObjectSearcher deviceSearcher = new ManagementObjectSearcher(@"Select * From Win32_PnPEntity Where DeviceID=" + sDeviceID);
-                ManagementObjectCollection deviceCollection = deviceSearcher.Get();
-
-                foreach (ManagementBaseObject device in deviceCollection)
+                using (ManagementObjectCollection controllerCollection = controllerSearcher.Get())
                 {
-                    // Attempt to get the name of the device
-                    object oName = device.GetPropertyValue("Name");
-                    if (null != oName)
+                    foreach (ManagementBaseObject controller in controllerCollection)
                     {
-                        // Check if this is a USB serial device
-                        string sDeviceName = (string)oName;
-                        string sSerialDeviceRegex = @".*USB.*Serial.*COM\d+.*";
-                        bool bSerialDevice = Regex.IsMatch(sDeviceName, sSerialDeviceRegex, RegexOptions.IgnoreCase);
-                        if (bSerialDevice)
-                        {
-                            // Extract the port name and number
-                            string sComPortRegex = @"COM\d+";
-                            string sComName = Regex.Match(sDeviceName, sComPortRegex, RegexOptions.IgnoreCase).Value;
-                            string sPortNumRegex = @"\d+";
-                            string sPortNumString = Regex.Match(sComName, sPortNumRegex, RegexOptions.IgnoreCase).Value;
-                            int iPortNum = Convert.ToInt32(sPortNumString);
+                        // Get the ID of the dependent device for the controller
+                        string sDependent = (string)controller.GetPropertyValue("Dependent");
+                        string[] sDependentSplit = System.Text.RegularExpressions.Regex.Split(sDependent, "DeviceID=");
+                        string sDeviceID = sDependentSplit[1];
 
-                            // Add the device to the list
-                            RNGDevice currentDevice = new RNGDevice(sComName, iPortNum);
-                            m_DeviceList.Add(currentDevice);
+                        // Search all of the USB devices found with this device ID (should only be 1)
+                        ManagementObjectSearcher deviceSearcher = new ManagementObjectSearcher(@"Select * From Win32_PnPEntity Where DeviceID=" + sDeviceID);
+                        ManagementObjectCollection deviceCollection = deviceSearcher.Get();
+
+                        foreach (ManagementBaseObject device in deviceCollection)
+                        {
+                            // Attempt to get the name of the device
+                            object oName = device.GetPropertyValue("Name");
+                            if (null != oName)
+                            {
+                                // Check if this is a USB serial device
+                                string sDeviceName = (string)oName;
+                                string sSerialDeviceRegex = @".*USB.*Serial.*COM\d+.*";
+                                bool bSerialDevice = Regex.IsMatch(sDeviceName, sSerialDeviceRegex, RegexOptions.IgnoreCase);
+                                if (bSerialDevice)
+                                {
+                                    // Extract the port name and number
+                                    string sComPortRegex = @"COM\d+";
+                                    string sComName = Regex.Match(sDeviceName, sComPortRegex, RegexOptions.IgnoreCase).Value;
+                                    string sPortNumRegex = @"\d+";
+                                    string sPortNumString = Regex.Match(sComName, sPortNumRegex, RegexOptions.IgnoreCase).Value;
+                                    int iPortNum = Convert.ToInt32(sPortNumString);
+
+                                    // Add the device to the list
+                                    RNGDevice currentDevice = new RNGDevice(sComName, iPortNum);
+                                    m_DeviceList.Add(currentDevice);
+                                } // END: if (bSerialDevice)
+                            } // END: if (null != oName)
+
+                            // Break out of the loop if the thread was terminated early
+                            if (m_bTerminate)
+                            {
+                                break;
+                            }
+                        } // END: foreach (ManagementBaseObject device in deviceCollection)
+
+                        // Break out of the loop if the thread was terminated early
+                        if (m_bTerminate)
+                        {
+                            break;
                         }
-                    }
-                }
-            }
+                    } // END: foreach (ManagementBaseObject controller in controllerCollection)
+                } // END: using (ManagementObjectCollection controllerCollection = controllerSearcher.Get())
+            } // END: using (ManagementObjectSearcher controllerSearcher = new ManagementObjectSearcher(@"Select * From Win32_USBControllerDevice"))
         }
 
         /// <summary>
@@ -190,8 +212,14 @@ namespace RandomNumberGenerator
         /// </summary>
         public static IGeneratorForm Parent { get => m_Parent; set => m_Parent = value; }
 
-        // Synchronizaion object
+        /// <summary>
+        /// Flag to set to terminate the thread early
+        /// </summary>
+        public static bool Terminate { get => m_bTerminate; set => m_bTerminate = value; }
+
+        // Synchronizaion objects
         private static object m_Lock = new object();
+        private static bool m_bTerminate = false;
 
         // Device list update data members
         private static BindingList<IRNGDevice> m_DeviceList = new BindingList<IRNGDevice>();

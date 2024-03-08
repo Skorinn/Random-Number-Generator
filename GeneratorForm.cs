@@ -100,7 +100,12 @@ namespace RandomNumberGenerator
 
             // Start the device update thread and trigger an update
             DeviceUpdateThread.Parent = this;
-            ThreadPool.QueueUserWorkItem(DeviceUpdateThread.ThreadProc);
+            ThreadPool.QueueUserWorkItem(state =>
+            {
+                m_DeviceUpdateComplete.Reset(); // Clear the device update complete flag
+                DeviceUpdateThread.ThreadProc(state);
+                m_DeviceUpdateComplete.Set(); // Signal that the device update has finished
+            });
 
             // Create the source from the list of device ports
             m_DeviceBindingSource = new BindingSource();
@@ -146,7 +151,12 @@ namespace RandomNumberGenerator
                     // For both connect and remove, trigger the watchdog to do an update
                     case USBDeviceNotification.iDEVICE_CONNECTED:
                     case USBDeviceNotification.iDEVICE_REMOVED:
-                        ThreadPool.QueueUserWorkItem(DeviceUpdateThread.ThreadProc);
+                        ThreadPool.QueueUserWorkItem(state =>
+                        {
+                            m_DeviceUpdateComplete.Reset(); // Clear the device update complete flag
+                            DeviceUpdateThread.ThreadProc(state);
+                            m_DeviceUpdateComplete.Set(); // Signal that the device update has finished
+                        });
                         break;
 
                     // Ignore any other events
@@ -317,7 +327,7 @@ namespace RandomNumberGenerator
                 if (false == bValid)
                 {
                     // Display error in info box
-                    this.m_StatusTextBox.BackColor = System.Drawing.Color.Red;
+                    m_StatusTextBox.BackColor = System.Drawing.Color.Red;
                     m_StatusTextBox.Text = m_sINVALID_SEED_ERROR;
 
                     // Cancel the input
@@ -415,8 +425,18 @@ namespace RandomNumberGenerator
             _ = sender;
             _ = e;
 
+            // Reset the info box to the message state
+            m_StatusTextBox.ForeColor = System.Drawing.Color.Black;
+            m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
+
             // Make sure any running session is stoped
+            m_StatusTextBox.Text = m_sCLOSE_STOP_SESSION;
             StopButton_Click(sender, e);
+
+            // Signal the device update thread to stop and wait for it to complete (10 second timeout)
+            m_StatusTextBox.Text = m_sCLOSE_STOP_DEVICE_UPDATE;
+            DeviceUpdateThread.Terminate = true;
+            m_DeviceUpdateComplete.WaitOne(10000);
         }
 
         #endregion
@@ -501,14 +521,14 @@ namespace RandomNumberGenerator
             if (false == bDeviceInitialized)
             {
                 // Most likely issue is that the device is not at the specified port number
-                this.m_StatusTextBox.BackColor = System.Drawing.Color.Red;
+                m_StatusTextBox.BackColor = System.Drawing.Color.Red;
                 m_StatusTextBox.Text = m_sDEVICE_INIT_ERROR;
             }
             else
             {
                 // Initialized successfully to clear any displayed errors
                 m_StatusTextBox.Text = m_sINIT_MESSAGE;
-                this.m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
+                m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
             }
         }
 
@@ -628,7 +648,8 @@ namespace RandomNumberGenerator
             m_PauseButton.Text = m_sPAUSE_BUTTON;
 
             // Enable the file browser
-            m_FileBrowseButton.Enabled = true;
+            //!!! mpullen - disable file support until functionality is fully implemented !!!
+            m_FileBrowseButton.Enabled = false;// true;
 
             // Enable the target number field
             m_TargetComboBox.Enabled = true;
@@ -639,7 +660,7 @@ namespace RandomNumberGenerator
 
             // Update the info box
             m_StatusTextBox.Text = m_sIDLE_MESSAGE;
-            this.m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
+            m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
         }
 
         /// <summary>
@@ -661,7 +682,7 @@ namespace RandomNumberGenerator
             m_StatusTextBox.Text = m_sPAUSED_MESSAGE;
 
             // Reset the background color of the info box
-            this.m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
+            m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
         }
 
         /// <summary>
@@ -683,7 +704,7 @@ namespace RandomNumberGenerator
             m_StatusTextBox.Text = m_sIDLE_MESSAGE;
 
             // Reset the background color of the info box
-            this.m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
+            m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
         }
 
         /// <summary>
@@ -703,7 +724,7 @@ namespace RandomNumberGenerator
 
             // Update the info box after initializing the device, which updates the status box as well
             m_StatusTextBox.Text = RunningMessage;
-            this.m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
+            m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
 
             // Start a new data session
             bStatus = m_Data.StartSession();
@@ -836,7 +857,8 @@ namespace RandomNumberGenerator
                     else
                     {
                         // Enable the browse, start, and clear buttons
-                        m_FileBrowseButton.Enabled = true;
+                        //!!! mpullen - disable file support until functionality is fully implemented !!!
+                        m_FileBrowseButton.Enabled = false;// true;
                         m_StartButton.Enabled = true;
                         m_ClearButton.Enabled = true;
                     }
@@ -915,7 +937,7 @@ namespace RandomNumberGenerator
         // Device settings
         private int m_iSeed = 0;
         private BindingSource m_DeviceBindingSource;
-
+        private ManualResetEvent m_DeviceUpdateComplete = new ManualResetEvent(false);
         // Display settings
         private const string m_sAVERAGE_FORMAT = "0.000000000";
 
@@ -930,6 +952,8 @@ namespace RandomNumberGenerator
         private const string m_sINIT_MESSAGE = " Initialized";
         private const string m_sIDLE_MESSAGE = " Idle";
         private const string m_sPAUSED_MESSAGE = " Paused";
+        private const string m_sCLOSE_STOP_SESSION = " Ending current session...";
+        private const string m_sCLOSE_STOP_DEVICE_UPDATE = " Waiting for USB device search to end...";
 
         #endregion
     }
