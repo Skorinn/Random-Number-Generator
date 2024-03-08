@@ -21,9 +21,6 @@
     <ClInclude Include="pch.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="rng.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="TruRNGpro.h">
       <Filter>Header Files</Filter>
     </ClInclude>

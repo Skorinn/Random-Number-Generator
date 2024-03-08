@@ -227,7 +227,6 @@
     <ClInclude Include="framework.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="RNGInterface.h" />
-    <ClInclude Include="rng.h" />
     <ClInclude Include="TruRNGpro.h" />
     <ClInclude Include="RNGSimulator.h" />
   </ItemGroup>
