@@ -99,8 +99,8 @@ namespace RandomNumberGenerator
             lock (this)
             {
                 // Create (or recreate) the writer
-                m_Writer = XmlWriter.Create(m_sFilePath, m_Settings);
-                bStatus = (m_Writer != null);
+                const bool bRECREATE = true;
+                bStatus = CreateWriter(bRECREATE);
 
                 // If the writer was created, write the session start tag
                 if (bStatus)
@@ -124,14 +124,16 @@ namespace RandomNumberGenerator
         /// <returns>true if successful; otherwise false</returns>
         public bool WriteDataPoint(IXMLDataPoint dataPoint)
         {
-            // Default status to failure
-            bool bStatus = false;
-
-            // Limit access to the file to one thread at a time
-            lock (this)
+            // VAlidate the data point
+            bool bStatus = (null != dataPoint);
+            if (bStatus)
             {
-                // Attempt to write the data point to the file
-                bStatus = dataPoint.WriteDataPoint(m_Writer);
+                // Limit access to the file to one thread at a time
+                lock (this)
+                {
+                    // Attempt to write the data point to the file
+                    bStatus = dataPoint.WriteDataPoint(m_Writer);
+                }
             }
 
             return bStatus;
@@ -149,12 +151,8 @@ namespace RandomNumberGenerator
             // Limit access to the file to one thread at a time
             lock (this)
             {
-                // Create (or recreate) the writer
-                if (null == m_Writer)
-                {
-                    m_Writer = XmlWriter.Create(m_sFilePath, m_Settings);
-                }
-                bStatus = (m_Writer != null);
+                // Create the writer if it doesn't exist
+                bStatus = CreateWriter();
 
                 // If the writer was created, write the session start tag
                 if (bStatus)
@@ -181,6 +179,35 @@ namespace RandomNumberGenerator
             m_Settings = new XmlWriterSettings();
             m_Settings.Indent = true;
             m_Settings.IndentChars = "\t";
+        }
+
+        /// <summary>
+        /// Attempts to create the XML writer object
+        /// <\summary>
+        /// <param name="bRecreate">IN - True to recreate the writer if it already exists (default = false)</param>"
+        /// <returns>true if successful; otherwise, false</returns>
+        private bool CreateWriter(bool bRecreate = false)
+        {
+            // Default to success in case the writer is already created
+            bool bStatus = true;
+
+            // Only recreate the writer if the flag is set
+            if (null == m_Writer)
+            {
+                try
+                {
+                    // Attempt to create the writer
+                    m_Writer = XmlWriter.Create(m_sFilePath, m_Settings);
+                    bStatus = (m_Writer != null);
+                }
+                catch (System.ArgumentException)
+                {
+                    // Path or settings are not valid
+                    bStatus = false;
+                }
+            }
+
+            return bStatus;
         }
 
         #endregion

@@ -134,6 +134,32 @@ namespace RandomNumberGenerator.Test
         }
 
         /// <summary>
+        /// Tests the constructor generates an exception when the writer is null
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        [ExpectedException(typeof(System.ArgumentNullException))]
+        public void Constructor_NullWriter_Exception()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Create the object under test
+            RNGSessionDataFile sessionDataFile = new RNGSessionDataFile(null);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Expecting an exception
+        }
+
+        /// <summary>
         /// Tests StartSession() method works correctly when the writer is valid
         /// <\summary>
         [TestMethod]
@@ -217,6 +243,39 @@ namespace RandomNumberGenerator.Test
         }
 
         /// <summary>
+        /// Tests StartSession() generates an exception when the session data is null
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        [ExpectedException(typeof(System.ArgumentNullException))]
+        public void StartSession_NullSessionData_Exception()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Mock the IRNGXMLWriter interface
+            var xmlWriterMock = new Mock<IRNGXMLWriter>();
+            xmlWriterMock.Setup(mock => mock.FilePath).Returns(m_sTEST_FILE_PATH);
+
+            // Create the object under test
+            RNGSessionDataFile sessionDataFile = new RNGSessionDataFile(xmlWriterMock.Object);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Start the session
+            bool bStatus = sessionDataFile.StartSession(null);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Expecting an exception
+        }
+
+        /// <summary>
         /// Tests WriteDataPoint() method generates an error when the writer is valid but no session was started
         /// <\summary>
         [TestMethod]
@@ -297,6 +356,39 @@ namespace RandomNumberGenerator.Test
 
             // Verify no data point was written
             xmlWriterMock.Verify(mock => mock.WriteDataPoint(dataPointMock.Object), Times.Once);
+        }
+
+        /// <summary>
+        /// Tests WriteDataPoint() generates an exception when the data point is null
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        [ExpectedException(typeof(System.ArgumentNullException))]
+        public void WriteDataPoint_NullDataPoint_Exception()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Mock the IRNGXMLWriter interface
+            var xmlWriterMock = new Mock<IRNGXMLWriter>();
+            xmlWriterMock.Setup(mock => mock.FilePath).Returns(m_sTEST_FILE_PATH);
+
+            // Create the object under test
+            RNGSessionDataFile sessionDataFile = new RNGSessionDataFile(xmlWriterMock.Object);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Write the data point
+            bool bStatus = sessionDataFile.WriteDataPoint(null);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Expecting an exception
         }
 
         /// <summary>

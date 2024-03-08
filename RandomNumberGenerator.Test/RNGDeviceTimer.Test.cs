@@ -249,6 +249,36 @@ namespace RandomNumberGenerator.Test
         }
 
         /// <summary>
+        /// Tests that TriggerTick is success if no callback is set
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void TriggerTick_NoCallback_Success()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Create the object under test 
+            RNGDeviceTimer timer = new RNGDeviceTimer();
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Simulate the timer ticking without a callback
+            timer.Start();
+            timer.TriggerTick();
+            timer.Stop();
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // No exception should be thrown
+        }
+
+        /// <summary>
         /// Tests that Start sets the Enabled property to true
         /// </summary>
         [TestMethod]
