@@ -87,17 +87,12 @@ namespace RandomNumberGenerator.Test
 
         // Session time to use for testing
         private const string m_sSESSION_START_TIME = "01:00:00";
-        private const string m_sSESSION_DATA_TIME = "01:54:21";
 
         // Target value to use for testing
         private const int m_iTARGET_VALUE = 1;
 
-        // Data point to use for testing
-        private const double m_fDATA_POINT = 9.1;
-
         // Define the expected XML entries here as they depend on the time, target, and data values above
         private const string sEXPECTED_SESSION_START_ENTRY = "<Session Start=\"01:00:00\" Target=\"1\">";
-        private const string sEXPECTED_DATA_POINT_ENTRY = "<DataPoint Time=\"01:54:21\" Value=\"9.1\" />";
         private const string sEXPECTED_SESSION_END_ENTRY = "</Session>";
         private const string sEXPECTED_SESSION_END_ENTRY_NO_DATA = "<Session Start=\"01:00:00\" Target=\"1\" />";
 
