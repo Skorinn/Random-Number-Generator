@@ -12,7 +12,6 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System.Drawing;
-using System.Xml;
 
 namespace RandomNumberGenerator.Test
 {
@@ -132,11 +131,11 @@ namespace RandomNumberGenerator.Test
         }
 
         // <summary>
-        // Test for get and set for the Busy property using true
+        // Test for get and set for the FileBrowseActive property using true
         // <\summary>
         [TestMethod]
         [TestCategory("Component")]
-        public void Busy_SetProperty_True()
+        public void FileBrowseActive_SetProperty_True()
         {
             //**************************************************************//
             // Arrange
@@ -170,11 +169,11 @@ namespace RandomNumberGenerator.Test
         }
 
         // <summary>
-        // Test for get and set for the Busy property using false
+        // Test for get and set for the FileBrowseActive property using false
         // <\summary>
         [TestMethod]
         [TestCategory("Component")]
-        public void Busy_SetProperty_False()
+        public void FileBrowseActive_SetProperty_False()
         {
             //**************************************************************//
             // Arrange

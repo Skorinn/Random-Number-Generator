@@ -12,7 +12,6 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System.Windows.Forms;
-using System.Xml;
 
 namespace RandomNumberGenerator.Test
 {
@@ -290,7 +289,7 @@ namespace RandomNumberGenerator.Test
             // Verify the timer text was updated
             Assert.AreEqual(sEXPECTED_VALUE, timerTextBox.Text);
         }
-        
+
         /// <summary>
         /// Tests the Enabled property doesn't affect the InProgress property when set to false
         /// </summary>
