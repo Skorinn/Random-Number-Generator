@@ -42,11 +42,11 @@ namespace RandomNumberGenerator
         /// </summary>
         private void InitializeComponent()
         {
-            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea1 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
-            System.Windows.Forms.DataVisualization.Charting.Legend legend1 = new System.Windows.Forms.DataVisualization.Charting.Legend();
-            System.Windows.Forms.DataVisualization.Charting.Series series1 = new System.Windows.Forms.DataVisualization.Charting.Series();
-            System.Windows.Forms.DataVisualization.Charting.DataPoint dataPoint1 = new System.Windows.Forms.DataVisualization.Charting.DataPoint(0D, 0.5D);
-            System.Windows.Forms.DataVisualization.Charting.Series series2 = new System.Windows.Forms.DataVisualization.Charting.Series();
+            System.Windows.Forms.DataVisualization.Charting.ChartArea resultChartArea = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
+            System.Windows.Forms.DataVisualization.Charting.Legend resultLegend = new System.Windows.Forms.DataVisualization.Charting.Legend();
+            System.Windows.Forms.DataVisualization.Charting.Series dataPointSeries = new System.Windows.Forms.DataVisualization.Charting.Series();
+            System.Windows.Forms.DataVisualization.Charting.DataPoint initialDataPoint = new System.Windows.Forms.DataVisualization.Charting.DataPoint(0D, 0.5D);
+            System.Windows.Forms.DataVisualization.Charting.Series averagesSeries = new System.Windows.Forms.DataVisualization.Charting.Series();
             this.m_CurrentAverageLabel = new System.Windows.Forms.Label();
             this.m_CurrentAverageTextBox = new System.Windows.Forms.TextBox();
             this.m_SessionTimerTextBox = new System.Windows.Forms.TextBox();
@@ -209,31 +209,8 @@ namespace RandomNumberGenerator
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.m_ResultChart.BackColor = System.Drawing.Color.Transparent;
-            chartArea1.AxisX.Enabled = System.Windows.Forms.DataVisualization.Charting.AxisEnabled.False;
-            chartArea1.AxisY.Interval = 0.005D;
-            chartArea1.AxisY.Maximum = 0.51D;
-            chartArea1.AxisY.Minimum = 0.49D;
-            chartArea1.Name = "Results";
-            this.m_ResultChart.ChartAreas.Add(chartArea1);
-            legend1.Name = "Legend";
-            this.m_ResultChart.Legends.Add(legend1);
             this.m_ResultChart.Location = new System.Drawing.Point(6, 202);
             this.m_ResultChart.Name = "m_ResultChart";
-            series1.ChartArea = "Results";
-            series1.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Line;
-            series1.Color = System.Drawing.Color.Blue;
-            series1.IsVisibleInLegend = false;
-            series1.Legend = "Legend";
-            series1.Name = "Data Points";
-            series1.Points.Add(dataPoint1);
-            series2.ChartArea = "Results";
-            series2.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Line;
-            series2.Color = System.Drawing.Color.Red;
-            series2.IsVisibleInLegend = false;
-            series2.Legend = "Legend";
-            series2.Name = "Averages";
-            this.m_ResultChart.Series.Add(series1);
-            this.m_ResultChart.Series.Add(series2);
             this.m_ResultChart.Size = new System.Drawing.Size(748, 463);
             this.m_ResultChart.TabIndex = 9;
             this.m_ResultChart.TabStop = false;
