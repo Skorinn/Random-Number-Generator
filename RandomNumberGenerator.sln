@@ -11,6 +11,9 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TruRNGpro", "TruRNGpro\TruRNGpro.vcxproj", "{983F2AF3-825E-4283-B55C-D0401CDA780B}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RandomNumberGenerator.Test", "RandomNumberGenerator.Test\RandomNumberGenerator.Test.csproj", "{0507DC94-C63E-4C0A-8659-B18BC37DDE25}"
+	ProjectSection(ProjectDependencies) = postProject
+		{983F2AF3-825E-4283-B55C-D0401CDA780B} = {983F2AF3-825E-4283-B55C-D0401CDA780B}
+	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{6CD28B7C-DA39-4B05-80E5-25F802AFEB43}"
 EndProject
