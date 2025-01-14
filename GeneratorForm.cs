@@ -285,7 +285,10 @@ namespace RandomNumberGenerator
 
             // Update the timer and average displayed
             m_SessionTimerTextBox.Text = m_Data.SessionTime;
-            m_CurrentAverageTextBox.Text = m_sAVERAGE_FORMAT;
+            m_CurrentAverageTextBox.Text = m_sFLOAT_FORMAT;
+            m_DataPointsTextBox.Text = m_sINTEGER_FORMAT;
+            m_MeanDeviationTextBox.Text = m_sEXP_FLOAT_FORMAT;
+            m_StandardDeviationTextBox.Text = m_sEXP_FLOAT_FORMAT;
         }
 
         /// <summary>
@@ -492,6 +495,9 @@ namespace RandomNumberGenerator
 
                     // Update the displayed average and add the point to the chart
                     m_CurrentAverageTextBox.Text = CurrentAverage;
+                    m_DataPointsTextBox.Text = NumDataPoints;
+                    m_MeanDeviationTextBox.Text = MeanDeviation;
+                    m_StandardDeviationTextBox.Text = StandardDeviation;
                     m_ResultChart.AddPoint(fResult, m_Data.CurrentAverage);
 
                     // Clear any displayed errors 
@@ -527,6 +533,9 @@ namespace RandomNumberGenerator
         /// </summary>
         private void InitializeInterface()
         {
+            // Set the wait cursor
+            Cursor.Current = Cursors.WaitCursor;
+
             // Attempt to initialize the interface
             int iPort = GetSelectedPort();
             bool bDeviceInitialized = m_Timer.InitializeDevice(iPort, m_Data.Simulated);
@@ -544,6 +553,9 @@ namespace RandomNumberGenerator
                 m_StatusTextBox.Text = m_sINIT_MESSAGE;
                 m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
             }
+
+            // Restore the cursor
+            Cursor.Current = Cursors.Default;
         }
 
         /// <summary>
@@ -924,7 +936,22 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Current average string (read-only)
         /// </summary>
-        private string CurrentAverage { get => m_Data.CurrentAverage.ToString(m_sAVERAGE_FORMAT); }
+        private string CurrentAverage { get => m_Data.CurrentAverage.ToString(m_sFLOAT_FORMAT); }
+
+        /// <summary>
+        /// Number of data points gathered
+        /// </summary>
+        private string NumDataPoints { get => m_Data.NumDataPoints.ToString(m_sINTEGER_FORMAT); }
+
+        /// <summary>
+        /// Deviation from the statistical mean
+        /// </summary>
+        private string MeanDeviation { get => m_Data.MeanDeviation.ToString(m_sEXP_FLOAT_FORMAT); }
+
+        /// <summary>
+        /// Standard deviation of the data set
+        /// </summary>
+        private string StandardDeviation { get => m_Data.StandardDeviation.ToString(m_sEXP_FLOAT_FORMAT); }
 
         /// <summary>
         /// Message to display in the info box while a session is running (read-only)
@@ -960,8 +987,11 @@ namespace RandomNumberGenerator
         private int m_iSeed = 0;
         private BindingSource m_DeviceBindingSource;
         private ManualResetEvent m_DeviceUpdateComplete = new ManualResetEvent(false);
+        
         // Display settings
-        private const string m_sAVERAGE_FORMAT = "0.000000000";
+        private const string m_sFLOAT_FORMAT = "0.000000000";
+        private const string m_sINTEGER_FORMAT = "0";
+        private const string m_sEXP_FLOAT_FORMAT = "0.000000e0";
 
         // Button text
         internal const string m_sPAUSE_BUTTON = "PAUSE";

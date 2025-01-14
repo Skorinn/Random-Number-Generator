@@ -283,7 +283,7 @@ namespace RandomNumberGenerator
             this.m_SimulateToggle.CausesValidation = false;
             this.m_SimulateToggle.DisabledBackground = System.Drawing.Color.Gray;
             this.m_SimulateToggle.DisabledToggle = System.Drawing.Color.LightGray;
-            this.m_SimulateToggle.Enabled = false;
+            this.m_SimulateToggle.Enabled = true;
             this.m_SimulateToggle.Location = new System.Drawing.Point(92, 102);
             this.m_SimulateToggle.MinimumSize = new System.Drawing.Size(50, 25);
             this.m_SimulateToggle.Name = "m_SimulateToggle";
@@ -385,7 +385,7 @@ namespace RandomNumberGenerator
             this.m_MeanDeviationTextBox.Size = new System.Drawing.Size(144, 26);
             this.m_MeanDeviationTextBox.TabIndex = 8;
             this.m_MeanDeviationTextBox.TabStop = false;
-            this.m_MeanDeviationTextBox.Text = "0.000000000";
+            this.m_MeanDeviationTextBox.Text = "0.000000e0";
             this.m_MeanDeviationTextBox.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             this.m_MeanDeviationTextBox.WordWrap = false;
             // 
@@ -408,7 +408,7 @@ namespace RandomNumberGenerator
             this.m_StandardDeviationTextBox.Size = new System.Drawing.Size(144, 26);
             this.m_StandardDeviationTextBox.TabIndex = 6;
             this.m_StandardDeviationTextBox.TabStop = false;
-            this.m_StandardDeviationTextBox.Text = "0.000000000";
+            this.m_StandardDeviationTextBox.Text = "0.000000e0";
             this.m_StandardDeviationTextBox.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             this.m_StandardDeviationTextBox.WordWrap = false;
             // 

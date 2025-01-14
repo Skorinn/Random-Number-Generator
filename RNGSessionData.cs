@@ -13,6 +13,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
+using System.Windows.Forms.DataVisualization.Charting;
 
 namespace RandomNumberGenerator
 {
@@ -22,6 +23,9 @@ namespace RandomNumberGenerator
     public interface IRNGSessionData
     {
         double CurrentAverage { get; }
+        int NumDataPoints { get; }
+        double MeanDeviation { get; }
+        double StandardDeviation { get; }
         ConcurrentQueue<double> DataPoints { get; set; }
         int DataWindowSize { get; set; }
         string FilePath { get; set; }
@@ -170,18 +174,34 @@ namespace RandomNumberGenerator
         /// <returns>true, if successful; otherwise false</returns>
         public bool AddDataPoint(double fDataPoint)
         {
-            // Check if the data set is full
-            if (m_DataPoints.Count >= m_iDataWindowSize)
+            // Since we have to walk the data to calculate standard devication a lock is
+            // required, even though ConcurrentQueue is used, to ensure elements are not added
+            // or removed while we are evaluating the data
+            lock (m_DataLock)
             {
-                double fResult; // unused out parameter
-                m_DataPoints.TryDequeue(out fResult);
+                // Check if the data set is full
+                if (m_DataPoints.Count >= m_iDataWindowSize)
+                {
+                    double fResult; // unused out parameter
+                    m_DataPoints.TryDequeue(out fResult);
+                }
+
+                // Add the point to the data set
+                m_DataPoints.Enqueue(fDataPoint);
             }
 
-            // Add the point to the data set
-            m_DataPoints.Enqueue(fDataPoint);
-
-            // Update the current average
+            // Update the current fAverage and count
             Interlocked.Exchange(ref m_fCurrentAverage, m_DataPoints.Average());
+            Interlocked.Exchange(ref m_iNumDataPoints, m_DataPoints.Count);
+
+            // Calculate the mean deviation
+            double fMeanDev = 0.5 - m_fCurrentAverage;
+            fMeanDev = Math.Abs(fMeanDev);
+            Interlocked.Exchange(ref m_fMeanDeviation, fMeanDev);
+
+            // Calculate the standard deviation
+            double fStandardDev = CalculateStandardDeviation();
+            Interlocked.Exchange(ref m_fStandardDeviation, fStandardDev);
 
             // Record a new data point exists and Write the data to the file (if interval reached)
             ++m_iPendingDataPointCounter;
@@ -234,21 +254,75 @@ namespace RandomNumberGenerator
                 m_Timer.Reset();
             }
 
-            // Clear cannot be done atomically so just create new queues
-            m_DataPoints = new ConcurrentQueue<double>();
+            // Since we have to walk the data to calculate standard devication a lock is
+            // required, even though ConcurrentQueue is used, to ensure elements are not added
+            // or removed while we are evaluating the data
+            lock (m_DataLock)
+            {
+                // Clear cannot be done atomically so just create new queues
+                m_DataPoints = new ConcurrentQueue<double>();
+            }
 
-            // Clear the set target value and average
+            // Clear the set target value and fAverage
             m_iTargetValue = TargetValues.NO_VALUE_SET;
             Interlocked.Exchange(ref m_fCurrentAverage, 0.0);
+            Interlocked.Exchange(ref m_iNumDataPoints, 0);
+            Interlocked.Exchange(ref m_fMeanDeviation, 0.0);
+            Interlocked.Exchange(ref m_fStandardDeviation, 0.0);
+        }
+
+        /// <summary>
+        /// Calculates the deviation from the statistical mean for the current data set
+        /// </summary>
+        /// <returns>Deviation from statistical mean</returns>
+        private double CalculateMeanDeviation()
+        {
+            double fMeanDev = 0.5 - m_fCurrentAverage;
+            fMeanDev = Math.Abs(fMeanDev);
+            return fMeanDev;
+        }
+
+        /// <summary>
+        /// Calculates the standard deviation of a set of data points
+        /// </summary>
+        /// <param name="dataPoints">The data points</param>
+        /// <returns>The standard deviation</returns>
+        private double CalculateStandardDeviation()
+        {
+            // Since we have to walk the data to calculate standard devication a lock is
+            // required, even though ConcurrentQueue is used, to ensure elements are not added
+            // or removed while we are evaluating the data
+            lock (m_DataLock)
+            {
+                double fAverage = m_DataPoints.Average();
+                double fSumOfSquaresOfDifferences = m_DataPoints.Select(val => (val - fAverage) * (val - fAverage)).Sum();
+                double fStandardDeviation = Math.Sqrt(fSumOfSquaresOfDifferences / m_DataPoints.Count);
+                return fStandardDeviation;
+            }
         }
 
         #endregion
         #region Properties
 
         /// <summary>
-        /// The current average of the data points (read-only)
+        /// The current fAverage of the data points (read-only)
         /// </summary>
         public double CurrentAverage { get => m_fCurrentAverage; }
+
+        /// <summary>
+        /// The current number of data points (read-only)
+        /// </summary>
+        public int NumDataPoints { get => m_iNumDataPoints; }
+
+        /// <summary>
+        /// Deviation from the statistical mean
+        /// </summary>
+        public double MeanDeviation { get => m_fMeanDeviation; }
+
+        /// <summary>
+        /// Standard deviation of the data set
+        /// </summary>
+        public double StandardDeviation { get => m_fStandardDeviation; }
 
         /// <summary>
         /// Full data point set
@@ -256,7 +330,7 @@ namespace RandomNumberGenerator
         public ConcurrentQueue<double> DataPoints { get => m_DataPoints; set => m_DataPoints = value; }
 
         /// <summary>
-        /// Maximum size for the data and average sets held in memory
+        /// Maximum size for the data and fAverage sets held in memory
         /// </summary>
         public int DataWindowSize { get => m_iDataWindowSize; set => Interlocked.Exchange(ref m_iDataWindowSize, value); }
 
@@ -359,8 +433,14 @@ namespace RandomNumberGenerator
 
         // RNG Data
         private double m_fCurrentAverage = 0.0;
+        private int m_iNumDataPoints = 0;
+        private double m_fMeanDeviation = 0.0;
+        private double m_fStandardDeviation = 0.0;
         private ConcurrentQueue<double> m_DataPoints = new ConcurrentQueue<double>();
         private int m_iDataWindowSize = 4096;
+
+        // Data lock object
+        private object m_DataLock = new object();
 
         // Target values
         private int m_iTargetValue = TargetValues.NO_VALUE_SET;
