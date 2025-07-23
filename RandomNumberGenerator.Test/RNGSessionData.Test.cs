@@ -826,6 +826,209 @@ namespace RandomNumberGenerator.Test
             mockDataFile.Verify(mock => mock.WriteDataPoint(It.IsAny<IXMLDataPoint>()), Times.Never);
         }
 
+        /// <summary>
+        /// Tests that DataPointAddedCallback is set and invoked when data points are added
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void DataPointAddedCallback_SetAndInvoked_CallbackExecuted()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Mock the data file object
+            var mockDataFile = new Mock<IRNGSessionDataFile>();
+            mockDataFile.Setup(mock => mock.WriteDataPoint(It.IsAny<IXMLDataPoint>())).Returns(true);
+
+            // Mock the session timer object
+            var mockSessionTimer = new Mock<IRNGSessionTimer>();
+
+            // Create the object under test
+            RNGSessionData sessionData = new RNGSessionData(mockDataFile.Object, mockSessionTimer.Object);
+
+            // Variables to capture callback parameters
+            double capturedDataPoint = 0.0;
+            double capturedAverage = 0.0;
+            int callbackCount = 0;
+
+            // Set up the callback
+            sessionData.DataPointAddedCallback = (dataPoint, average) =>
+            {
+                capturedDataPoint = dataPoint;
+                capturedAverage = average;
+                callbackCount++;
+            };
+
+            const double fTEST_DATA_POINT = 0.75;
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Add a data point which should trigger the callback
+            sessionData.AddDataPoint(fTEST_DATA_POINT);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the callback was invoked with correct parameters
+            Assert.AreEqual(1, callbackCount, "Callback should be invoked once");
+            Assert.AreEqual(fTEST_DATA_POINT, capturedDataPoint, "Callback should receive the correct data point");
+            Assert.AreEqual(fTEST_DATA_POINT, capturedAverage, "Callback should receive the correct average for single data point");
+        }
+
+        /// <summary>
+        /// Tests that DataPointAddedCallback is invoked multiple times for multiple data points
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void DataPointAddedCallback_MultipleDataPoints_CallbackInvokedMultipleTimes()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Mock the data file object
+            var mockDataFile = new Mock<IRNGSessionDataFile>();
+            mockDataFile.Setup(mock => mock.WriteDataPoint(It.IsAny<IXMLDataPoint>())).Returns(true);
+
+            // Mock the session timer object
+            var mockSessionTimer = new Mock<IRNGSessionTimer>();
+
+            // Create the object under test
+            RNGSessionData sessionData = new RNGSessionData(mockDataFile.Object, mockSessionTimer.Object);
+
+            // Variables to track callback invocations
+            int callbackCount = 0;
+            List<double> capturedDataPoints = new List<double>();
+            List<double> capturedAverages = new List<double>();
+
+            // Set up the callback
+            sessionData.DataPointAddedCallback = (dataPoint, average) =>
+            {
+                capturedDataPoints.Add(dataPoint);
+                capturedAverages.Add(average);
+                callbackCount++;
+            };
+
+            const double fFIRST_DATA_POINT = 0.6;
+            const double fSECOND_DATA_POINT = 0.8;
+            const double fEXPECTED_AVERAGE = (fFIRST_DATA_POINT + fSECOND_DATA_POINT) / 2.0;
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Add multiple data points
+            sessionData.AddDataPoint(fFIRST_DATA_POINT);
+            sessionData.AddDataPoint(fSECOND_DATA_POINT);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the callback was invoked for each data point
+            Assert.AreEqual(2, callbackCount, "Callback should be invoked twice");
+            Assert.AreEqual(fFIRST_DATA_POINT, capturedDataPoints[0], "First callback should receive first data point");
+            Assert.AreEqual(fSECOND_DATA_POINT, capturedDataPoints[1], "Second callback should receive second data point");
+            Assert.AreEqual(fEXPECTED_AVERAGE, capturedAverages[1], 0.000001, "Second callback should receive correct average");
+        }
+
+        /// <summary>
+        /// Tests that batch loading data points invokes callback for each point
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void LoadDataPointsBatch_CallbackSet_CallbackInvokedForEachPoint()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Mock the data file object
+            var mockDataFile = new Mock<IRNGSessionDataFile>();
+
+            // Mock the session timer object
+            var mockSessionTimer = new Mock<IRNGSessionTimer>();
+
+            // Create the object under test
+            RNGSessionData sessionData = new RNGSessionData(mockDataFile.Object, mockSessionTimer.Object);
+
+            // Variables to track callback invocations
+            int callbackCount = 0;
+            List<double> capturedDataPoints = new List<double>();
+
+            // Set up the callback
+            sessionData.DataPointAddedCallback = (dataPoint, average) =>
+            {
+                capturedDataPoints.Add(dataPoint);
+                callbackCount++;
+            };
+
+            // Create test data points
+            var testDataPoints = new List<double> { 0.1, 0.2, 0.3, 0.4, 0.5 };
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Load data points in batch
+            sessionData.LoadDataPointsBatch(testDataPoints);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the callback was invoked for each data point
+            Assert.AreEqual(testDataPoints.Count, callbackCount, "Callback should be invoked for each data point in batch");
+            for (int i = 0; i < testDataPoints.Count; i++)
+            {
+                Assert.AreEqual(testDataPoints[i], capturedDataPoints[i], $"Callback should receive correct data point at index {i}");
+            }
+        }
+
+        /// <summary>
+        /// Tests that DataPointAddedCallback can be null without causing issues
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void DataPointAddedCallback_Null_NoException()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Mock the data file object
+            var mockDataFile = new Mock<IRNGSessionDataFile>();
+            mockDataFile.Setup(mock => mock.WriteDataPoint(It.IsAny<IXMLDataPoint>())).Returns(true);
+
+            // Mock the session timer object
+            var mockSessionTimer = new Mock<IRNGSessionTimer>();
+
+            // Create the object under test
+            RNGSessionData sessionData = new RNGSessionData(mockDataFile.Object, mockSessionTimer.Object);
+
+            // Leave DataPointAddedCallback as null (default)
+            Assert.IsNull(sessionData.DataPointAddedCallback, "Callback should be null by default");
+
+            //**************************************************************//
+            // Act & Assert
+            //**************************************************************//
+
+            // Add a data point - should not throw exception even with null callback
+            try
+            {
+                sessionData.AddDataPoint(0.5);
+                Assert.IsTrue(true, "AddDataPoint should complete without exception when callback is null");
+            }
+            catch (Exception ex)
+            {
+                Assert.Fail($"AddDataPoint should handle null callback gracefully but threw: {ex.Message}");
+            }
+        }
+
         #endregion
     }
 }

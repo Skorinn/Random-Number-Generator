@@ -88,6 +88,9 @@ namespace RandomNumberGenerator
             // Set the status callback for the device timer
             m_Timer.SetReadCallback(RecordReadResult);
 
+            // Set the data point added callback for chart updates
+            m_Data.DataPointAddedCallback = OnDataPointAdded;
+
             // Dump USB devices if debugging and defined
 #if DUMP_DEVICES && DEBUG
                 DumpUSBDevices();
@@ -366,13 +369,18 @@ namespace RandomNumberGenerator
             string sSelectedFile = null;
             using (OpenFileDialog dataFileOpenDialog = new OpenFileDialog())
             {
-                dataFileOpenDialog.Title = "Create or open a Random Number Generage data file";
-                dataFileOpenDialog.FileName = "Select a data file";
-                dataFileOpenDialog.Filter = "RNG data files (*.rng)|*.rng";
+                // Generate a default file name with the format: session_YYYYMMDD_HHMMSS.rng
+                dataFileOpenDialog.Title = "Create or open a Random Number Generator data file";
+                dataFileOpenDialog.FileName = $"session_{DateTime.Now:yyyyMMdd_HHmmss}.rng";
+                dataFileOpenDialog.Filter = "RNG data files (*.rng)|*.rng|All files (*.*)|*.*";
+                dataFileOpenDialog.DefaultExt = "rng";
+                dataFileOpenDialog.AddExtension = true;
 
                 // Allow creation of new files but directory must exist
                 dataFileOpenDialog.CheckFileExists = false;
                 dataFileOpenDialog.CheckPathExists = true;
+                dataFileOpenDialog.ValidateNames = true;
+                dataFileOpenDialog.DereferenceLinks = true;
 
                 // Show the file open dialog
                 DialogResult result = dataFileOpenDialog.ShowDialog();
@@ -547,15 +555,14 @@ namespace RandomNumberGenerator
                 {
                     try
                     {
-                        // Record the new data point
+                        // Record the new data point (this will trigger the chart update via callback)
                         RecordDataPoint(fResult);
 
-                        // Update the displayed average and add the point to the chart
+                        // Update the displayed average
                         m_CurrentAverageTextBox.Text = CurrentAverage;
                         m_DataPointsTextBox.Text = NumDataPoints;
                         m_MeanDeviationTextBox.Text = MeanDeviation;
                         m_StandardDeviationTextBox.Text = StandardDeviation;
-                        m_ResultChart.AddPoint(fResult, m_Data.CurrentAverage);
 
                         // Clear any displayed errors 
                         SetStatusBoxState(RunningMessage, System.Drawing.Color.Black, System.Drawing.SystemColors.Info);
@@ -585,6 +592,25 @@ namespace RandomNumberGenerator
                         SetStatusBoxError($" Unexpected error recording data: {generalEx.Message}");
                     }
                 }
+            }
+        }
+
+        /// <summary>
+        /// Callback method invoked when a data point is added to the session data
+        /// This method updates the chart in a thread-safe manner
+        /// </summary>
+        /// <param name="fDataPoint">IN - The data point that was added</param>
+        /// <param name="fCurrentAverage">IN - The current average after adding the data point</param>
+        private void OnDataPointAdded(double fDataPoint, double fCurrentAverage)
+        {
+            // Update the chart on the UI thread
+            if (InvokeRequired)
+            {
+                Invoke(new Action(() => m_ResultChart.AddPoint(fDataPoint, fCurrentAverage)));
+            }
+            else
+            {
+                m_ResultChart.AddPoint(fDataPoint, fCurrentAverage);
             }
         }
 

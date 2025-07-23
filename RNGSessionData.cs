@@ -19,6 +19,13 @@ using System.Windows.Forms.DataVisualization.Charting;
 namespace RandomNumberGenerator
 {
     /// <summary>
+    /// Delegate for data point added callback
+    /// </summary>
+    /// <param name="fDataPoint">The data point that was added</param>
+    /// <param name="fCurrentAverage">The current average after adding the data point</param>
+    public delegate void DataPointAddedDelegate(double fDataPoint, double fCurrentAverage);
+
+    /// <summary>
     /// Interface for the RNG session data
     /// </summary>
     public interface IRNGSessionData
@@ -38,6 +45,8 @@ namespace RandomNumberGenerator
         int TargetValue { get; set; }
         IRNGSessionTimer Timer { get; }
         uint WriteFileInterval { get; }
+
+        DataPointAddedDelegate DataPointAddedCallback { get; set; }
 
         bool AddDataPoint(double fDataPoint);
         void EndSession();
@@ -203,6 +212,22 @@ namespace RandomNumberGenerator
         /// <returns>true, if successful; otherwise false</returns>
         public bool AddDataPoint(double fDataPoint)
         {
+            // Record the data point in the data set
+            RecordDataPoint(fDataPoint);
+
+            // Record a new data point exists and Write the data to the file (if interval reached)
+            ++m_iPendingDataPointCounter;
+            bool bStatus = WritePendingData();
+
+            return bStatus;
+        }
+
+        /// <summary>
+        /// Records a new data point in the data set and updates statistics
+        /// </summary>
+        /// <param name="fDataPoint">IN - The new data point to record</param>
+        private void RecordDataPoint(double fDataPoint)
+        {
             // Since we have to walk the data to calculate standard devication a lock is
             // required, even though ConcurrentQueue is used, to ensure elements are not added
             // or removed while we are evaluating the data
@@ -232,11 +257,8 @@ namespace RandomNumberGenerator
             double fStandardDev = CalculateStandardDeviation();
             Interlocked.Exchange(ref m_fStandardDeviation, fStandardDev);
 
-            // Record a new data point exists and Write the data to the file (if interval reached)
-            ++m_iPendingDataPointCounter;
-            bool bStatus = WritePendingData();
-
-            return bStatus;
+            // Invoke the callback if it's set
+            DataPointAddedCallback?.Invoke(fDataPoint, m_fCurrentAverage);
         }
 
         /// <summary>
@@ -403,33 +425,13 @@ namespace RandomNumberGenerator
                 foreach (double fDataPoint in dataPoints)
                 {
                     // Check if we've reached the maximum count limit
-                    if ((uMaxCount > 0) && (uProcessedCount >= uMaxCount))
+                    if ((uMaxCount > 0) && (uProcessedCount++ >= uMaxCount))
                     {
                         break;
                     }
 
-                    // Use a modified version of AddDataPoint that doesn't trigger file writes
-                    // This is more efficient for batch loading
-                    lock (m_DataLock)
-                    {
-                        // Check if the data set is full (respect existing DataWindowSize)
-                        if (m_DataPoints.Count >= m_iDataWindowSize)
-                        {
-                            double fResult; // unused out parameter
-                            m_DataPoints.TryDequeue(out fResult);
-                        }
-
-                        // Add the point to the data set
-                        m_DataPoints.Enqueue(fDataPoint);
-                    }
-
-                    ++uProcessedCount;
-                }
-
-                // After batch processing, update statistics once for efficiency
-                if (uProcessedCount > 0)
-                {
-                    UpdateStatistics();
+                    // Record the data point (this will NOT trigger the callback since it's batch loading)
+                    RecordDataPoint(fDataPoint);
                 }
             }
             catch (System.OutOfMemoryException)
@@ -603,6 +605,11 @@ namespace RandomNumberGenerator
         /// The timer object for the data session (read-only)
         /// </summary>
         public IRNGSessionTimer Timer { get => m_Timer; }
+
+        /// <summary>
+        /// Callback that is invoked when a data point is added
+        /// </summary>
+        public DataPointAddedDelegate DataPointAddedCallback { get; set; }
 
         /// <summary>
         /// Number of data points pending to be written to the file (read-only)
