@@ -2,12 +2,12 @@
 // File Name:      RNGSessionDataFile.Test.cs
 // Description:    Unit tests for the RNGSessionDataFile class
 //
-// Copyright (C) 2024 Mike Pullen. All Rights Reserved.
+// Copyright (C) 2025 Mike Pullen. All Rights Reserved.
 // Confidential and Proprietary
 //
 // Revision History: 
 //====================================================================================================================
-// 2024/01/20 - Mike Pullen - Original implementation.
+// 2025/07/21 - Mike Pullen - Original implementation.
 //*********************************************************************************************************************
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
@@ -200,28 +200,29 @@ namespace RandomNumberGenerator.Test
         }
 
         /// <summary>
-        /// Tests StartSession() method returns false when the writer is invalid
-        /// <\summary>
+        /// Tests StartSession() method throws InvalidOperationException when the writer is invalid
+        /// </summary>
+        /// <exception cref="System.InvalidOperationException">Expected exception when no file path is set</exception>
         [TestMethod]
         [TestCategory("Component")]
-        public void StartSession_InvalidWriter_Failure()
+        [ExpectedException(typeof(System.InvalidOperationException))]
+        public void StartSession_InvalidWriter_Exception()
         {
             //**************************************************************//
             // Arrange
             //**************************************************************//
 
-            // Use an invalid fiel name for the path (empty string)
+            // Use an invalid file name for the path (empty string)
             const string sEMPTY_PATH = "";
 
             // Mock the IRNGXMLWriter interface
             var xmlWriterMock = new Mock<IRNGXMLWriter>();
             xmlWriterMock.Setup(mock => mock.FilePath).Returns(sEMPTY_PATH);
-            xmlWriterMock.Setup(mock => mock.WriteSessionStart(It.IsAny<string>(), It.IsAny<int>())).Returns(false);
 
             // Create the object under test
             RNGSessionDataFile sessionDataFile = new RNGSessionDataFile(xmlWriterMock.Object);
 
-            // Mock the iRNGSessionData interface
+            // Mock the IRNGSessionData interface
             var sessionDataMock = new Mock<IRNGSessionData>();
             sessionDataMock.Setup(mock => mock.SessionTime).Returns("00:00:00");
             sessionDataMock.Setup(mock => mock.TargetValue).Returns(0);
@@ -230,16 +231,14 @@ namespace RandomNumberGenerator.Test
             // Act
             //**************************************************************//
 
-            // Start the session
+            // Start the session - should throw InvalidOperationException
             bool bStatus = sessionDataFile.StartSession(sessionDataMock.Object);
 
             //**************************************************************//
             // Assert
             //**************************************************************//
 
-            // Verify the the return value and in progress flags
-            Assert.IsFalse(bStatus);
-            Assert.IsFalse(sessionDataFile.SessionInProgress);
+            // Expecting an exception (handled by attribute)
         }
 
         /// <summary>

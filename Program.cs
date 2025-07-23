@@ -38,7 +38,12 @@ namespace RandomNumberGenerator
             writerSettings.Indent = true;
             writerSettings.IndentChars = "\t";
             RNGXMLWriter writer = new RNGXMLWriter(writerSettings);
-            RNGSessionDataFile sessionDataFile = new RNGSessionDataFile(writer);
+
+            // Create the XML reader for session data loading
+            RNGXMLReader reader = new RNGXMLReader();
+
+            // Create the session data file with both writer and reader capabilities
+            RNGSessionDataFile sessionDataFile = new RNGSessionDataFile(writer, reader);
 
             // Create the session timer object
             RNGSessionTimer sessionTimer = new RNGSessionTimer();

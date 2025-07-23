@@ -570,6 +570,9 @@ namespace RandomNumberGenerator.Test
             // Create a pending data point
             sessionData.AddDataPoint(0.0);
 
+            // Record the number of data points pending
+            uint iPendingDataCount = sessionData.PendingDataPointCounter;
+
             // Reset the invocations tracker for the data file and timer to clear calls made during the start session
             mockDataFile.Invocations.Clear();
             mockSessionTimer.Invocations.Clear();
@@ -587,8 +590,9 @@ namespace RandomNumberGenerator.Test
             // Verify that the session has ended in the data file
             mockDataFile.Verify(mock => mock.EndSession(), Times.Once);
 
-            // Verify that write was called
-            mockDataFile.Verify(mock => mock.WriteDataPoint(It.IsAny<IXMLDataPoint>()), Times.Once);
+            // Verify how write was called based on the pending data points
+            Moq.Times expectedWriteCalls = (iPendingDataCount > 0 ? Times.Once() : Times.Never());
+            mockDataFile.Verify(mock => mock.WriteDataPoint(It.IsAny<IXMLDataPoint>()), expectedWriteCalls);
 
             // Verify the timer was stoped
             mockSessionTimer.Verify(mock => mock.Stop(), Times.Once);

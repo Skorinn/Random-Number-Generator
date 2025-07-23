@@ -11,6 +11,7 @@
 //*********************************************************************************************************************
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
+using System;
 using System.IO;
 using System.Xml;
 
@@ -214,11 +215,13 @@ namespace RandomNumberGenerator.Test
         }
 
         /// <summary>
-        /// Tests WriteSessionStart() method returns false if the writer is not valid
+        /// Tests WriteSessionStart() method generates exception if the writer is not valid
         /// <\summary>
         [TestMethod]
         [TestCategory("Component")]
-        public void WriteSessionStart_InvalidWriter_Failure()
+        [ExpectedException(typeof(InvalidOperationException))]
+
+        public void WriteSessionStart_InvalidWriter_Exception()
         {
             //**************************************************************//
             // Arrange
@@ -241,16 +244,17 @@ namespace RandomNumberGenerator.Test
             // Assert
             //**************************************************************//
 
-            // Verify the write was not successful
-            Assert.IsFalse(bStatus);
+            // Exception expected, so no need to verify the status
         }
 
         /// <summary>
-        /// Tests WriteSessionStart() method returns false if the writer is NULL
+        /// Tests WriteSessionStart() method generates exception if the writer is NULL
         /// </summary>
         [TestMethod]
         [TestCategory("Component")]
-        public void WriteSessionStart_NullWriter_Failure()
+        [ExpectedException(typeof(InvalidOperationException))]
+
+        public void WriteSessionStart_NullWriter_Exception()
         {
             //**************************************************************//
             // Arrange
@@ -270,8 +274,7 @@ namespace RandomNumberGenerator.Test
             // Assert
             //**************************************************************//
 
-            // Verify the write was not successful
-            Assert.IsFalse(bStatus);
+            // Exception expected, so no need to verify the status
         }
 
         /// <summary>
@@ -312,11 +315,13 @@ namespace RandomNumberGenerator.Test
         }
 
         /// <summary>
-        /// Tests WriteDataPoint() method returns false if the data point fails to write
+        /// Tests WriteDataPoint() method generates exception if the data point fails to write
         /// <\summary>
         [TestMethod]
         [TestCategory("Component")]
-        public void WriteDataPoint_Failure_ReturnsFalse()
+        [ExpectedException(typeof(InvalidOperationException))]
+
+        public void WriteDataPoint_Failure_Exception()
         {
             //**************************************************************//
             // Arrange
@@ -340,16 +345,17 @@ namespace RandomNumberGenerator.Test
             // Assert
             //**************************************************************//
 
-            // Verify the write was not successful
-            Assert.IsFalse(bStatus);
+            // Exception expected, so no need to verify the status
         }
 
         /// <summary>
-        /// Tests WriteDataPoint() method returns false if the writer is NULL
+        /// Tests WriteDataPoint() method generatees exception if the writer is NULL
         /// </summary>
         [TestMethod]
         [TestCategory("Component")]
-        public void WriteDataPoint_NullWriter_Failure()
+        [ExpectedException(typeof(InvalidOperationException))]
+
+        public void WriteDataPoint_NullWriter_Exception()
         {
             //**************************************************************//
             // Arrange
@@ -373,16 +379,17 @@ namespace RandomNumberGenerator.Test
             // Assert
             //**************************************************************//
 
-            // Verify the write was not successful
-            Assert.IsFalse(bStatus);
+            // Exception expected, so no need to verify the status
         }
 
         /// <summary>
-        /// Tests WriteDataPoint() method returns false if the data point is NULL
+        /// Tests WriteDataPoint() method generates exception if the data point is NULL
         /// </summary>
         [TestMethod]
         [TestCategory("Component")]
-        public void WriteDataPoint_NullDataPoint_Failure()
+        [ExpectedException(typeof(ArgumentNullException))]
+
+        public void WriteDataPoint_NullDataPoint_Exception()
         {
             //**************************************************************//
             // Arrange
@@ -402,8 +409,7 @@ namespace RandomNumberGenerator.Test
             // Assert
             //**************************************************************//
 
-            // Verify the write was not successful
-            Assert.IsFalse(bStatus);
+            // Exception expected, so no need to verify the status
         }
 
         /// <summary>
@@ -495,11 +501,13 @@ namespace RandomNumberGenerator.Test
         }
 
         /// <summary>
-        /// Tests WriteSessionEnd() method returns false if the writer is NULL
+        /// Tests WriteSessionEnd() method generates exception if the writer is NULL
         /// </summary>
         [TestMethod]
         [TestCategory("Component")]
-        public void WriteSessionEnd_NullWriter_Failure()
+        [ExpectedException(typeof(InvalidOperationException))]
+
+        public void WriteSessionEnd_NullWriter_Exception()
         {
             //**************************************************************//
             // Arrange
@@ -519,8 +527,7 @@ namespace RandomNumberGenerator.Test
             // Assert
             //**************************************************************//
 
-            // Verify the write was not successful
-            Assert.IsFalse(bStatus);
+            // Exception expected, so no need to verify the status
         }
 
         /// <summary>

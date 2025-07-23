@@ -13,12 +13,12 @@ All source files must include a standardized header:
 // File Name:      [FileName].cs
 // Description:    [Brief description of the file's purpose]
 //
-// Copyright (C) [Year] Mike Pullen. All Rights Reserved.
+// Copyright (C) 2025 Mike Pullen. All Rights Reserved.
 // Confidential and Proprietary
 //
 // Revision History: 
 //====================================================================================================================
-// [Date] - [Author] - [Description of changes]
+// 2025/07/21 - [Author] - [Description of changes]
 //*********************************************************************************************************************
 ```
 
@@ -140,6 +140,65 @@ public bool MethodName(int paramName)
 - Use XML documentation for all public members
 - Include `<summary>`, `<param>`, and `<returns>` tags
 - Parameter directions: `IN`, `OUT`, `INOUT`
+- Document all explicitly thrown exceptions using `<exception>` tags
+
+#### Standard XML Documentation Template
+```csharp
+/// <summary>
+/// Brief description of what the method does and its purpose
+/// </summary>
+/// <param name="parameterName">IN/OUT/INOUT - Description of the parameter and its constraints</param>
+/// <param name="anotherParameter">IN - Description of another parameter</param>
+/// <returns>Description of the return value and what it represents</returns>
+/// <exception cref="ArgumentNullException">Thrown when parameterName is null</exception>
+/// <exception cref="ArgumentException">Thrown when parameterName contains invalid characters</exception>
+/// <exception cref="InvalidOperationException">Thrown when the object is not in a valid state for this operation</exception>
+/// <exception cref="UnauthorizedAccessException">Thrown when file access is denied</exception>
+/// <exception cref="System.IO.IOException">Thrown when file I/O operations fail</exception>
+public bool ExampleMethod(string parameterName, int anotherParameter)
+{
+    // Implementation
+}
+```
+
+#### Exception Documentation Best Practices
+- **Complete Coverage**: Document ALL exceptions that can be explicitly thrown by the method
+- **Specific Conditions**: Clearly state the conditions under which each exception is thrown
+- **User-Friendly Language**: Write descriptions that help developers understand how to avoid or handle the exception
+- **Consistent Format**: Use consistent language patterns across all exception documentation
+- **Inheritance Awareness**: Consider exceptions thrown by base class methods or interface implementations
+
+#### Exception Documentation Examples
+```csharp
+// Good - specific and actionable
+/// <exception cref="ArgumentNullException">Thrown when the dataPoint parameter is null</exception>
+/// <exception cref="InvalidOperationException">Thrown when no file path is set or XML writer is in an invalid state</exception>
+
+// Better - includes guidance
+/// <exception cref="UnauthorizedAccessException">Thrown when file access is denied. Check file permissions and ensure the file is not open in another application</exception>
+
+// Best - specific condition and user guidance
+/// <exception cref="System.IO.IOException">Thrown when file I/O operations fail, such as when the disk is full or the file is corrupted</exception>
+```
+
+#### Exception Documentation
+All methods that explicitly throw exceptions must document them:
+
+```csharp
+/// <summary>
+/// Opens or creates a file for writing
+/// </summary>
+/// <param name="filePath">IN - Path to the file to create or open</param>
+/// <returns>true if successful; otherwise, false</returns>
+/// <exception cref="ArgumentNullException">Thrown when filePath parameter is null or empty</exception>
+/// <exception cref="UnauthorizedAccessException">Thrown when file access is denied</exception>
+/// <exception cref="System.IO.IOException">Thrown when file I/O operations fail</exception>
+/// <exception cref="InvalidOperationException">Thrown when the operation cannot be completed due to object state</exception>
+public bool OpenFile(string filePath)
+{
+    // Implementation
+}
+```
 
 ### Comments
 - Use `//` for single-line comments
@@ -162,15 +221,50 @@ public void MethodName(object parameter)
 }
 ```
 
+### Exception Handling Principles
+- **Meaningful Messages**: Always provide descriptive error messages that help users understand what went wrong
+- **Exception Propagation**: Re-throw exceptions to bubble errors up to the GUI layer for user feedback
+- **Context Preservation**: When wrapping exceptions, preserve the original exception as the inner exception
+- **Avoid Silent Failures**: Never catch exceptions and return false without proper error reporting
+
+#### Exception Throwing Guidelines
+```csharp
+// Good - descriptive message with user-actionable information
+throw new InvalidOperationException(" No file selected. Please select a data file before starting a session.");
+
+// Good - preserving original exception context
+catch (IOException ioEx)
+{
+    throw new IOException($" File I/O error accessing '{fileName}': {ioEx.Message}", ioEx);
+}
+
+// Bad - generic message without context
+throw new Exception("Error occurred");
+
+// Bad - silently returning false
+catch (Exception)
+{
+    return false; // Don't do this - exceptions should bubble up
+}
+```
+
+#### Exception Documentation Requirements
+- Document all explicitly thrown exceptions using `<exception cref="ExceptionType">description</exception>`
+- Include when the exception is thrown and what causes it
+- Provide actionable information for handling the exception
+- Group related exceptions logically in documentation
+
 ### Return Values
 - Use boolean return values for success/failure operations
 - Return null for failed object creation
 - Use out parameters for multiple return values
+- Throw exceptions for error conditions that should be reported to the user
 
 ### Exception Handling
 - Use try-catch blocks for external operations (file I/O, device access)
-- Provide meaningful error messages
-- Log errors appropriately
+- Provide meaningful error messages that will be displayed to users
+- Re-throw exceptions to propagate errors to the GUI layer
+- Use specific exception types rather than generic Exception when possible
 
 ### Function Calls in Conditionals
 - Do not make function calls inside conditional statements

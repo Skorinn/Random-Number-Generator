@@ -144,22 +144,13 @@ namespace RandomNumberGenerator
             // Make sure the parent is valid and not terminaating early
             if ((null != m_Parent) && (false == Terminating))
             {
-                // Check if invoke is required (should be)
-                if (m_Parent.InvokeRequired)
-                {
-                    // Invoke the update in the parent thread
-                    m_Parent.Invoke(new Action(() => GetInfoBoxState()));
-                }
-                else
-                {
-                    // Update here
-                    GetInfoBoxState();
-                }
+                // Get the current status box state through the parent's interface
+                m_Parent.GetStatusBoxState(out m_sStatusBoxText, out m_StatusBoxTextColor, out m_StatusBoxBackColor);
             }
         }
 
         /// <summary>
-        /// Restores the current text and color of the parent's info box
+        /// Updates the current text and color of the parent's info box
         /// </summary>
         /// <param name="sText">IN - Text to display in the info box</param>
         /// <param name="textColor">IN - Text color to set for the info box</param>
@@ -169,50 +160,8 @@ namespace RandomNumberGenerator
             // Make sure the parent is valid and not terminaating early
             if ((null != m_Parent) && (false == Terminating))
             {
-                // Check if invoke is required (should be)
-                if (m_Parent.InvokeRequired)
-                {
-                    // Invoke the update in the parent thread
-                    m_Parent.Invoke(new Action(() => SetInfoBoxState(sText, textColor, backColor)));
-                }
-                else
-                {
-                    // Update here
-                    SetInfoBoxState(sText, textColor, backColor);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Gets the text and color of the parent's info box
-        /// </summary>
-        private static void GetInfoBoxState()
-        {
-            // Make sure the parent is valid and not terminaating early
-            if ((null != m_Parent) && (false == Terminating))
-            {
-                // Get the current text and color of the info box
-                m_sStatusBoxText = m_Parent.StatusBoxText;
-                m_StatusBoxTextColor = m_Parent.StatusBoxTextColor;
-                m_StatusBoxBackColor = m_Parent.StatusBoxBackColor;
-            }
-        }
-
-        /// <summary>
-        /// Sets the text and color of the parent's info box
-        /// </summary>
-        /// <param name="sText">IN - Text to display in the info box</param>
-        /// <param name="textColor">IN - Text color to set for the info box</param>
-        /// <param name="backColor">IN - Background color to set for the info box</param>
-        private static void SetInfoBoxState(string sText, Color textColor, Color backColor)
-        {
-            // Make sure the parent is valid and not terminaating early
-            if ((null != m_Parent) && (false == Terminating))
-            {
-                // Set the text and color of the info box
-                m_Parent.StatusBoxText = sText;
-                m_Parent.StatusBoxTextColor = textColor;
-                m_Parent.StatusBoxBackColor = backColor;
+                // Use parent's method which already handles invoke requirements
+                m_Parent.SetStatusBoxState(sText, textColor, backColor);
             }
         }
 
@@ -229,7 +178,7 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Indicates if the thread is terminating early (read-only)
         /// </summary>
-        public static bool Terminating { get => (GeneratorForm.RngGuiStates.Terminating == m_Parent.State); }
+        public static bool Terminating { get => (null != m_Parent) && (GeneratorForm.RngGuiStates.Terminating == m_Parent.State); }
 
         // Synchronizaion objects
         private static object m_Lock = new object();

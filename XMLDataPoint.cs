@@ -69,6 +69,7 @@ namespace RandomNumberGenerator
                 writer.WriteAttributeString("Time", m_sSessionTime);
                 writer.WriteValue(m_fDataPoint.ToString());
                 writer.WriteEndElement();
+                writer.Flush();
             }
             catch (Exception)
             {

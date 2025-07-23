@@ -25,12 +25,12 @@ All C++ source files must include a standardized header:
 //* File Name:      [FileName].h/.cpp
 //* Description:    [Brief description of the file's purpose]
 //*
-//* Copyright (C) [Year] Mike Pullen. All Rights Reserved.
+//* Copyright (C) 2025 Mike Pullen. All Rights Reserved.
 //* Confidential and Proprietary
 //*
 //* Revision History: 
 //=====================================================================================================================
-//* [Date] - [Author] - [Description of changes]
+//* 2025/07/21 - [Author] - [Description of changes]
 //*********************************************************************************************************************
 ```
 
@@ -158,10 +158,66 @@ Use XML-style comments consistent with C# components:
 
 ```cpp
 /// <summary>
-/// Brief description of the method/class
+/// Brief description of the method/class and its purpose
 /// </summary>
-/// <param name="paramName">IN/OUT/INOUT - Parameter description</param>
-/// <returns>Description of return value</returns>
+/// <param name="paramName">IN/OUT/INOUT - Parameter description and constraints</param>
+/// <returns>Description of return value and what it represents</returns>
+/// <exception cref="ExceptionType">Description of when this exception is thrown</exception>
+/// <exception cref="std::invalid_argument">Thrown when parameters are invalid</exception>
+/// <exception cref="std::runtime_error">Thrown when runtime conditions prevent operation</exception>
+```
+
+#### Exception Documentation Standards
+All methods that can throw exceptions must document them using XML-style comments:
+
+#### Standard Exception Documentation Template
+```cpp
+/// <summary>
+/// Initializes the RNG device with the specified port number
+/// </summary>
+/// <param name="iPortNum">IN - Port number for device communication (must be positive)</param>
+/// <param name="bSimulate">IN - Whether to use simulation mode instead of real device</param>
+/// <returns>true if initialization successful; otherwise, false</returns>
+/// <exception cref="std::invalid_argument">Thrown when iPortNum is negative or out of valid range</exception>
+/// <exception cref="std::runtime_error">Thrown when device communication fails or device is not found</exception>
+/// <exception cref="std::system_error">Thrown when underlying system calls fail</exception>
+bool Initialize(int iPortNum, bool bSimulate);
+```
+
+#### Exception Documentation Best Practices
+- **Complete Coverage**: Document ALL exceptions that can be explicitly thrown by the method
+- **Standard Library Exceptions**: Use appropriate standard library exception types (`std::invalid_argument`, `std::runtime_error`, etc.)
+- **Specific Conditions**: Clearly state the conditions under which each exception is thrown
+- **User-Friendly Language**: Write descriptions that help developers understand how to avoid or handle the exception
+- **Consistent Format**: Use consistent language patterns across all exception documentation
+- **C++ Specific**: Consider exceptions from standard library functions and system calls
+
+#### Common C++ Exception Types to Document
+```cpp
+// Parameter validation
+/// <exception cref="std::invalid_argument">Thrown when parameter values are invalid</exception>
+/// <exception cref="std::out_of_range">Thrown when array/container indices are out of bounds</exception>
+
+// Resource and system errors  
+/// <exception cref="std::runtime_error">Thrown when operation cannot be completed due to runtime conditions</exception>
+/// <exception cref="std::system_error">Thrown when underlying system calls fail</exception>
+/// <exception cref="std::bad_alloc">Thrown when memory allocation fails</exception>
+
+// Logic and state errors
+/// <exception cref="std::logic_error">Thrown when method is called in invalid object state</exception>
+/// <exception cref="std::domain_error">Thrown when input is outside valid domain</exception>
+```
+
+#### Exception Documentation Examples
+```cpp
+// Good - specific and actionable
+/// <exception cref="std::invalid_argument">Thrown when iPortNum is less than 0 or greater than 255</exception>
+
+// Better - includes guidance
+/// <exception cref="std::runtime_error">Thrown when device initialization fails. Ensure device is connected and drivers are installed</exception>
+
+// Best - specific condition and user guidance
+/// <exception cref="std::system_error">Thrown when COM port access fails, typically due to permissions or port already in use by another application</exception>
 ```
 
 ### Parameter Direction Indicators
@@ -240,6 +296,71 @@ return bStatus;
 - Minimize exception usage in performance-critical code
 - Use exceptions for truly exceptional conditions
 - Provide strong exception safety guarantees
+
+### Exception Handling Principles
+- **Meaningful Messages**: Always provide descriptive error messages that help developers understand what went wrong
+- **Standard Library Usage**: Prefer standard library exception types over custom exceptions
+- **Exception Safety**: Provide appropriate exception safety guarantees (basic, strong, or no-throw)
+- **Resource Management**: Use RAII to ensure proper cleanup even when exceptions occur
+- **Performance Consideration**: Use exceptions for exceptional conditions, not normal control flow
+
+#### Exception Throwing Guidelines
+```cpp
+// Good - descriptive message with actionable information
+throw std::invalid_argument("Port number must be between 0 and 255, received: " + std::to_string(iPortNum));
+
+// Good - preserving system error context
+catch (const std::system_error& sysErr)
+{
+    throw std::runtime_error("Device initialization failed: " + sysErr.what());
+}
+
+// Good - using appropriate standard exception types
+if (nullptr == pDevice)
+{
+    throw std::logic_error("Device must be initialized before calling GetBitAverage()");
+}
+
+// Bad - generic message without context
+throw std::runtime_error("Error occurred");
+
+// Bad - throwing exceptions for normal conditions
+if (m_Buffer.empty())
+{
+    throw std::runtime_error("Buffer empty"); // Should return false instead
+}
+```
+
+#### Exception Safety Guidelines
+```cpp
+// Strong exception safety - all or nothing
+bool LoadConfiguration(const std::string& configFile)
+{
+    // Make a copy of current state
+    auto backup = m_currentConfig;
+    
+    try
+    {
+        // Attempt to load new configuration
+        auto newConfig = ParseConfigFile(configFile);
+        m_currentConfig = std::move(newConfig);
+        return true;
+    }
+    catch (...)
+    {
+        // Restore original state on any exception
+        m_currentConfig = std::move(backup);
+        throw; // Re-throw the exception
+    }
+}
+```
+
+#### Exception Documentation Requirements
+- Document all explicitly thrown exceptions using `<exception cref="ExceptionType">description</exception>`
+- Include when the exception is thrown and what causes it
+- Provide actionable information for handling the exception
+- Consider exceptions from called standard library functions
+- Group related exceptions logically in documentation
 
 ### Function Calls in Conditionals
 - Do not make function calls inside conditional statements
@@ -420,13 +541,34 @@ Before submitting C++ code, verify:
 - [ ] Thread safety considerations
 - [ ] Performance implications
 - [ ] Platform compatibility
+- [ ] Complete exception documentation using `<exception>` tags
+- [ ] Exception messages are descriptive and actionable
+- [ ] Exception types are appropriate for error conditions
+- [ ] Exception safety guarantees are clearly defined
+- [ ] RAII principles used for exception-safe resource management
+
+### Exception Documentation Review
+When reviewing exception documentation, verify:
+- [ ] All explicitly thrown exceptions are documented
+- [ ] Exception conditions are clearly described
+- [ ] Exception messages provide actionable information
+- [ ] Standard library exception types are used appropriately
+- [ ] Exception safety level is appropriate for the method
+- [ ] Resource cleanup occurs properly even when exceptions are thrown
 
 ### Static Analysis
 - Address all compiler warnings
 - Use appropriate access modifiers
 - Follow const-correctness principles
 - Validate pointer usage
+- Ensure exception specifications are accurate and complete
 
 ---
 
 *This document should be updated as the C++ codebase evolves and new patterns emerge.*
+
+## Recent Updates
+- Added comprehensive exception documentation standards and requirements
+- Defined exception throwing guidelines and best practices  
+- Established exception safety principles for C++14 development
+- Updated code review checklist to include exception documentation verification

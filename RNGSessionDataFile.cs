@@ -24,6 +24,7 @@ namespace RandomNumberGenerator
 
         bool EndSession();
         bool IsValid();
+        bool LoadSession(IRNGSessionData sessionData, string sFilePath);
         bool StartSession(IRNGSessionData sessionData);
         bool WriteDataPoint(IXMLDataPoint dataPoint);
     }
@@ -48,6 +49,23 @@ namespace RandomNumberGenerator
             }
 
             m_Writer = writer;
+        }
+
+        /// <summary>
+        /// Construct with the writer and reader
+        /// </summary>
+        /// <param name="writer">IN - The XML writer object to use for the file (cannot be null)</param>
+        /// <param name="reader">IN - The XML reader object to use for the file (can be null)</param>
+        public RNGSessionDataFile(IRNGXMLWriter writer, IRNGXMLReader reader)
+        {
+            // Writer object provided cannot be null
+            if (null == writer)
+            {
+                throw new ArgumentNullException("Specified writer object cannot be null");
+            }
+
+            m_Writer = writer;
+            m_Reader = reader;
         }
 
         /// <summary>
@@ -80,13 +98,45 @@ namespace RandomNumberGenerator
             // Default the status to failure
             bool bStatus = false;
 
-            // Check if the writer is valid
-            bool bValid = IsValid();
-            if (bValid)
+            try
             {
-                // Write the session start
-                m_bSessionInProgress = true;
-                bStatus = m_Writer.WriteSessionStart(sessionData.SessionTime, sessionData.TargetValue);
+                // Check if the writer is valid
+                bool bValid = IsValid();
+                if (bValid)
+                {
+                    // Write the session start
+                    m_bSessionInProgress = true;
+                    bStatus = m_Writer.WriteSessionStart(sessionData.SessionTime, sessionData.TargetValue);
+                }
+                else
+                {
+                    // Invalid writer - likely no file path set
+                    throw new InvalidOperationException(" No data file selected. Please select a file before starting a session.");
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // Re-throw InvalidOperationException to be handled by calling code
+                m_bSessionInProgress = false;
+                throw;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Re-throw UnauthorizedAccessException to be handled by calling code
+                m_bSessionInProgress = false;
+                throw;
+            }
+            catch (System.IO.IOException)
+            {
+                // Re-throw IO exceptions to be handled by calling code
+                m_bSessionInProgress = false;
+                throw;
+            }
+            catch (Exception)
+            {
+                // Re-throw other exceptions to be handled by calling code
+                m_bSessionInProgress = false;
+                throw;
             }
 
             return bStatus;
@@ -95,7 +145,7 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Writes a data point to the file
         /// </summary>
-        /// <param name="fDataPoint">IN - The data point object to be written (cannot be null)</param>
+        /// <param name="dataPoint">IN - The data point to write (cannot be null)</param>
         /// <returns>true if successful; otherwise, false</returns>
         public bool WriteDataPoint(IXMLDataPoint dataPoint)
         {
@@ -108,7 +158,7 @@ namespace RandomNumberGenerator
             // Default the status to failure
             bool bStatus = false;
 
-            // Check if the writer is valid and a session has been started
+            // Check if the writer is valid and a session is in progress
             bool bValid = IsValid();
             if (bValid && m_bSessionInProgress)
             {
@@ -117,6 +167,95 @@ namespace RandomNumberGenerator
             }
 
             return bStatus;
+        }
+
+        /// <summary>
+        /// Loads session data from an existing XML file
+        /// </summary>
+        /// <param name="sessionData">INOUT - The session data object to load into (cannot be null)</param>
+        /// <param name="sFilePath">IN - Path to the session file to load (cannot be null or empty)</param>
+        /// <returns>true if successful; otherwise, false</returns>
+        public bool LoadSession(IRNGSessionData sessionData, string sFilePath)
+        {
+            // Validate parameters
+            if (null == sessionData)
+            {
+                throw new ArgumentNullException("Specified session data object cannot be null");
+            }
+
+            if (string.IsNullOrEmpty(sFilePath))
+            {
+                throw new ArgumentNullException("Specified file path cannot be null or empty");
+            }
+
+            bool bStatus = false;
+
+            // Check if we have a reader available
+            if (null != m_Reader)
+            {
+                try
+                {
+                    // Set the file path and load the session
+                    m_Reader.FilePath = sFilePath;
+                    bStatus = m_Reader.LoadFile(sessionData);
+
+                    // If loading failed, throw an exception with the detailed error message
+                    if (false == bStatus)
+                    {
+                        string sErrorMessage = m_Reader.LastError;
+                        if (string.IsNullOrEmpty(sErrorMessage))
+                        {
+                            sErrorMessage = $" Unknown error loading file '{Path.GetFileName(sFilePath)}'.";
+                        }
+                        throw new InvalidDataException(sErrorMessage);
+                    }
+
+                    // Update our file path to match the loaded session
+                    FilePath = sFilePath;
+
+                    // Prepare the writer for appending to the loaded file
+                    PrepareWriterForAppend(sFilePath);
+                }
+                catch (IOException ioException)
+                {
+                    // Re-throw IO exceptions to be handled by calling code
+                    throw new IOException($" File I/O error accessing '{Path.GetFileName(sFilePath)}': {ioException.Message}", ioException);
+                }
+                catch (InvalidDataException)
+                {
+                    // Re-throw InvalidDataException (from XML reader errors) to be handled by calling code
+                    throw;
+                }
+                catch (Exception generalException)
+                {
+                    // Wrap other exceptions with file context
+                    throw new Exception($" Unexpected error loading file '{Path.GetFileName(sFilePath)}': {generalException.Message}", generalException);
+                }
+            }
+            else
+            {
+                // No reader available - cannot load sessions
+                throw new InvalidOperationException(" No XML reader available for loading session data. Use constructor with reader parameter.");
+            }
+
+            return bStatus;
+        }
+
+        /// <summary>
+        /// Prepares the writer for appending data to an existing loaded file
+        /// </summary>
+        /// <param name="sFilePath">IN - Path to the file to prepare for appending</param>
+        private void PrepareWriterForAppend(string sFilePath)
+        {
+            // Set the session as in progress since we loaded an existing session
+            // The file is already open and contains a session start tag
+            m_bSessionInProgress = true;
+            
+            // Configure the writer for append mode with the specific file path
+            if (null != m_Writer)
+            {
+                m_Writer.PrepareForAppend(sFilePath);
+            }
         }
 
         /// <summary>
@@ -145,24 +284,44 @@ namespace RandomNumberGenerator
         /// </summary>
         public bool IsValid()
         {
-            // Default to valid
-            bool bValid = true;
+            // Default to invalid until proven otherwise
+            bool bValid = false;
 
-            // Only validate the file once
-            if (false == m_bFileValidated)
+            // Check if the writer exists and has a valid file path
+            if (null != m_Writer)
             {
-                // Check if a file info object can be created from the writer's file property
-                try
+                // Check if a file path is set
+                if (!string.IsNullOrEmpty(m_Writer.FilePath))
                 {
-                    FileInfo file = new FileInfo(m_Writer.FilePath);
+                    // Only validate the file once
+                    if (false == m_bFileValidated)
+                    {
+                        // Check if a file info object can be created from the writer's file property
+                        try
+                        {
+                            FileInfo file = new FileInfo(m_Writer.FilePath);
+                            bValid = true;
+                            m_bFileValidated = true;
+                        }
+                        catch
+                        {
+                            // File path is not valid
+                            bValid = false;
+                        }
+                    }
+                    else
+                    {
+                        // File was previously validated
+                        bValid = true;
+                    }
                 }
-                catch
+                // No file path set
+                else
                 {
-                    // File is not valid
                     bValid = false;
                 }
-
             }
+
             return bValid;
         }
 
@@ -195,6 +354,7 @@ namespace RandomNumberGenerator
         #region Data Members
 
         private IRNGXMLWriter m_Writer = null;
+        private IRNGXMLReader m_Reader = null;
         private bool m_bSessionInProgress = false;
         private bool m_bFileValidated = false;
 

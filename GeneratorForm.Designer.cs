@@ -310,7 +310,7 @@ namespace RandomNumberGenerator
             // 
             // m_FileBrowseButton
             // 
-            this.m_FileBrowseButton.Enabled = false;
+            this.m_FileBrowseButton.Enabled = true;
             this.m_FileBrowseButton.Location = new System.Drawing.Point(347, 40);
             this.m_FileBrowseButton.Name = "m_FileBrowseButton";
             this.m_FileBrowseButton.Size = new System.Drawing.Size(75, 29);

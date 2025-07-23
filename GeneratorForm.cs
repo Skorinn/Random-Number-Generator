@@ -40,7 +40,9 @@ namespace RandomNumberGenerator
         GeneratorForm.RngGuiStates State { get; }
 
         object Invoke(Action method);
+        void GetStatusBoxState(out string sText, out Color textColor, out Color backColor);
         void RecordReadResult(double fResult);
+        void SetStatusBoxState(string sText, Color textColor, Color backColor);
     }
 
     /// <summary>
@@ -251,8 +253,8 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Event handler for stop button
         /// </summary>
-        /// <param name="sender">IN - Sender of the event (not used)</param>
-        /// <param name="e">IN - The event arguments (not used)</param>
+        /// <param="sender">IN - Sender of the event (not used)</param>
+        /// <param="e">IN - The event arguments (not used)</param>
         private void StopButton_Click(object sender, EventArgs e)
         {
             // Discard unused parameters
@@ -380,8 +382,6 @@ namespace RandomNumberGenerator
                 }
             }
 
-            //!!! mpullen - need to verify if it is possible to go from having a file selected to not having one !!!
-
             // Check if the selection will have any effect
             FileBrowseActive = (false == String.IsNullOrEmpty(sSelectedFile));
             if (FileBrowseActive)
@@ -396,9 +396,22 @@ namespace RandomNumberGenerator
                 bool bFileExists = File.Exists(sSelectedFile);
                 if (bFileExists)
                 {
-                    //!!! mpullen - TBD load file !!!
-
-                    // Leave busy flag set until the file has been loaded (updated by thread)
+                    // Load the existing file by setting the file path and triggering a load operation
+                    // This approach works through the interface hierarchy rather than directly parsing XML
+                    ThreadPool.QueueUserWorkItem(state =>
+                    {
+                        bool bLoadSuccess = LoadExistingSessionFile(sSelectedFile);
+                        
+                        // Update the UI on the main thread
+                        if (InvokeRequired)
+                        {
+                            Invoke(new Action(() => OnFileLoadCompleted(sSelectedFile, bLoadSuccess)));
+                        }
+                        else
+                        {
+                            OnFileLoadCompleted(sSelectedFile, bLoadSuccess);
+                        }
+                    });
                 }
                 else
                 {
@@ -407,13 +420,21 @@ namespace RandomNumberGenerator
                     const string sMessage = "File does not exist. Would you like to create it and begin a new session?";
                     DialogResult confirmResult = MessageBox.Show(sMessage, sCaption, MessageBoxButtons.OKCancel);
 
-                    // Reset the string if user opts to cancel
-                    if (DialogResult.OK != confirmResult)
+                    // If user accepts to create new file
+                    if (DialogResult.OK == confirmResult)
                     {
-                        sSelectedFile = null;
+                        // Set the file path in the session data
+                        m_Data.FilePath = sSelectedFile;
+                        
+                        // Update the file display
+                        m_FileTextBox.Text = Path.GetFileName(sSelectedFile);
+                        
+                        // Show success status
+                        SetStatusBoxState($" New file selected: {Path.GetFileName(sSelectedFile)}. Ready for new session.", 
+                                        System.Drawing.Color.Black, System.Drawing.Color.LightGreen);
                     }
 
-                    // Either way we can re-enable session actions
+                    // Re-enable session actions for new file scenario
                     FileBrowseActive = false;
                 }
             }
@@ -468,6 +489,42 @@ namespace RandomNumberGenerator
         }
 
         /// <summary>
+        /// Implementation of GetStatusBoxState to retrieve status box state
+        /// </summary>
+        public void GetStatusBoxState(out string sText, out Color textColor, out Color backColor)
+        {
+            // Initialize output parameters
+            sText = "";
+            textColor = System.Drawing.Color.Black;
+            backColor = System.Drawing.SystemColors.Info;
+
+            // Get UI state on the main thread
+            if (InvokeRequired)
+            {
+                string tempText = "";
+                Color tempTextColor = System.Drawing.Color.Black;
+                Color tempBackColor = System.Drawing.SystemColors.Info;
+
+                Invoke(new Action(() =>
+                {
+                    tempText = m_StatusTextBox.Text;
+                    tempTextColor = m_StatusTextBox.ForeColor;
+                    tempBackColor = m_StatusTextBox.BackColor;
+                }));
+
+                sText = tempText;
+                textColor = tempTextColor;
+                backColor = tempBackColor;
+            }
+            else
+            {
+                sText = m_StatusTextBox.Text;
+                textColor = m_StatusTextBox.ForeColor;
+                backColor = m_StatusTextBox.BackColor;
+            }
+        }
+
+        /// <summary>
         /// Updates the status box based on the device read status
         /// </summary>
         /// <param name="fResult">IN - The result of the read (double max indicates error)</param>
@@ -483,27 +540,50 @@ namespace RandomNumberGenerator
                     SetIdleState();
 
                     // Set the status box text and color based on the status
-                    m_StatusTextBox.Text = m_sDEVICE_READ_ERROR;
-                    m_StatusTextBox.ForeColor = System.Drawing.Color.Black;
-                    m_StatusTextBox.BackColor = System.Drawing.Color.Red;
+                    SetStatusBoxError(m_sDEVICE_READ_ERROR);
                 }
                 // Read was successful
                 else
                 {
-                    // Record the new data point
-                    RecordDataPoint(fResult);
+                    try
+                    {
+                        // Record the new data point
+                        RecordDataPoint(fResult);
 
-                    // Update the displayed average and add the point to the chart
-                    m_CurrentAverageTextBox.Text = CurrentAverage;
-                    m_DataPointsTextBox.Text = NumDataPoints;
-                    m_MeanDeviationTextBox.Text = MeanDeviation;
-                    m_StandardDeviationTextBox.Text = StandardDeviation;
-                    m_ResultChart.AddPoint(fResult, m_Data.CurrentAverage);
+                        // Update the displayed average and add the point to the chart
+                        m_CurrentAverageTextBox.Text = CurrentAverage;
+                        m_DataPointsTextBox.Text = NumDataPoints;
+                        m_MeanDeviationTextBox.Text = MeanDeviation;
+                        m_StandardDeviationTextBox.Text = StandardDeviation;
+                        m_ResultChart.AddPoint(fResult, m_Data.CurrentAverage);
 
-                    // Clear any displayed errors 
-                    m_StatusTextBox.Text = RunningMessage;
-                    m_StatusTextBox.ForeColor = System.Drawing.Color.Black;
-                    m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
+                        // Clear any displayed errors 
+                        SetStatusBoxState(RunningMessage, System.Drawing.Color.Black, System.Drawing.SystemColors.Info);
+                    }
+                    catch (InvalidOperationException invalidOpEx)
+                    {
+                        // Handle file/operation errors and display in status bar
+                        SetIdleState();
+                        SetStatusBoxError(invalidOpEx.Message);
+                    }
+                    catch (UnauthorizedAccessException accessEx)
+                    {
+                        // Handle file access errors and display in status bar
+                        SetIdleState();
+                        SetStatusBoxError(accessEx.Message);
+                    }
+                    catch (System.IO.IOException ioEx)
+                    {
+                        // Handle file I/O errors and display in status bar
+                        SetIdleState();
+                        SetStatusBoxError($" File I/O error: {ioEx.Message}");
+                    }
+                    catch (Exception generalEx)
+                    {
+                        // Handle any other errors and display in status bar
+                        SetIdleState();
+                        SetStatusBoxError($" Unexpected error recording data: {generalEx.Message}");
+                    }
                 }
             }
         }
@@ -544,14 +624,12 @@ namespace RandomNumberGenerator
             if (false == bDeviceInitialized)
             {
                 // Most likely issue is that the device is not at the specified port number
-                m_StatusTextBox.BackColor = System.Drawing.Color.Red;
-                m_StatusTextBox.Text = m_sDEVICE_INIT_ERROR;
+                SetStatusBoxError(m_sDEVICE_INIT_ERROR);
             }
             else
             {
                 // Initialized successfully to clear any displayed errors
-                m_StatusTextBox.Text = m_sINIT_MESSAGE;
-                m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
+                SetStatusBoxState(m_sINIT_MESSAGE, System.Drawing.Color.Black, System.Drawing.SystemColors.Info);
             }
 
             // Restore the cursor
@@ -676,9 +754,8 @@ namespace RandomNumberGenerator
             // Reset the pause button
             m_PauseButton.Text = m_sPAUSE_BUTTON;
 
-            // Enable the file browser
-            //!!! mpullen - disable file support until functionality is fully implemented !!!
-            m_FileBrowseButton.Enabled = false;// true;
+            // Enable the file browser when not running a session
+            m_FileBrowseButton.Enabled = true;
 
             // Enable the target number field
             m_TargetComboBox.Enabled = true;
@@ -688,8 +765,7 @@ namespace RandomNumberGenerator
             m_PortComboBox.Enabled = true;
 
             // Update the info box
-            m_StatusTextBox.Text = m_sIDLE_MESSAGE;
-            m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
+            SetStatusBoxState(m_sIDLE_MESSAGE, System.Drawing.Color.Black, System.Drawing.SystemColors.Info);
         }
 
         /// <summary>
@@ -708,10 +784,7 @@ namespace RandomNumberGenerator
             m_Data.PauseSession();
 
             // Update the info box message
-            m_StatusTextBox.Text = m_sPAUSED_MESSAGE;
-
-            // Reset the background color of the info box
-            m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
+            SetStatusBoxState(m_sPAUSED_MESSAGE, System.Drawing.Color.Black, System.Drawing.SystemColors.Info);
         }
 
         /// <summary>
@@ -730,10 +803,7 @@ namespace RandomNumberGenerator
             m_Data.ResumeSession();
 
             // Update the info box message
-            m_StatusTextBox.Text = m_sIDLE_MESSAGE;
-
-            // Reset the background color of the info box
-            m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
+            SetStatusBoxState(m_sIDLE_MESSAGE, System.Drawing.Color.Black, System.Drawing.SystemColors.Info);
         }
 
         /// <summary>
@@ -744,22 +814,54 @@ namespace RandomNumberGenerator
         {
             bool bStatus = true;
 
-            // If the device has not been initialized
-            if (false == m_Timer.Initialized)
+            try
             {
-                // Initialize the device interface
-                InitializeInterface();
+                // If the device has not been initialized
+                if (false == m_Timer.Initialized)
+                {
+                    // Initialize the device interface
+                    InitializeInterface();
+                }
+
+                // Update the info box after initializing the device, which updates the status box as well
+                SetStatusBoxState(RunningMessage, System.Drawing.Color.Black, System.Drawing.SystemColors.Info);
+
+                // Start a new data session
+                bStatus = m_Data.StartSession();
+
+                // Start the read timer
+                m_Timer.Start();
+            }
+            catch (InvalidOperationException invalidOpEx)
+            {
+                // Handle file/operation errors and display in status bar
+                SetStatusBoxError(invalidOpEx.Message);
+                bStatus = false;
+            }
+            catch (UnauthorizedAccessException accessEx)
+            {
+                // Handle file access errors and display in status bar
+                SetStatusBoxError(accessEx.Message);
+                bStatus = false;
+            }
+            catch (System.IO.IOException ioEx)
+            {
+                // Handle file I/O errors and display in status bar
+                SetStatusBoxError($" File I/O error: {ioEx.Message}");
+                bStatus = false;
+            }
+            catch (Exception generalEx)
+            {
+                // Handle any other errors and display in status bar
+                SetStatusBoxError($" Unexpected error starting session: {generalEx.Message}");
+                bStatus = false;
             }
 
-            // Update the info box after initializing the device, which updates the status box as well
-            m_StatusTextBox.Text = RunningMessage;
-            m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
-
-            // Start a new data session
-            bStatus = m_Data.StartSession();
-
-            // Start the read timer
-            m_Timer.Start();
+            // If session start failed, ensure we're in idle state
+            if (!bStatus)
+            {
+                SetIdleState();
+            }
 
             return bStatus;
         }
@@ -852,6 +954,97 @@ namespace RandomNumberGenerator
             }
         }
 
+        /// <summary>
+        /// Loads session data from an existing file by working through the interface hierarchy
+        /// </summary>
+        /// <param name="sFilePath">IN - Path to the file to load</param>
+        /// <returns>true if successful; otherwise, false</returns>
+        private bool LoadExistingSessionFile(string sFilePath)
+        {
+            bool bStatus = false;
+            
+            try
+            {
+                // Load the session through the interface hierarchy
+                bStatus = m_Data.LoadSession(sFilePath);
+            }
+            catch (IOException fileIOException)
+            {
+                // Display file I/O error using helper method
+                SetStatusBoxError($" File I/O error accessing file {Path.GetFileName(sFilePath)}: {fileIOException.Message}");
+                bStatus = false;
+            }
+            catch (Exception generalException)
+            {
+                // Display general error using helper method
+                SetStatusBoxError($" Unexpected error accessing file {Path.GetFileName(sFilePath)}: {generalException.Message}");
+                bStatus = false;
+            }
+
+            return bStatus;
+        }
+
+        /// <summary>
+        /// Called when file loading operation completes (on UI thread)
+        /// </summary>
+        /// <param name="sFilePath">IN - Path to the file that was loaded</param>
+        /// <param name="bSuccess">IN - Whether the load operation succeeded</param>
+        private void OnFileLoadCompleted(string sFilePath, bool bSuccess)
+        {
+            // Re-enable UI controls
+            FileBrowseActive = false;
+
+            if (bSuccess)
+            {
+                // Update the file display
+                m_FileTextBox.Text = Path.GetFileName(sFilePath);
+                
+                // Show success status using helper method
+                SetStatusBoxState($" File selected: {Path.GetFileName(sFilePath)}. Ready for new session.", 
+                                System.Drawing.Color.Black, System.Drawing.Color.LightGreen);
+            }
+            else
+            {
+                // Show error status using helper method
+                SetStatusBoxError($" Error accessing file {Path.GetFileName(sFilePath)}. Please verify the file exists and is readable.");
+            }
+        }
+
+        /// <summary>
+        /// Updates the status box state in a thread-safe manner
+        /// </summary>
+        /// <param name="sText">IN - Text to display in the status box</param>
+        /// <param name="textColor">IN - Text color to set for the status box</param>
+        /// <param name="backColor">IN - Background color to set for the status box</param>
+        public void SetStatusBoxState(string sText, Color textColor, Color backColor)
+        {
+            // Update UI on the main thread
+            if (InvokeRequired)
+            {
+                Invoke(new Action(() =>
+                {
+                    m_StatusTextBox.Text = sText;
+                    m_StatusTextBox.ForeColor = textColor;
+                    m_StatusTextBox.BackColor = backColor;
+                }));
+            }
+            else
+            {
+                m_StatusTextBox.Text = sText;
+                m_StatusTextBox.ForeColor = textColor;
+                m_StatusTextBox.BackColor = backColor;
+            }
+        }
+
+        /// <summary>
+        /// Updates the status box with error information in a thread-safe manner
+        /// </summary>
+        /// <param name="sText">IN - Error text to display</param>
+        public void SetStatusBoxError(string sText)
+        {
+            SetStatusBoxState(sText, System.Drawing.Color.Black, System.Drawing.Color.Red);
+        }
+
         #endregion
         #region Properties
 
@@ -886,8 +1079,7 @@ namespace RandomNumberGenerator
                     else
                     {
                         // Enable the browse, start, and clear buttons
-                        //!!! mpullen - disable file support until functionality is fully implemented !!!
-                        m_FileBrowseButton.Enabled = false;// true;
+                        m_FileBrowseButton.Enabled = true;
                         m_StartButton.Enabled = true;
                         m_ClearButton.Enabled = true;
                     }
@@ -1006,6 +1198,7 @@ namespace RandomNumberGenerator
         private const string m_sPAUSED_MESSAGE = " Paused";
         private const string m_sCLOSE_STOP_SESSION = " Ending current session...";
         private const string m_sCLOSE_STOP_DEVICE_UPDATE = " Waiting for USB device search to end...";
+        private const string m_sFILE_LOAD_ERROR = " Error loading file. Please verify the file format is correct.";
 
         #endregion
     }

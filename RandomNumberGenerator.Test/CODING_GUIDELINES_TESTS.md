@@ -29,12 +29,12 @@ All test files must include the standardized header:
 // File Name:      [ClassName].Test.cs
 // Description:    Unit tests for the [ClassName] class
 //
-// Copyright (C) [Year] Mike Pullen. All Rights Reserved.
+// Copyright (C) 2025 Mike Pullen. All Rights Reserved.
 // Confidential and Proprietary
 //
 // Revision History: 
 //====================================================================================================================
-// [Date] - [Author] - [Description of changes]
+// 2025/07/21 - [Author] - [Description of changes]
 //*********************************************************************************************************************
 ```
 
@@ -531,6 +531,104 @@ Assert.AreEqual(expectedCount, actualCount);
 /// <summary>
 /// Tests [specific behavior] when [condition] to ensure [expected outcome]
 /// </summary>
+/// <exception cref="ExceptionType">Documents any exceptions that might be thrown during test execution</exception>
+```
+
+#### Exception Documentation in Tests
+All test methods that explicitly test exception scenarios or may throw exceptions should document them:
+
+```csharp
+/// <summary>
+/// Tests that the constructor throws ArgumentNullException when session data parameter is null
+/// </summary>
+/// <exception cref="System.ArgumentNullException">Expected exception when constructor parameter is null</exception>
+[TestMethod]
+[TestCategory("Component")]
+[ExpectedException(typeof(System.ArgumentNullException))]
+public void Constructor_NullSessionData_Exception()
+{
+    // Test implementation
+}
+```
+
+#### Exception Testing Documentation Standards
+- **Test Intent**: Clearly document which exception the test expects to receive
+- **Test Conditions**: Describe the conditions that should trigger the exception
+- **Expected Behavior**: Document that the exception is the expected and correct behavior
+- **Exception Types**: Use full type names for clarity in test documentation
+
+#### Exception Testing Best Practices
+```csharp
+// Good - documents expected exception and condition
+/// <summary>
+/// Tests that WriteDataPoint throws ArgumentNullException when dataPoint parameter is null
+/// </summary>
+/// <exception cref="System.ArgumentNullException">Expected exception for null parameter validation</exception>
+
+// Better - includes why this exception is appropriate
+/// <summary>
+/// Tests that StartSession throws InvalidOperationException when no file path is set,
+/// ensuring proper validation before attempting to create XML writer
+/// </summary>
+/// <exception cref="System.InvalidOperationException">Expected exception when file path validation fails</exception>
+
+// Best - documents expected user experience
+/// <summary>
+/// Tests that file access errors result in UnauthorizedAccessException being thrown,
+/// which should be caught by the GUI layer and displayed as a user-friendly error message
+/// </summary>
+/// <exception cref="System.UnauthorizedAccessException">Expected exception for file permission errors</exception>
+```
+
+#### Helper Method Exception Documentation
+Even test helper methods should document exceptions they might throw:
+
+```csharp
+/// <summary>
+/// Creates a mock XML writer configured for testing exception scenarios
+/// </summary>
+/// <param name="shouldThrow">IN - Whether the mock should throw exceptions</param>
+/// <returns>Configured mock XML writer</returns>
+/// <exception cref="ArgumentException">Thrown when mock configuration is invalid</exception>
+private Mock<IRNGXMLWriter> CreateMockWriter(bool shouldThrow)
+{
+    // Implementation
+}
+```
+
+### Exception Testing Patterns
+
+#### Comprehensive Exception Testing
+```csharp
+/// <summary>
+/// Tests all exception scenarios for WriteSessionStart method to ensure
+/// proper error handling and user feedback
+/// </summary>
+[TestMethod]
+[TestCategory("Component")]
+public void WriteSessionStart_ExceptionScenarios_ProperErrorHandling()
+{
+    //**************************************************************//
+    // Arrange
+    //**************************************************************//
+    
+    var xmlWriter = new RNGXMLWriter(); // No file path set
+    
+    //**************************************************************//
+    // Act & Assert
+    //**************************************************************//
+    
+    // Test missing file path exception
+    try
+    {
+        xmlWriter.WriteSessionStart("00:00:00", 0);
+        Assert.Fail("Expected InvalidOperationException was not thrown");
+    }
+    catch (InvalidOperationException ex)
+    {
+        StringAssert.Contains(ex.Message, "No file selected");
+    }
+}
 ```
 
 ### Inline Comments
@@ -543,6 +641,19 @@ var result = objectUnderTest.Method();
 
 // Verify the expected behavior occurred
 Assert.IsTrue(result);
+
+// Test exception scenarios to ensure robust error handling
+try
+{
+    objectUnderTest.MethodThatShouldThrow();
+    Assert.Fail("Expected exception was not thrown");
+}
+catch (ExpectedException ex)
+{
+    // Verify the exception message provides useful information
+    Assert.IsNotNull(ex.Message);
+    StringAssert.Contains(ex.Message, "expected error description");
+}
 ```
 
 ## Quality Guidelines
@@ -569,6 +680,21 @@ Before submitting test code, verify:
 - [ ] Resource cleanup
 - [ ] Test isolation
 - [ ] Edge case coverage
+- [ ] Exception testing for all error paths
+- [ ] Exception message validation in tests
+- [ ] Complete exception documentation using `<exception>` tags
+- [ ] Exception propagation testing where appropriate
+- [ ] Tests verify user-friendly error handling
+
+### Exception Testing Review
+When reviewing exception tests, verify:
+- [ ] All exception scenarios are tested
+- [ ] Exception messages are validated for usefulness
+- [ ] Exception types are verified to be appropriate
+- [ ] Exception propagation through layers is tested
+- [ ] User experience during exception conditions is tested
+- [ ] System stability after exceptions is verified
+- [ ] Test documentation explains expected exception behavior
 
 ## Build Integration
 
@@ -594,6 +720,13 @@ echo Copied to "$(TargetDir)"
 
 *This document should be updated as the test framework evolves and new testing patterns emerge.*
 
+## Recent Updates
+- Added comprehensive exception testing guidelines and documentation standards
+- Defined exception testing patterns for various error scenarios
+- Established requirements for testing exception propagation through application layers
+- Updated code review checklist to include exception testing verification
+- Added guidelines for validating exception messages and user experience during error conditions
+
 ### Exception Handling
 - Test exception scenarios using ExpectedException attribute
 - Verify proper error messages and exception types
@@ -617,3 +750,224 @@ if (bLoadSuccess)
 {
     // Assert success
 }
+```
+
+## Error Handling in Tests
+
+### Exception Testing Principles
+- **Comprehensive Coverage**: Test all exception paths to ensure robust error handling
+- **User Experience Focus**: Verify that exceptions result in appropriate user feedback
+- **Message Validation**: Assert that exception messages are helpful and actionable
+- **Exception Propagation**: Test that exceptions properly bubble up through the call stack
+- **Graceful Degradation**: Verify that the application remains stable after exceptions
+
+#### Exception Testing Guidelines
+```csharp
+// Good - tests specific exception type and message
+[TestMethod]
+[ExpectedException(typeof(ArgumentNullException))]
+public void Method_NullParameter_ThrowsArgumentNullException()
+{
+    // Test that validates proper parameter checking
+}
+
+// Better - validates exception message content
+[TestMethod]
+public void Method_InvalidState_ThrowsMeaningfulException()
+{
+    try
+    {
+        objectUnderTest.MethodThatShouldFail();
+        Assert.Fail("Expected exception was not thrown");
+    }
+    catch (InvalidOperationException ex)
+    {
+        StringAssert.Contains(ex.Message, "expected error description");
+        StringAssert.Contains(ex.Message, "user guidance");
+    }
+}
+
+// Best - tests complete error handling flow including GUI response
+[TestMethod]
+public void StartSession_FileAccessDenied_DisplaysErrorInStatusBar()
+{
+    // Arrange: Set up conditions that cause file access exception
+    // Act: Trigger the operation that should fail
+    // Assert: Verify exception is caught and status bar shows error
+}
+```
+
+### Exception Testing Categories
+
+#### Parameter Validation Testing
+Test that methods properly validate input parameters:
+
+```csharp
+/// <summary>
+/// Tests that all public methods properly validate null parameters
+/// and throw ArgumentNullException with descriptive messages
+/// </summary>
+[TestMethod]
+[TestCategory("Component")]
+public void PublicMethods_NullParameters_ThrowArgumentNullException()
+{
+    // Test multiple methods for consistent parameter validation
+}
+```
+
+#### State Validation Testing
+Test that methods check object state before execution:
+
+```csharp
+/// <summary>
+/// Tests that operations requiring initialization throw InvalidOperationException
+/// when called on uninitialized objects
+/// </summary>
+[TestMethod]
+[TestCategory("Component")]
+public void Operations_UninitializedObject_ThrowInvalidOperationException()
+{
+    // Test that proper state checking is implemented
+}
+```
+
+#### External Dependency Error Testing
+Test handling of external system failures:
+
+```csharp
+/// <summary>
+/// Tests that file I/O errors are properly handled and result in appropriate
+/// IOException being thrown with meaningful error messages
+/// </summary>
+[TestMethod]
+[TestCategory("Integration")]
+public void FileOperations_IOErrors_ThrowIOException()
+{
+    // Test external dependency error handling
+}
+```
+
+### Exception Testing
+```csharp
+// Use ExpectedException attribute for simple exception testing
+[ExpectedException(typeof(ArgumentNullException))]
+
+// For more complex exception testing, use try-catch
+try
+{
+    // Action that should throw
+    objectUnderTest.MethodThatShouldThrow();
+    Assert.Fail("Expected exception was not thrown");
+}
+catch (ExpectedException ex)
+{
+    // Verify exception details
+    Assert.IsNotNull(ex.Message);
+    StringAssert.Contains(ex.Message, "expected content");
+}
+
+// Test exception chaining and inner exceptions
+catch (Exception ex)
+{
+    Assert.IsNotNull(ex.InnerException);
+    Assert.IsInstanceOfType(ex.InnerException, typeof(ExpectedInnerException));
+}
+```
+
+### Exception Message Testing
+Always verify that exception messages provide value to developers and users:
+
+```csharp
+/// <summary>
+/// Tests that exception messages contain actionable information for users
+/// </summary>
+[TestMethod]
+public void Exceptions_ContainActionableMessages()
+{
+    try
+    {
+        // Trigger exception condition
+        objectUnderTest.FailingMethod();
+        Assert.Fail("Expected exception was not thrown");
+    }
+    catch (InvalidOperationException ex)
+    {
+        // Verify message provides context
+        StringAssert.Contains(ex.Message, "what went wrong");
+        StringAssert.Contains(ex.Message, "what user should do");
+        
+        // Verify message is user-friendly, not just technical
+        Assert.IsFalse(ex.Message.Contains("null reference"));
+        Assert.IsTrue(ex.Message.contains("file") || ex.Message.contains("select"));
+    }
+}
+```
+
+### Validation Testing
+```csharp
+// Test both valid and invalid inputs
+[TestMethod]
+public void Method_ValidInput_Success() { /* ... */ }
+
+[TestMethod]
+public void Method_InvalidInput_Failure() { /* ... */ }
+
+// Test boundary conditions that might cause exceptions
+[TestMethod]
+public void Method_BoundaryConditions_ProperHandling() { /* ... */ }
+```
+
+### Exception Propagation Testing
+Test that exceptions properly flow through the application layers:
+
+```csharp
+/// <summary>
+/// Tests that XML writer exceptions properly propagate to the GUI layer
+/// and result in status bar error messages being displayed to the user
+/// </summary>
+[TestMethod]
+[TestCategory("Integration")]
+public void XMLWriterException_PropagatesCorrectly_DisplaysInStatusBar()
+{
+    //**************************************************************//
+    // Arrange
+    //**************************************************************//
+    
+    // Set up mock that throws exception
+    var mockWriter = new Mock<IRNGXMLWriter>();
+    mockWriter.Setup(w => w.WriteSessionStart(It.IsAny<string>(), It.IsAny<int>()))
+              .Throws(new InvalidOperationException("Test exception message"));
+    
+    //**************************************************************//
+    // Act
+    //**************************************************************//
+    
+    // Trigger operation that should propagate exception
+    bool result = sessionDataFile.StartSession(mockSessionData.Object);
+    
+    //**************************************************************//
+    // Assert
+    //**************************************************************//
+    
+    // Verify exception was caught and handled appropriately
+    Assert.IsFalse(result);
+    // Additional assertions to verify error was logged/displayed
+}
+```
+
+### Exception Documentation Requirements for Tests
+- Document all expected exceptions in test methods using `<exception>` tags
+- Include the purpose of exception testing in test summaries
+- Verify that exception messages are helpful for debugging
+- Test that exceptions don't leave the system in an invalid state
+- Ensure exceptions are properly logged or displayed to users when appropriate
+
+## Quality Guidelines
+
+### Exception Testing Coverage
+As part of comprehensive testing, ensure:
+- All public methods that can throw exceptions have corresponding exception tests
+- Exception messages are validated for usefulness
+- Exception types are appropriate for the error conditions
+- Exception handling doesn't mask important error information
+- System remains stable after exception conditions

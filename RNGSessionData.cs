@@ -11,6 +11,7 @@
 //*********************************************************************************************************************
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Windows.Forms.DataVisualization.Charting;
@@ -40,6 +41,8 @@ namespace RandomNumberGenerator
 
         bool AddDataPoint(double fDataPoint);
         void EndSession();
+        bool LoadSession(string sFilePath);
+        bool LoadDataPointsBatch(IEnumerable<double> dataPoints, uint uMaxCount = 0);
         void PauseSession();
         void Reset();
         void ResumeSession();
@@ -99,21 +102,47 @@ namespace RandomNumberGenerator
             EndSession();
 
             // Start a new session
-            bool bStatus = (null != m_DataFile);
-            if (bStatus)
+            bool bStatus = false;
+            
+            try
             {
-                bStatus = m_DataFile.StartSession(this);
-            }
+                // Validate data file exists
+                if (null == m_DataFile)
+                {
+                    throw new InvalidOperationException(" No data file interface available.");
+                }
 
-            // Then start the timer
-            bStatus = (null != m_Timer);
-            if (bStatus)
+                // Start the file session
+                bStatus = m_DataFile.StartSession(this);
+
+                // Then start the timer if file session was successful
+                if (bStatus && null != m_Timer)
+                {
+                    m_Timer.Start();
+                }
+            }
+            catch (InvalidOperationException)
             {
-                m_Timer.Start();
+                // Re-throw InvalidOperationException to be handled by calling code
+                throw;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Re-throw UnauthorizedAccessException to be handled by calling code
+                throw;
+            }
+            catch (System.IO.IOException)
+            {
+                // Re-throw IO exceptions to be handled by calling code
+                throw;
+            }
+            catch (Exception)
+            {
+                // Re-throw other exceptions to be handled by calling code
+                throw;
             }
 
             return bStatus;
-
         }
 
         /// <summary>
@@ -220,24 +249,56 @@ namespace RandomNumberGenerator
             // Default to true as the call is successful if nothings needs to be done
             bool bStatus = true;
 
-            // If flushing and unwritten data exists
-            bool bFlushUnwritten = (bFlush && (0 < m_iPendingDataPointCounter));
-
-            // if the data point interval has been reached
-            bool bWritePending = (WRITE_FILE_INTERVAL <= m_iPendingDataPointCounter);
-
-            // Write the data point if either condition is met
-            if (bFlushUnwritten || bWritePending)
+            try
             {
-                // Write the data point and reset the counter
-                XMLDataPoint dataPoint = new XMLDataPoint(SessionTime, CurrentAverage);
-                bStatus = (m_DataFile != null);
-                if (bStatus)
-                {
-                    bStatus = m_DataFile.WriteDataPoint(dataPoint);
-                }
+                // If flushing and unwritten data exists
+                bool bFlushUnwritten = (bFlush && (0 < m_iPendingDataPointCounter));
 
-                m_iPendingDataPointCounter = 0;
+                // if the data point interval has been reached
+                bool bWritePending = (WRITE_FILE_INTERVAL <= m_iPendingDataPointCounter);
+
+                // Write the data point if either condition is met
+                if (bFlushUnwritten || bWritePending)
+                {
+                    // Write the data point and reset the counter
+                    XMLDataPoint dataPoint = new XMLDataPoint(SessionTime, CurrentAverage);
+                    
+                    if (null == m_DataFile)
+                    {
+                        throw new InvalidOperationException(" No data file available for writing.");
+                    }
+
+                    bStatus = m_DataFile.WriteDataPoint(dataPoint);
+                    
+                    if (bStatus)
+                    {
+                        m_iPendingDataPointCounter = 0;
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException(" Failed to write data point to file.");
+                    }
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // Re-throw InvalidOperationException to be handled by calling code
+                throw;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Re-throw UnauthorizedAccessException to be handled by calling code
+                throw;
+            }
+            catch (System.IO.IOException)
+            {
+                // Re-throw IO exceptions to be handled by calling code
+                throw;
+            }
+            catch (Exception)
+            {
+                // Re-throw other exceptions to be handled by calling code
+                throw;
             }
 
             return bStatus;
@@ -269,6 +330,139 @@ namespace RandomNumberGenerator
             Interlocked.Exchange(ref m_iNumDataPoints, 0);
             Interlocked.Exchange(ref m_fMeanDeviation, 0.0);
             Interlocked.Exchange(ref m_fStandardDeviation, 0.0);
+        }
+
+        /// <summary>
+        /// Loads session data from an existing XML file through the interface hierarchy
+        /// </summary>
+        /// <param name="sFilePath">IN - Path to the session file to load</param>
+        /// <returns>true if successful; otherwise, false</returns>
+        public bool LoadSession(string sFilePath)
+        {
+            // Validate parameters
+            if (string.IsNullOrEmpty(sFilePath))
+            {
+                return false;
+            }
+
+            // Validate the file exists and is readable
+            if (false == System.IO.File.Exists(sFilePath))
+            {
+                return false;
+            }
+
+            bool bStatus = false;
+
+            try
+            {
+                // Reset current session data to prepare for new data
+                Reset();
+
+                // Use the data file interface to load the session (maintains loose coupling)
+                bStatus = m_DataFile.LoadSession(this, sFilePath);
+            }
+            catch (System.IO.IOException)
+            {
+                // Re-throw IO exceptions to be handled by calling code
+                throw;
+            }
+            catch (System.IO.InvalidDataException)
+            {
+                // Re-throw InvalidDataException (from XML reader errors) to be handled by calling code
+                throw;
+            }
+            catch (System.Exception)
+            {
+                // Re-throw other exceptions to be handled by calling code
+                throw;
+            }
+
+            return bStatus;
+        }
+
+        /// <summary>
+        /// Loads a batch of data points into the session
+        /// </summary>
+        /// <param name="dataPoints">IN - Collection of data points to load</param>
+        /// <param name="uMaxCount">IN - Maximum number of points to load from the collection (0 = no limit)</param>
+        /// <returns>true if successful; otherwise, false</returns>
+        public bool LoadDataPointsBatch(IEnumerable<double> dataPoints, uint uMaxCount = 0)
+        {
+            // Validate parameters
+            if (null == dataPoints)
+            {
+                return false;
+            }
+
+            bool bStatus = true;
+            uint uProcessedCount = 0;
+
+            try
+            {
+                // Process each data point in the batch
+                foreach (double fDataPoint in dataPoints)
+                {
+                    // Check if we've reached the maximum count limit
+                    if ((uMaxCount > 0) && (uProcessedCount >= uMaxCount))
+                    {
+                        break;
+                    }
+
+                    // Use a modified version of AddDataPoint that doesn't trigger file writes
+                    // This is more efficient for batch loading
+                    lock (m_DataLock)
+                    {
+                        // Check if the data set is full (respect existing DataWindowSize)
+                        if (m_DataPoints.Count >= m_iDataWindowSize)
+                        {
+                            double fResult; // unused out parameter
+                            m_DataPoints.TryDequeue(out fResult);
+                        }
+
+                        // Add the point to the data set
+                        m_DataPoints.Enqueue(fDataPoint);
+                    }
+
+                    ++uProcessedCount;
+                }
+
+                // After batch processing, update statistics once for efficiency
+                if (uProcessedCount > 0)
+                {
+                    UpdateStatistics();
+                }
+            }
+            catch (System.OutOfMemoryException)
+            {
+                // Handle memory issues during batch processing
+                bStatus = false;
+            }
+            catch (System.Exception)
+            {
+                // Any other errors during batch processing
+                bStatus = false;
+            }
+
+            return bStatus;
+        }
+
+        /// <summary>
+        /// Updates all calculated statistics for the current data set
+        /// </summary>
+        private void UpdateStatistics()
+        {
+            // Update the current average and count
+            Interlocked.Exchange(ref m_fCurrentAverage, m_DataPoints.Average());
+            Interlocked.Exchange(ref m_iNumDataPoints, m_DataPoints.Count);
+
+            // Calculate the mean deviation
+            double fMeanDev = 0.5 - m_fCurrentAverage;
+            fMeanDev = Math.Abs(fMeanDev);
+            Interlocked.Exchange(ref m_fMeanDeviation, fMeanDev);
+
+            // Calculate the standard deviation
+            double fStandardDev = CalculateStandardDeviation();
+            Interlocked.Exchange(ref m_fStandardDeviation, fStandardDev);
         }
 
         /// <summary>
@@ -411,6 +605,11 @@ namespace RandomNumberGenerator
         public IRNGSessionTimer Timer { get => m_Timer; }
 
         /// <summary>
+        /// Number of data points pending to be written to the file (read-only)
+        /// </summary>
+        public uint PendingDataPointCounter { get => m_iPendingDataPointCounter; }
+
+        /// <summary>
         /// Interval at which data points should be written to the data file (read-only)
         /// </summary>
         public uint WriteFileInterval { get => WRITE_FILE_INTERVAL; }
@@ -426,7 +625,7 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Interval at which data should be record to the file (if used)
         /// </summary>
-        private const uint WRITE_FILE_INTERVAL = 1000;
+        private const uint WRITE_FILE_INTERVAL = 1;
 
         #endregion
         #region Data Members
