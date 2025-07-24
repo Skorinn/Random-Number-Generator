@@ -89,6 +89,12 @@ namespace RandomNumberGenerator
         /// <returns>true if successful; otherwise, false</returns>
         public bool StartSession(IRNGSessionData sessionData)
         {
+            // If a session is already in progress, there is nothing to do
+            if (true == m_bSessionInProgress)
+            {
+                return true;
+            }
+
             // Session data object provided cannot be null
             if (null == sessionData)
             {

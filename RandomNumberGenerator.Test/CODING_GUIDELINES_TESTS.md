@@ -752,6 +752,33 @@ if (bLoadSuccess)
 }
 ```
 
+### Well-Named Constants for Method Parameters in Tests
+- Use descriptive, well-named constants for boolean and other parameters in test method calls
+- This improves test readability, maintainability, and makes test intent clearer
+- Constants should clearly indicate the purpose and expected behavior being tested
+
+```csharp
+// Incorrect - magic boolean literals in tests
+CreateWriter(true, false);
+timer.InitializeDevice(123, true);
+
+// Correct - use well-named constants in tests
+const bool bAPPEND_MODE = true;
+const bool bRECREATE = false;
+CreateWriter(bAPPEND_MODE, bRECREATE);
+
+const int iTEST_SEED = 123;
+const bool bSIMULATE_DEVICE = true;
+timer.InitializeDevice(iTEST_SEED, bSIMULATE_DEVICE);
+```
+
+#### Benefits in Test Code
+- **Test Intent Clarity**: Constants make the test purpose immediately obvious
+- **Easier Test Maintenance**: Parameter changes are centralized and named
+- **Better Test Documentation**: Constants serve as inline documentation
+- **Reduced Test Errors**: Less likely to pass wrong parameters in test setup
+- **Improved Test Debugging**: Breakpoints can be set on constant declarations
+
 ## Error Handling in Tests
 
 ### Exception Testing Principles

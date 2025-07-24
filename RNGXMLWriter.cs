@@ -112,8 +112,9 @@ namespace RandomNumberGenerator
                 }
 
                 // Create (or recreate) the writer
+                const bool bAPPEND_MODE = false;
                 const bool bRECREATE = true;
-                bStatus = CreateWriter(bRECREATE);
+                bStatus = CreateWriter(bAPPEND_MODE, bRECREATE);
 
                 // If the writer was created, write the session start tag
                 if (bStatus && null != m_Writer)
@@ -222,7 +223,9 @@ namespace RandomNumberGenerator
             lock (this)
             {
                 // Create the writer if it doesn't exist
-                bStatus = CreateWriter();
+                const bool bAPPEND_MODE = false;
+                const bool bRECREATE = false;
+                bStatus = CreateWriter(bAPPEND_MODE, bRECREATE);
 
                 // If the writer was created, write the session end tag
                 if (bStatus && null != m_Writer)
@@ -296,17 +299,16 @@ namespace RandomNumberGenerator
 
                     // For appending to XML files, we need to:
                     // 1. Read the existing file to memory
-                    // 2. Remove the closing session tag
+                    // 2. Remove the closing session tag and document end
                     // 3. Create a new writer that will continue from that point
-                    
-                    // This is a simplified approach - in a full implementation, 
-                    // you might use XDocument or other XML manipulation techniques
                     bStatus = PrepareFileForAppending();
                     
                     if (bStatus)
                     {
-                        // Create the writer for the modified file
-                        bStatus = CreateWriter();
+                        // Create the writer for the modified file using append mode
+                        const bool bAPPEND_MODE = true;
+                        const bool bRECREATE = false;
+                        bStatus = CreateWriter(bAPPEND_MODE, bRECREATE);
                         if (!bStatus)
                         {
                             throw new InvalidOperationException(" Unable to create XML writer after preparing file for append.");
@@ -402,13 +404,14 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Attempts to create the XML writer object
         /// </summary>
+        /// <param name="bAppendMode">IN - True to create writer in append mode (default = false)</param>
         /// <param name="bRecreate">IN - True to recreate the writer if it already exists (default = false)</param>
         /// <returns>true if successful; otherwise, false</returns>
         /// <exception cref="System.ArgumentException">Thrown when file path or settings are invalid</exception>
         /// <exception cref="UnauthorizedAccessException">Thrown when file access is denied</exception>
         /// <exception cref="System.IO.DirectoryNotFoundException">Thrown when the directory does not exist</exception>
         /// <exception cref="System.IO.IOException">Thrown when file I/O operations fail</exception>
-        private bool CreateWriter(bool bRecreate = false)
+        private bool CreateWriter(bool bAppendMode = false, bool bRecreate = false)
         {
             // Default to success in case the writer is already created
             bool bStatus = true;
@@ -432,8 +435,38 @@ namespace RandomNumberGenerator
                         throw new InvalidOperationException(" File path is not set. Cannot create XML writer without a valid file path.");
                     }
 
-                    // Attempt to create the writer
-                    m_Writer = XmlWriter.Create(m_sFilePath, m_Settings);
+                    // Create writer based on mode (append vs. new file)
+                    if (bAppendMode)
+                    {
+                        // Store original settings values to restore later
+                        bool originalOmitDeclaration = m_Settings.OmitXmlDeclaration;
+                        ConformanceLevel originalConformanceLevel = m_Settings.ConformanceLevel;
+
+                        try
+                        {
+                            // Create a FileStream in append mode
+                            var fileStream = new System.IO.FileStream(m_sFilePath, System.IO.FileMode.Append, System.IO.FileAccess.Write);
+                            
+                            // Modify settings for appending (no declaration, fragment mode)
+                            m_Settings.OmitXmlDeclaration = true; // Don't write XML declaration when appending
+                            m_Settings.ConformanceLevel = ConformanceLevel.Fragment; // Allow fragments for appending
+                            
+                            // Create the writer with the file stream
+                            m_Writer = XmlWriter.Create(fileStream, m_Settings);
+                        }
+                        finally
+                        {
+                            // Restore original settings
+                            m_Settings.OmitXmlDeclaration = originalOmitDeclaration;
+                            m_Settings.ConformanceLevel = originalConformanceLevel;
+                        }
+                    }
+                    else
+                    {
+                        // Normal mode - create new file or overwrite existing
+                        m_Writer = XmlWriter.Create(m_sFilePath, m_Settings);
+                    }
+
                     bStatus = (m_Writer != null);
                     
                     if (!bStatus)

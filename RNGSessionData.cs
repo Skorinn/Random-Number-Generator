@@ -107,10 +107,6 @@ namespace RandomNumberGenerator
         /// <returns>true if successful; otherwise, false</returns>
         public bool StartSession()
         {
-            // End any session currently in progress
-            EndSession();
-
-            // Start a new session
             bool bStatus = false;
             
             try

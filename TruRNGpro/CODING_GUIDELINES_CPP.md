@@ -382,6 +382,35 @@ if (bInitialized)
 }
 ```
 
+### Well-Named Constants for Method Parameters
+- Use descriptive, well-named constants for boolean and other parameters in method calls
+- This improves code readability, maintainability, and self-documentation
+- Constants should clearly indicate the purpose and meaning of the parameter
+
+```cpp
+// Incorrect - magic boolean literals
+CreateConnection(true, false);
+ProcessBuffer(false, true, 4096);
+
+// Correct - use well-named constants
+const bool bENABLE_SSL = true;
+const bool bALLOW_RECONNECT = false;
+CreateConnection(bENABLE_SSL, bALLOW_RECONNECT);
+
+const bool bVALIDATE_CHECKSUM = false;
+const bool bFORCE_PROCESSING = true;
+const size_t iMAX_BUFFER_SIZE = 4096;
+ProcessBuffer(bVALIDATE_CHECKSUM, bFORCE_PROCESSING, iMAX_BUFFER_SIZE);
+```
+
+#### Benefits of Well-Named Constants
+- **Self-Documenting Code**: The constant name explains what the parameter does
+- **Easier Debugging**: Breakpoints can be set on constant declarations
+- **Reduced Errors**: Less likely to pass parameters in wrong order
+- **Better Maintenance**: Changes to parameter values are centralized
+- **Improved Readability**: Code reads like natural language
+- **Compile-Time Optimization**: Compiler can optimize constant expressions
+
 ## Interface Design
 
 ### Abstract Base Classes

@@ -286,6 +286,34 @@ if (bSessionFound)
 }
 ```
 
+### Well-Named Constants for Method Parameters
+- Use descriptive, well-named constants for boolean and other parameters in method calls
+- This improves code readability, maintainability, and self-documentation
+- Constants should clearly indicate the purpose and meaning of the parameter
+
+```csharp
+// Incorrect - magic boolean literals
+CreateWriter(true, false);
+ProcessData(false, true, 1024);
+
+// Correct - use well-named constants
+const bool bAPPEND_MODE = true;
+const bool bRECREATE = false;
+CreateWriter(bAPPEND_MODE, bRECREATE);
+
+const bool bVALIDATE_INPUT = false;
+const bool bFORCE_PROCESSING = true;
+const int iMAX_BUFFER_SIZE = 1024;
+ProcessData(bVALIDATE_INPUT, bFORCE_PROCESSING, iMAX_BUFFER_SIZE);
+```
+
+#### Benefits of Well-Named Constants
+- **Self-Documenting Code**: The constant name explains what the parameter does
+- **Easier Debugging**: Breakpoints can be set on constant declarations
+- **Reduced Errors**: Less likely to pass parameters in wrong order
+- **Better Maintenance**: Changes to parameter values are centralized
+- **Improved Readability**: Code reads like natural language
+
 ## Threading and Concurrency
 
 ### Thread Safety

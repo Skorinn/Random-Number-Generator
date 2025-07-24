@@ -367,26 +367,27 @@ namespace RandomNumberGenerator
 
             // Prompt the user to select a file
             string sSelectedFile = null;
-            using (OpenFileDialog dataFileOpenDialog = new OpenFileDialog())
+            using (SaveFileDialog dataFileSaveDialog = new SaveFileDialog())
             {
                 // Generate a default file name with the format: session_YYYYMMDD_HHMMSS.rng
-                dataFileOpenDialog.Title = "Create or open a Random Number Generator data file";
-                dataFileOpenDialog.FileName = $"session_{DateTime.Now:yyyyMMdd_HHmmss}.rng";
-                dataFileOpenDialog.Filter = "RNG data files (*.rng)|*.rng|All files (*.*)|*.*";
-                dataFileOpenDialog.DefaultExt = "rng";
-                dataFileOpenDialog.AddExtension = true;
+                dataFileSaveDialog.Title = "Create or open a Random Number Generator data file";
+                dataFileSaveDialog.FileName = $"session_{DateTime.Now:yyyyMMdd_HHmmss}.rng";
+                dataFileSaveDialog.Filter = "RNG data files (*.rng)|*.rng|All files (*.*)|*.*";
+                dataFileSaveDialog.DefaultExt = "rng";
+                dataFileSaveDialog.AddExtension = true;
 
-                // Allow creation of new files but directory must exist
-                dataFileOpenDialog.CheckFileExists = false;
-                dataFileOpenDialog.CheckPathExists = true;
-                dataFileOpenDialog.ValidateNames = true;
-                dataFileOpenDialog.DereferenceLinks = true;
+                // Allow creation of new files and ensure directory exists
+                dataFileSaveDialog.CheckFileExists = false;
+                dataFileSaveDialog.CheckPathExists = true;
+                dataFileSaveDialog.ValidateNames = true;
+                dataFileSaveDialog.DereferenceLinks = true;
+                dataFileSaveDialog.OverwritePrompt = false; // We'll handle this ourselves since we want to load existing files
 
-                // Show the file open dialog
-                DialogResult result = dataFileOpenDialog.ShowDialog();
+                // Show the file save dialog (which allows creating new files)
+                DialogResult result = dataFileSaveDialog.ShowDialog();
                 if (DialogResult.OK == result)
                 {
-                    sSelectedFile = dataFileOpenDialog.FileName;
+                    sSelectedFile = dataFileSaveDialog.FileName;
                 }
             }
 
@@ -400,6 +401,9 @@ namespace RandomNumberGenerator
             // If the file is being changed
             if (FileBrowseActive)
             {
+                // A new session file has been selected, so end the current session
+                EndSession();
+
                 // Check if the file exists
                 bool bFileExists = File.Exists(sSelectedFile);
                 if (bFileExists)
@@ -469,6 +473,9 @@ namespace RandomNumberGenerator
             // Make sure any running session is stoped
             m_StatusTextBox.Text = m_sCLOSE_STOP_SESSION;
             StopButton_Click(sender, e);
+
+            // End the current session
+            EndSession();
 
             // Signal the device update thread to stop and wait for it to complete (10 second timeout)
             m_StatusTextBox.Text = m_sCLOSE_STOP_DEVICE_UPDATE;
@@ -763,14 +770,14 @@ namespace RandomNumberGenerator
         /// </summary>
         private void SetIdleState()
         {
+            // Stop the read timer if running
+            m_Timer.Stop();
+
             // Set the state only if not terminating
             if (RngGuiStates.Terminating != m_State)
             {
                 m_State = RngGuiStates.Idle;
             }
-
-            // End the current session
-            EndSession();
 
             // Update the button statuses
             m_StartButton.Enabled = true;
@@ -783,8 +790,7 @@ namespace RandomNumberGenerator
             // Enable the file browser when not running a session
             m_FileBrowseButton.Enabled = true;
 
-            // Enable the target number field
-            m_TargetComboBox.Enabled = true;
+            // Target number field stays disabled until the session is ended
 
             // Enable the interface controls
             m_SimulateToggle.Enabled = true;
@@ -906,6 +912,9 @@ namespace RandomNumberGenerator
 
             // End the current session
             m_Data.EndSession();
+
+            // Enable the target number field for the next session
+            m_TargetComboBox.Enabled = true;
 
             return bStatus;
         }
