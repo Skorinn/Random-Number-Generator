@@ -112,7 +112,7 @@ namespace RandomNumberGenerator
                 {
                     // Write the session start
                     m_bSessionInProgress = true;
-                    bStatus = m_Writer.WriteSessionStart(sessionData.SessionTime, sessionData.TargetValue);
+                    bStatus = m_Writer.WriteSessionStart(sessionData.Simulated, sessionData.TargetValue);
                 }
                 else
                 {

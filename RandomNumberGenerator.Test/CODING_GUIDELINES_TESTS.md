@@ -621,7 +621,7 @@ public void WriteSessionStart_ExceptionScenarios_ProperErrorHandling()
     // Test missing file path exception
     try
     {
-        xmlWriter.WriteSessionStart("00:00:00", 0);
+        xmlWriter.WriteSessionStart(false, 0);
         Assert.Fail("Expected InvalidOperationException was not thrown");
     }
     catch (InvalidOperationException ex)
@@ -752,249 +752,78 @@ if (bLoadSuccess)
 }
 ```
 
+### Order of Operations with Parentheses in Tests
+- Always use parentheses to explicitly denote order of operations in complex test expressions
+- Do not rely on operator precedence rules that may be unclear to other developers
+- This improves test readability, maintainability, and reduces the chance of test logic errors
+
+```csharp
+// Incorrect - unclear operator precedence in test assertions
+Assert.IsTrue(bCallbackExecuted && iCallCount > 0 || bForceSuccess);
+
+// Correct - explicit order of operations with parentheses
+Assert.IsTrue((bCallbackExecuted && (iCallCount > 0)) || bForceSuccess);
+
+// Incorrect - mathematical test expression without clear precedence
+double fExpected = fBase + fOffset * fMultiplier / fDivisor;
+
+// Correct - explicit order with parentheses
+double fExpected = fBase + ((fOffset * fMultiplier) / fDivisor);
+
+// Incorrect - complex test condition without clear precedence
+if (mockObject.Invocations.Count > 0 && bTestPassed || bIgnoreFailures)
+{
+    // Test validation
+}
+
+// Correct - explicit order with parentheses
+if ((mockObject.Invocations.Count > 0 && bTestPassed) || bIgnoreFailures)
+{
+    // Test validation
+}
+```
+
+#### Benefits of Explicit Parentheses in Tests
+- **Clear Test Intent**: Makes the intended logic of test assertions obvious
+- **Reduced Test Errors**: Prevents bugs in test logic caused by incorrect operator precedence
+- **Better Test Maintenance**: Future developers can understand test logic without memorizing precedence rules
+- **Improved Test Debugging**: Complex test conditions are easier to understand during debugging
+- **Test Reliability**: Ensures test conditions evaluate as intended
+
+### String Usage and Literals in Tests
+- Use `string.Empty` instead of `""` for empty string literals in test code
+- Use `string.IsNullOrEmpty()` for checking empty or null strings in test validation
+- Use string interpolation over concatenation for test messages and expected values
+- Ensure string comparisons in tests are explicit and clear
+
+```csharp
+// Incorrect - empty string literal in tests
+const string sEXPECTED_EMPTY_RESULT = "";
+Assert.AreEqual("", actualResult);
+
+// Correct - use string.Empty in tests
+const string sEXPECTED_EMPTY_RESULT = string.Empty;
+Assert.AreEqual(string.Empty, actualResult);
+
+// Better - use descriptive test validation
+Assert.IsTrue(string.IsNullOrEmpty(actualResult), "Result should be null or empty");
+
+// Incorrect - string concatenation in test messages
+Assert.IsTrue(bResult, "Test failed for file " + sTestFile + " with value " + iTestValue.ToString());
+
+// Correct - string interpolation in test messages
+Assert.IsTrue(bResult, $"Test failed for file {sTestFile} with value {iTestValue}");
+
+// Test data setup with string.Empty
+const string sEMPTY_PATH = string.Empty;
+const string sVALID_PATH = "TestFile.xml";
+```
+
+#### Benefits of string.Empty in Tests
+- **Test Clarity**: Makes empty string expectations explicit in test assertions
+- **Performance**: Avoids repeated string allocations during test execution
+- **Consistency**: Maintains consistency with production code conventions
+- **Test Reliability**: Reduces ambiguity in string comparison tests
+- **Better Test Messages**: Clear distinction between null, empty, and whitespace scenarios
+
 ### Well-Named Constants for Method Parameters in Tests
-- Use descriptive, well-named constants for boolean and other parameters in test method calls
-- This improves test readability, maintainability, and makes test intent clearer
-- Constants should clearly indicate the purpose and expected behavior being tested
-
-```csharp
-// Incorrect - magic boolean literals in tests
-CreateWriter(true, false);
-timer.InitializeDevice(123, true);
-
-// Correct - use well-named constants in tests
-const bool bAPPEND_MODE = true;
-const bool bRECREATE = false;
-CreateWriter(bAPPEND_MODE, bRECREATE);
-
-const int iTEST_SEED = 123;
-const bool bSIMULATE_DEVICE = true;
-timer.InitializeDevice(iTEST_SEED, bSIMULATE_DEVICE);
-```
-
-#### Benefits in Test Code
-- **Test Intent Clarity**: Constants make the test purpose immediately obvious
-- **Easier Test Maintenance**: Parameter changes are centralized and named
-- **Better Test Documentation**: Constants serve as inline documentation
-- **Reduced Test Errors**: Less likely to pass wrong parameters in test setup
-- **Improved Test Debugging**: Breakpoints can be set on constant declarations
-
-## Error Handling in Tests
-
-### Exception Testing Principles
-- **Comprehensive Coverage**: Test all exception paths to ensure robust error handling
-- **User Experience Focus**: Verify that exceptions result in appropriate user feedback
-- **Message Validation**: Assert that exception messages are helpful and actionable
-- **Exception Propagation**: Test that exceptions properly bubble up through the call stack
-- **Graceful Degradation**: Verify that the application remains stable after exceptions
-
-#### Exception Testing Guidelines
-```csharp
-// Good - tests specific exception type and message
-[TestMethod]
-[ExpectedException(typeof(ArgumentNullException))]
-public void Method_NullParameter_ThrowsArgumentNullException()
-{
-    // Test that validates proper parameter checking
-}
-
-// Better - validates exception message content
-[TestMethod]
-public void Method_InvalidState_ThrowsMeaningfulException()
-{
-    try
-    {
-        objectUnderTest.MethodThatShouldFail();
-        Assert.Fail("Expected exception was not thrown");
-    }
-    catch (InvalidOperationException ex)
-    {
-        StringAssert.Contains(ex.Message, "expected error description");
-        StringAssert.Contains(ex.Message, "user guidance");
-    }
-}
-
-// Best - tests complete error handling flow including GUI response
-[TestMethod]
-public void StartSession_FileAccessDenied_DisplaysErrorInStatusBar()
-{
-    // Arrange: Set up conditions that cause file access exception
-    // Act: Trigger the operation that should fail
-    // Assert: Verify exception is caught and status bar shows error
-}
-```
-
-### Exception Testing Categories
-
-#### Parameter Validation Testing
-Test that methods properly validate input parameters:
-
-```csharp
-/// <summary>
-/// Tests that all public methods properly validate null parameters
-/// and throw ArgumentNullException with descriptive messages
-/// </summary>
-[TestMethod]
-[TestCategory("Component")]
-public void PublicMethods_NullParameters_ThrowArgumentNullException()
-{
-    // Test multiple methods for consistent parameter validation
-}
-```
-
-#### State Validation Testing
-Test that methods check object state before execution:
-
-```csharp
-/// <summary>
-/// Tests that operations requiring initialization throw InvalidOperationException
-/// when called on uninitialized objects
-/// </summary>
-[TestMethod]
-[TestCategory("Component")]
-public void Operations_UninitializedObject_ThrowInvalidOperationException()
-{
-    // Test that proper state checking is implemented
-}
-```
-
-#### External Dependency Error Testing
-Test handling of external system failures:
-
-```csharp
-/// <summary>
-/// Tests that file I/O errors are properly handled and result in appropriate
-/// IOException being thrown with meaningful error messages
-/// </summary>
-[TestMethod]
-[TestCategory("Integration")]
-public void FileOperations_IOErrors_ThrowIOException()
-{
-    // Test external dependency error handling
-}
-```
-
-### Exception Testing
-```csharp
-// Use ExpectedException attribute for simple exception testing
-[ExpectedException(typeof(ArgumentNullException))]
-
-// For more complex exception testing, use try-catch
-try
-{
-    // Action that should throw
-    objectUnderTest.MethodThatShouldThrow();
-    Assert.Fail("Expected exception was not thrown");
-}
-catch (ExpectedException ex)
-{
-    // Verify exception details
-    Assert.IsNotNull(ex.Message);
-    StringAssert.Contains(ex.Message, "expected content");
-}
-
-// Test exception chaining and inner exceptions
-catch (Exception ex)
-{
-    Assert.IsNotNull(ex.InnerException);
-    Assert.IsInstanceOfType(ex.InnerException, typeof(ExpectedInnerException));
-}
-```
-
-### Exception Message Testing
-Always verify that exception messages provide value to developers and users:
-
-```csharp
-/// <summary>
-/// Tests that exception messages contain actionable information for users
-/// </summary>
-[TestMethod]
-public void Exceptions_ContainActionableMessages()
-{
-    try
-    {
-        // Trigger exception condition
-        objectUnderTest.FailingMethod();
-        Assert.Fail("Expected exception was not thrown");
-    }
-    catch (InvalidOperationException ex)
-    {
-        // Verify message provides context
-        StringAssert.Contains(ex.Message, "what went wrong");
-        StringAssert.Contains(ex.Message, "what user should do");
-        
-        // Verify message is user-friendly, not just technical
-        Assert.IsFalse(ex.Message.Contains("null reference"));
-        Assert.IsTrue(ex.Message.contains("file") || ex.Message.contains("select"));
-    }
-}
-```
-
-### Validation Testing
-```csharp
-// Test both valid and invalid inputs
-[TestMethod]
-public void Method_ValidInput_Success() { /* ... */ }
-
-[TestMethod]
-public void Method_InvalidInput_Failure() { /* ... */ }
-
-// Test boundary conditions that might cause exceptions
-[TestMethod]
-public void Method_BoundaryConditions_ProperHandling() { /* ... */ }
-```
-
-### Exception Propagation Testing
-Test that exceptions properly flow through the application layers:
-
-```csharp
-/// <summary>
-/// Tests that XML writer exceptions properly propagate to the GUI layer
-/// and result in status bar error messages being displayed to the user
-/// </summary>
-[TestMethod]
-[TestCategory("Integration")]
-public void XMLWriterException_PropagatesCorrectly_DisplaysInStatusBar()
-{
-    //**************************************************************//
-    // Arrange
-    //**************************************************************//
-    
-    // Set up mock that throws exception
-    var mockWriter = new Mock<IRNGXMLWriter>();
-    mockWriter.Setup(w => w.WriteSessionStart(It.IsAny<string>(), It.IsAny<int>()))
-              .Throws(new InvalidOperationException("Test exception message"));
-    
-    //**************************************************************//
-    // Act
-    //**************************************************************//
-    
-    // Trigger operation that should propagate exception
-    bool result = sessionDataFile.StartSession(mockSessionData.Object);
-    
-    //**************************************************************//
-    // Assert
-    //**************************************************************//
-    
-    // Verify exception was caught and handled appropriately
-    Assert.IsFalse(result);
-    // Additional assertions to verify error was logged/displayed
-}
-```
-
-### Exception Documentation Requirements for Tests
-- Document all expected exceptions in test methods using `<exception>` tags
-- Include the purpose of exception testing in test summaries
-- Verify that exception messages are helpful for debugging
-- Test that exceptions don't leave the system in an invalid state
-- Ensure exceptions are properly logged or displayed to users when appropriate
-
-## Quality Guidelines
-
-### Exception Testing Coverage
-As part of comprehensive testing, ensure:
-- All public methods that can throw exceptions have corresponding exception tests
-- Exception messages are validated for usefulness
-- Exception types are appropriate for the error conditions
-- Exception handling doesn't mask important error information
-- System remains stable after exception conditions

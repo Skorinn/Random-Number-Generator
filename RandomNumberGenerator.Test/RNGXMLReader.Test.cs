@@ -54,14 +54,14 @@ namespace RandomNumberGenerator.Test
         private const string m_sINVALID_XML_FILE = "InvalidXMLFile.xml";
 
         // Test data values
-        private const string m_sSESSION_START_TIME = "01:30:45";
+        private const bool m_bSIMULATED_FLAG = false;
         private const int m_iTARGET_VALUE = 1;
         private const double m_fTEST_DATA_POINT_1 = 0.123456;
         private const double m_fTEST_DATA_POINT_2 = 0.789012;
 
         // Expected XML content
         private const string m_sVALID_XML_CONTENT = @"<?xml version=""1.0"" encoding=""utf-8""?>
-<Session Start=""01:30:45"" Target=""1"">
+<Session Simulated=""false"" Target=""1"">
     <Data Time=""01:30:45"">0.123456</Data>
     <Data Time=""01:30:46"">0.789012</Data>
 </Session>";
@@ -292,6 +292,7 @@ namespace RandomNumberGenerator.Test
             mockSessionData.Setup(mock => mock.Reset()).Verifiable();
             mockSessionData.Setup(mock => mock.LoadDataPointsBatch(It.IsAny<System.Collections.Generic.IEnumerable<double>>(), It.IsAny<uint>())).Returns(true).Verifiable();
             mockSessionData.SetupProperty(mock => mock.TargetValue);
+            mockSessionData.SetupProperty(mock => mock.Simulated);
             mockSessionData.SetupProperty(mock => mock.FilePath);
 
             // Create the object under test
@@ -315,6 +316,7 @@ namespace RandomNumberGenerator.Test
             // Verify session data was reset and configured
             mockSessionData.Verify(mock => mock.Reset(), Times.Once);
             mockSessionData.VerifySet(mock => mock.TargetValue = m_iTARGET_VALUE, Times.Once);
+            mockSessionData.VerifySet(mock => mock.Simulated = m_bSIMULATED_FLAG, Times.Once);
             mockSessionData.VerifySet(mock => mock.FilePath = m_sTEST_FILE_PATH, Times.Once);
 
             // Verify data was loaded
@@ -443,6 +445,7 @@ namespace RandomNumberGenerator.Test
             mockSessionData.Setup(mock => mock.Reset()).Verifiable();
             mockSessionData.Setup(mock => mock.LoadDataPointsBatch(It.IsAny<System.Collections.Generic.IEnumerable<double>>(), uCUSTOM_BATCH_SIZE)).Returns(true).Verifiable();
             mockSessionData.SetupProperty(mock => mock.TargetValue);
+            mockSessionData.SetupProperty(mock => mock.Simulated);
             mockSessionData.SetupProperty(mock => mock.FilePath);
 
             // Create the object under test
@@ -524,6 +527,7 @@ namespace RandomNumberGenerator.Test
             mockSessionData.Setup(mock => mock.Reset());
             mockSessionData.Setup(mock => mock.LoadDataPointsBatch(It.IsAny<System.Collections.Generic.IEnumerable<double>>(), It.IsAny<uint>())).Returns(true);
             mockSessionData.SetupProperty(mock => mock.TargetValue);
+            mockSessionData.SetupProperty(mock => mock.Simulated);
             mockSessionData.SetupProperty(mock => mock.FilePath);
 
             // Create the object under test
@@ -589,7 +593,7 @@ namespace RandomNumberGenerator.Test
 
             // Create malformed XML file
             const string sMalformedXML = @"<?xml version=""1.0"" encoding=""utf-8""?>
-<Session Start=""01:30:45"" Target=""1"">
+<Session Simulated=""false"" Target=""1"">
     <Data Time=""01:30:45"">0.123456</Data>
     <UnclosedElement>
 </Session>";

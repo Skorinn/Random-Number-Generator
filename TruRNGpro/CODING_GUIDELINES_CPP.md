@@ -382,6 +382,51 @@ if (bInitialized)
 }
 ```
 
+### Order of Operations with Parentheses
+- Always use parentheses to explicitly denote order of operations in complex expressions
+- Do not rely on operator precedence rules that may be unclear to other developers
+- This improves code readability, maintainability, and reduces the chance of logic errors
+
+```cpp
+// Incorrect - unclear operator precedence
+if (m_bEnabled && m_pDevice->IsConnected() || m_bForceUpdate)
+{
+    // Process update
+}
+
+// Correct - explicit order of operations with parentheses
+if ((m_bEnabled && m_pDevice->IsConnected()) || m_bForceUpdate)
+{
+    // Process update
+}
+
+// Incorrect - mathematical expression without clear precedence
+double fResult = fBase + fOffset * fMultiplier / fDivisor;
+
+// Correct - explicit order with parentheses
+double fResult = fBase + ((fOffset * fMultiplier) / fDivisor);
+
+// Incorrect - bitwise operations without clear precedence
+uint32_t iFlags = iBaseFlags | iNewFlag & iMask;
+
+// Correct - explicit order with parentheses
+uint32_t iFlags = iBaseFlags | (iNewFlag & iMask);
+
+// Incorrect - pointer arithmetic without clear precedence
+char* pResult = pBase + iOffset * sizeof(DataType);
+
+// Correct - explicit order with parentheses
+char* pResult = pBase + (iOffset * sizeof(DataType));
+```
+
+#### Benefits of Explicit Parentheses
+- **Clear Intent**: Makes the intended order of operations obvious to all developers
+- **Reduced Errors**: Prevents bugs caused by incorrect assumptions about operator precedence
+- **Better Maintenance**: Future developers can understand the logic without memorizing precedence rules
+- **Cross-Platform Consistency**: Precedence rules are consistent but explicit is better
+- **Improved Readability**: Complex expressions are easier to understand at a glance
+- **Compiler Optimization**: Modern compilers optimize regardless of parentheses placement
+
 ### Well-Named Constants for Method Parameters
 - Use descriptive, well-named constants for boolean and other parameters in method calls
 - This improves code readability, maintainability, and self-documentation

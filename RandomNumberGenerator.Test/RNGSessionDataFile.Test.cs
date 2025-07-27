@@ -173,14 +173,14 @@ namespace RandomNumberGenerator.Test
             // Mock the IRNGXMLWriter interface
             var xmlWriterMock = new Mock<IRNGXMLWriter>();
             xmlWriterMock.Setup(mock => mock.FilePath).Returns(m_sTEST_FILE_PATH);
-            xmlWriterMock.Setup(mock => mock.WriteSessionStart(It.IsAny<string>(), It.IsAny<int>())).Returns(true);
+            xmlWriterMock.Setup(mock => mock.WriteSessionStart(It.IsAny<bool>(), It.IsAny<int>())).Returns(true);
 
             // Create the object under test
             RNGSessionDataFile sessionDataFile = new RNGSessionDataFile(xmlWriterMock.Object);
 
             // Mock the iRNGSessionData interface
             var sessionDataMock = new Mock<IRNGSessionData>();
-            sessionDataMock.Setup(mock => mock.SessionTime).Returns("00:00:00");
+            sessionDataMock.Setup(mock => mock.Simulated).Returns(false);
             sessionDataMock.Setup(mock => mock.TargetValue).Returns(0);
 
             //**************************************************************//
@@ -224,7 +224,7 @@ namespace RandomNumberGenerator.Test
 
             // Mock the IRNGSessionData interface
             var sessionDataMock = new Mock<IRNGSessionData>();
-            sessionDataMock.Setup(mock => mock.SessionTime).Returns("00:00:00");
+            sessionDataMock.Setup(mock => mock.Simulated).Returns(false);
             sessionDataMock.Setup(mock => mock.TargetValue).Returns(0);
 
             //**************************************************************//

@@ -253,12 +253,12 @@ namespace RandomNumberGenerator
             double fStandardDev = CalculateStandardDeviation();
             Interlocked.Exchange(ref m_fStandardDeviation, fStandardDev);
 
-            // Invoke the callback if it's set
+            // Invoke the callback if it's set with the data point and the current running average
             DataPointAddedCallback?.Invoke(fDataPoint, m_fCurrentAverage);
         }
 
         /// <summary>
-        /// Write a data point to the file if the data interval has been reached
+        /// Write pending data points to the file if the data interval has been reached
         /// </summary>
         /// <param name="bFlush">IN - Whether to force a write (default = false)</param>
         /// <returns>true, if successful; otherwise false</returns>
@@ -275,27 +275,16 @@ namespace RandomNumberGenerator
                 // if the data point interval has been reached
                 bool bWritePending = (WRITE_FILE_INTERVAL <= m_iPendingDataPointCounter);
 
-                // Write the data point if either condition is met
+                // Write the data points if either condition is met
                 if (bFlushUnwritten || bWritePending)
                 {
-                    // Write the data point and reset the counter
-                    XMLDataPoint dataPoint = new XMLDataPoint(SessionTime, CurrentAverage);
-                    
                     if (null == m_DataFile)
                     {
                         throw new InvalidOperationException(" No data file available for writing.");
                     }
 
-                    bStatus = m_DataFile.WriteDataPoint(dataPoint);
-                    
-                    if (bStatus)
-                    {
-                        m_iPendingDataPointCounter = 0;
-                    }
-                    else
-                    {
-                        throw new InvalidOperationException(" Failed to write data point to file.");
-                    }
+                    // Write the pending data points using the dedicated helper method
+                    bStatus = WriteIndividualDataPoints();
                 }
             }
             catch (InvalidOperationException)
@@ -317,6 +306,77 @@ namespace RandomNumberGenerator
             {
                 // Re-throw other exceptions to be handled by calling code
                 throw;
+            }
+
+            return bStatus;
+        }
+
+        /// <summary>
+        /// Writes individual data points from the pending data queue to the file
+        /// </summary>
+        /// <returns>true if successful; otherwise, false</returns>
+        /// <exception cref="InvalidOperationException">Thrown when data extraction or writing fails</exception>
+        private bool WriteIndividualDataPoints()
+        {
+            // Get the last m_iPendingDataPointCounter number of data points from the queue
+            const uint uMAX_PENDING_POINTS = 10000; // Safety limit to prevent excessive memory usage
+            uint uPointsToWrite = Math.Min(m_iPendingDataPointCounter, uMAX_PENDING_POINTS);
+            
+            // Extract the data points in a thread-safe manner
+            double[] pendingDataPoints = new double[uPointsToWrite];
+            bool bDataExtracted = false;
+            
+            lock (m_DataLock)
+            {
+                // Ensure we don't try to extract more points than we have
+                uint uAvailablePoints = (uint)m_DataPoints.Count;
+                uPointsToWrite = Math.Min(uPointsToWrite, uAvailablePoints);
+                
+                if (uPointsToWrite > 0)
+                {
+                    // Convert queue to array to access the last N elements
+                    double[] allDataPoints = m_DataPoints.ToArray();
+                    
+                    // Copy the last uPointsToWrite elements
+                    int iStartIndex = Math.Max(0, allDataPoints.Length - (int)uPointsToWrite);
+                    Array.Copy(allDataPoints, iStartIndex, pendingDataPoints, 0, (int)uPointsToWrite);
+                    bDataExtracted = true;
+                }
+            }
+
+            // Write each pending data point if we successfully extracted data
+            bool bStatus = true;
+            if (bDataExtracted && uPointsToWrite > 0)
+            {
+                string sSessionTime = SessionTime;
+                
+                // Write each individual data point
+                for (uint uIndex = 0; uIndex < uPointsToWrite; uIndex++)
+                {
+                    XMLDataPoint dataPoint = new XMLDataPoint(sSessionTime, pendingDataPoints[uIndex]);
+                    
+                    bStatus = m_DataFile.WriteDataPoint(dataPoint);
+                    
+                    if (!bStatus)
+                    {
+                        throw new InvalidOperationException($" Failed to write data point {uIndex + 1} of {uPointsToWrite} to file.");
+                    }
+                }
+                
+                // Reset the counter only if all writes were successful
+                if (bStatus)
+                {
+                    m_iPendingDataPointCounter = 0;
+                }
+            }
+            else if (uPointsToWrite == 0)
+            {
+                // No points to write, just reset the counter
+                m_iPendingDataPointCounter = 0;
+            }
+            else
+            {
+                throw new InvalidOperationException(" Failed to extract pending data points for writing.");
             }
 
             return bStatus;
@@ -426,7 +486,7 @@ namespace RandomNumberGenerator
                         break;
                     }
 
-                    // Record the data point (this will NOT trigger the callback since it's batch loading)
+                    // Record the data point (this will trigger the callback and update the chart in real-time)
                     RecordDataPoint(fDataPoint);
                 }
             }

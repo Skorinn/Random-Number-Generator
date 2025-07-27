@@ -115,15 +115,16 @@ namespace RandomNumberGenerator
                     if (bStatus && (null != m_Reader))
                     {
                         // Read and process the session node
-                        string sStartTime = "";
+                        bool bSimulated = false;
                         int iTargetValue = TargetValues.NO_VALUE_SET;
-                        bStatus = ReadSessionNode(out sStartTime, out iTargetValue);
+                        bStatus = ReadSessionNode(out bSimulated, out iTargetValue);
 
                         if (bStatus)
                         {
-                            // Reset session data and set target value
+                            // Reset session data and set target value and simulation flag
                             sessionData.Reset();
                             sessionData.TargetValue = iTargetValue;
+                            sessionData.Simulated = bSimulated;
 
                             // Load all data points in batches
                             bStatus = ReadDataNodes(sessionData, uBatchSize);
@@ -175,13 +176,13 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Reads the Session node and extracts session-level attributes
         /// </summary>
-        /// <param name="sStartTime">OUT - Start time attribute from the session</param>
+        /// <param name="bSimulated">OUT - Simulated flag from the session</param>
         /// <param name="iTargetValue">OUT - Target value parsed from the session</param>
         /// <returns>true if successful; otherwise, false</returns>
-        private bool ReadSessionNode(out string sStartTime, out int iTargetValue)
+        private bool ReadSessionNode(out bool bSimulated, out int iTargetValue)
         {
             // Initialize output parameters
-            sStartTime = "";
+            bSimulated = false;
             iTargetValue = TargetValues.NO_VALUE_SET;
 
             // Read to the Session element
@@ -189,8 +190,11 @@ namespace RandomNumberGenerator
             if (bSessionFound)
             {
                 // Parse session attributes
-                sStartTime = m_Reader.GetAttribute("Start") ?? "";
+                string sSimulatedString = m_Reader.GetAttribute("Simulated");
                 string sTargetString = m_Reader.GetAttribute("Target");
+
+                // Parse simulated flag if present
+                bSimulated = ParseSimulatedValue(sSimulatedString);
 
                 // Parse target value if present
                 iTargetValue = ParseTargetValue(sTargetString);
@@ -202,6 +206,28 @@ namespace RandomNumberGenerator
                 m_sLastError = $" Invalid XML file format: No 'Session' element found in file '{System.IO.Path.GetFileName(m_sFilePath)}'.";
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Parses the simulated value from the simulated string attribute
+        /// </summary>
+        /// <param name="sSimulatedString">IN - Simulated string to parse</param>
+        /// <returns>Parsed simulated value or false if parsing fails</returns>
+        private bool ParseSimulatedValue(string sSimulatedString)
+        {
+            bool bSimulated = false;
+
+            bool bSimulatedStringExists = false == string.IsNullOrEmpty(sSimulatedString);
+            if (bSimulatedStringExists)
+            {
+                bool bSimulatedParsed = bool.TryParse(sSimulatedString, out bool bParsedSimulated);
+                if (bSimulatedParsed)
+                {
+                    bSimulated = bParsedSimulated;
+                }
+            }
+
+            return bSimulated;
         }
 
         /// <summary>

@@ -23,7 +23,7 @@ namespace RandomNumberGenerator
 
         bool WriteDataPoint(IXMLDataPoint dataPoint);
         bool WriteSessionEnd();
-        bool WriteSessionStart(string sStartTime, int iTargetValue);
+        bool WriteSessionStart(bool bSimulated, int iTargetValue);
         bool PrepareForAppend(string sFilePath);
     }
 
@@ -89,14 +89,14 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Opens or creates the file for writing and records the session start tag
         /// </summary>
-        /// <param name="sStartTime">IN - Start time for the session</param>
+        /// <param name="bSimulated">IN - Whether the session data is simulated or from real device</param>
         /// <param name="iTargetValue">IN - Target value for the session</param>
         /// <returns>true if successful; otherwise, false</returns>
         /// <exception cref="InvalidOperationException">Thrown when no file is selected or XML writer is in an invalid state</exception>
         /// <exception cref="UnauthorizedAccessException">Thrown when file access is denied</exception>
         /// <exception cref="System.IO.IOException">Thrown when file I/O operations fail</exception>
         /// <exception cref="Exception">Thrown for unexpected errors during session start</exception>
-        public bool WriteSessionStart(string sStartTime, int iTargetValue)
+        public bool WriteSessionStart(bool bSimulated, int iTargetValue)
         {
             // Default status to failure
             bool bStatus = false;
@@ -121,10 +121,10 @@ namespace RandomNumberGenerator
                 {
                     try
                     {
-                        // <Session TargetValue="0" />
+                        // <Session Simulated="true" Target="0" />
                         m_Writer.WriteStartDocument();
                         m_Writer.WriteStartElement("Session");
-                        m_Writer.WriteAttributeString("Start", sStartTime);
+                        m_Writer.WriteAttributeString("Simulated", bSimulated.ToString().ToLower());
                         m_Writer.WriteAttributeString("Target", iTargetValue.ToString());
                         m_Writer.Flush();
                     }
@@ -235,12 +235,18 @@ namespace RandomNumberGenerator
                         // Close the session tag
                         m_Writer.WriteEndElement();
 
-                        // Close the document
-                        m_Writer.WriteEndDocument();
+                        // Only close the document if we're NOT in append mode
+                        // Append mode uses fragment conformance which doesn't support WriteEndDocument()
+                        if (!m_bAppendMode)
+                        {
+                            // Close the document
+                            m_Writer.WriteEndDocument();
+                        }
 
-                        // Close the writer
+                        // Close the writer and clear the selected file
                         m_Writer.Flush();
                         m_Writer.Close();
+                        m_sFilePath = "";
                         bStatus = true;
                     }
                     catch (InvalidOperationException)
@@ -313,6 +319,15 @@ namespace RandomNumberGenerator
                         {
                             throw new InvalidOperationException(" Unable to create XML writer after preparing file for append.");
                         }
+                        
+                        // IMPORTANT: Tell the XML writer that we're inside a Session element
+                        // This prevents the "WriteEndElement called when there is no open start element" exception
+                        if (null != m_Writer)
+                        {
+                            // Write an invisible start element to match the existing <Session> tag
+                            // This establishes the element context for the writer without duplicating content
+                            m_Writer.WriteStartElement("Session");
+                        }
                     }
                     else
                     {
@@ -358,10 +373,14 @@ namespace RandomNumberGenerator
                 // Read the entire file content
                 string fileContent = System.IO.File.ReadAllText(m_sFilePath);
                 
-                // Find and remove the closing session tag and document tag
+                // Check for two possible session formats:
+                // 1. Sessions with data: <Session Simulated="..." Target="...">...</Session>
+                // 2. Empty sessions: <Session Simulated="..." Target="..." />
+                
                 int lastSessionEndIndex = fileContent.LastIndexOf("</Session>");
                 if (lastSessionEndIndex > 0)
                 {
+                    // Case 1: Session with data points - has closing </Session> tag
                     // Remove everything after the last data point
                     fileContent = fileContent.Substring(0, lastSessionEndIndex);
                     
@@ -371,7 +390,31 @@ namespace RandomNumberGenerator
                 }
                 else
                 {
-                    throw new InvalidOperationException(" Invalid XML structure: No closing session tag found in file.");
+                    // Case 2: Empty session - look for self-closing Session tag
+                    int selfClosingSessionIndex = fileContent.LastIndexOf(" />");
+                    if (selfClosingSessionIndex > 0)
+                    {
+                        // Check if this is indeed a Session tag by looking backwards
+                        int sessionStartIndex = fileContent.LastIndexOf("<Session", selfClosingSessionIndex);
+                        if ((sessionStartIndex >= 0) && (sessionStartIndex < selfClosingSessionIndex))
+                        {
+                            // Found a self-closing Session tag - convert it to an open tag
+                            // Extract the session attributes part
+                            string sessionAttributes = fileContent.Substring(sessionStartIndex + 8, selfClosingSessionIndex - sessionStartIndex - 8);
+                            
+                            // Replace self-closing tag with opening tag
+                            string beforeSession = fileContent.Substring(0, sessionStartIndex);
+                            string openingTag = $"<Session{sessionAttributes}>";
+                            string modifiedContent = beforeSession + openingTag;
+                            
+                            // Write the modified content back to the file
+                            System.IO.File.WriteAllText(m_sFilePath, modifiedContent);
+                            return true;
+                        }
+                    }
+                    
+                    // Neither format found - invalid XML structure
+                    throw new InvalidOperationException(" Invalid XML structure: No Session element found in file or file format is not recognized.");
                 }
             }
             catch (System.IO.IOException)
@@ -453,6 +496,9 @@ namespace RandomNumberGenerator
                             
                             // Create the writer with the file stream
                             m_Writer = XmlWriter.Create(fileStream, m_Settings);
+                            
+                            // Track that we're in append mode
+                            m_bAppendMode = true;
                         }
                         finally
                         {
@@ -465,6 +511,9 @@ namespace RandomNumberGenerator
                     {
                         // Normal mode - create new file or overwrite existing
                         m_Writer = XmlWriter.Create(m_sFilePath, m_Settings);
+                        
+                        // Track that we're NOT in append mode
+                        m_bAppendMode = false;
                     }
 
                     bStatus = (m_Writer != null);
@@ -523,6 +572,7 @@ namespace RandomNumberGenerator
         private string m_sFilePath = "";
         private XmlWriter m_Writer = null;
         private XmlWriterSettings m_Settings = null;
+        private bool m_bAppendMode = false; // Track if we're in append mode
 
         #endregion
     }

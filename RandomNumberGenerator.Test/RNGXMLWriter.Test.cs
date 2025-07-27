@@ -86,16 +86,16 @@ namespace RandomNumberGenerator.Test
         // Paths for files used for testing
         private const string m_sTEST_FILE_PATH = "TestSessionDataFile.RNGXMLWriterTests.xml";
 
-        // Session time to use for testing
-        private const string m_sSESSION_START_TIME = "01:00:00";
+        // Simulated flag to use for testing
+        private const bool m_bSIMULATED_FLAG = false;
 
         // Target value to use for testing
         private const int m_iTARGET_VALUE = 1;
 
-        // Define the expected XML entries here as they depend on the time, target, and data values above
-        private const string sEXPECTED_SESSION_START_ENTRY = "<Session Start=\"01:00:00\" Target=\"1\">";
+        // Define the expected XML entries here as they depend on the simulated flag, target, and data values above
+        private const string sEXPECTED_SESSION_START_ENTRY = "<Session Simulated=\"false\" Target=\"1\">";
         private const string sEXPECTED_SESSION_END_ENTRY = "</Session>";
-        private const string sEXPECTED_SESSION_END_ENTRY_NO_DATA = "<Session Start=\"01:00:00\" Target=\"1\" />";
+        private const string sEXPECTED_SESSION_END_ENTRY_NO_DATA = "<Session Simulated=\"false\" Target=\"1\" />";
 
         #endregion
         #region Additional test attributes
@@ -191,7 +191,7 @@ namespace RandomNumberGenerator.Test
             //**************************************************************//
 
             // Write the session start and record the result
-            bool bStatus = xmlWriter.WriteSessionStart(m_sSESSION_START_TIME, m_iTARGET_VALUE);
+            bool bStatus = xmlWriter.WriteSessionStart(m_bSIMULATED_FLAG, m_iTARGET_VALUE);
 
             // Write a data point to the file using the custom mock
             xmlWriter.WriteDataPoint(mockDataPoint);
@@ -207,10 +207,10 @@ namespace RandomNumberGenerator.Test
             Assert.IsTrue(bStatus);
 
             // Verify the file was created
-            Assert.IsTrue(File.Exists(xmlWriter.FilePath));
+            Assert.IsTrue(File.Exists(m_sTEST_FILE_PATH));
 
             // Verify the file contains the expected result
-            string sResult = File.ReadAllText(xmlWriter.FilePath);
+            string sResult = File.ReadAllText(m_sTEST_FILE_PATH);
             StringAssert.Contains(sResult, sEXPECTED_RESULT);
         }
 
@@ -238,7 +238,7 @@ namespace RandomNumberGenerator.Test
             //**************************************************************//
 
             // Write the session start and record the result
-            bool bStatus = xmlWriter.WriteSessionStart(m_sSESSION_START_TIME, m_iTARGET_VALUE);
+            bool bStatus = xmlWriter.WriteSessionStart(m_bSIMULATED_FLAG, m_iTARGET_VALUE);
 
             //**************************************************************//
             // Assert
@@ -268,7 +268,7 @@ namespace RandomNumberGenerator.Test
             //**************************************************************//
 
             // Write the session start and record the result
-            bool bStatus = xmlWriter.WriteSessionStart(m_sSESSION_START_TIME, m_iTARGET_VALUE);
+            bool bStatus = xmlWriter.WriteSessionStart(m_bSIMULATED_FLAG, m_iTARGET_VALUE);
 
             //**************************************************************//
             // Assert
@@ -437,7 +437,7 @@ namespace RandomNumberGenerator.Test
             //**************************************************************//
 
             // Write the session start (no need to record the return from session start as it is tested separately)
-            xmlWriter.WriteSessionStart(m_sSESSION_START_TIME, m_iTARGET_VALUE);
+            xmlWriter.WriteSessionStart(m_bSIMULATED_FLAG, m_iTARGET_VALUE);
 
             // Write a data point to the file using the custom mock
             xmlWriter.WriteDataPoint(mockDataPoint);
@@ -453,10 +453,10 @@ namespace RandomNumberGenerator.Test
             Assert.IsTrue(bStatus);
 
             // Verify the file was created
-            Assert.IsTrue(File.Exists(xmlWriter.FilePath));
+            Assert.IsTrue(File.Exists(m_sTEST_FILE_PATH));
 
             // Verify the file contains the expected result
-            string sResult = File.ReadAllText(xmlWriter.FilePath);
+            string sResult = File.ReadAllText(m_sTEST_FILE_PATH);
             StringAssert.Contains(sResult, sEXPECTED_RESULT);
         }
 
@@ -482,8 +482,8 @@ namespace RandomNumberGenerator.Test
             //**************************************************************//
 
             // Write the session start and end (no need to record the return from session start as it is tested separately)
-            xmlWriter.WriteSessionStart(m_sSESSION_START_TIME, m_iTARGET_VALUE);
-            bool bStatus = xmlWriter.WriteSessionEnd();
+            bool bStatus = xmlWriter.WriteSessionStart(m_bSIMULATED_FLAG, m_iTARGET_VALUE);
+            bStatus = xmlWriter.WriteSessionEnd();
 
             //**************************************************************//
             // Assert
@@ -492,11 +492,14 @@ namespace RandomNumberGenerator.Test
             // Verify the write was successful
             Assert.IsTrue(bStatus);
 
+            // Verify the session file was cleared
+            Assert.IsTrue(string.IsNullOrEmpty(xmlWriter.FilePath));
+
             // Verify the file was created
-            Assert.IsTrue(File.Exists(xmlWriter.FilePath));
+            Assert.IsTrue(File.Exists(m_sTEST_FILE_PATH));
 
             // Verify the file contains the expected result
-            string sResult = File.ReadAllText(xmlWriter.FilePath);
+            string sResult = File.ReadAllText(m_sTEST_FILE_PATH);
             StringAssert.Contains(sResult, sEXPECTED_RESULT);
         }
 

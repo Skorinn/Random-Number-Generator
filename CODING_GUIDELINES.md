@@ -286,6 +286,90 @@ if (bSessionFound)
 }
 ```
 
+### Order of Operations with Parentheses
+- Always use parentheses to explicitly denote order of operations in complex expressions
+- Do not rely on operator precedence rules that may be unclear to other developers
+- This improves code readability, maintainability, and reduces the chance of logic errors
+
+```csharp
+// Incorrect - unclear operator precedence
+if (m_bEnabled && m_Timer.InProgress || m_bForceUpdate)
+{
+    // Process update
+}
+
+// Correct - explicit order of operations with parentheses
+if ((m_bEnabled && m_Timer.InProgress) || m_bForceUpdate)
+{
+    // Process update
+}
+
+// Incorrect - mathematical expression without clear precedence
+double fResult = fBase + fOffset * fMultiplier / fDivisor;
+
+// Correct - explicit order with parentheses
+double fResult = fBase + ((fOffset * fMultiplier) / fDivisor);
+
+// Incorrect - bitwise operations without clear precedence
+int iFlags = iBaseFlags | iNewFlag & iMask;
+
+// Correct - explicit order with parentheses
+int iFlags = iBaseFlags | (iNewFlag & iMask);
+```
+
+#### Benefits of Explicit Parentheses
+- **Clear Intent**: Makes the intended order of operations obvious to all developers
+- **Reduced Errors**: Prevents bugs caused by incorrect assumptions about operator precedence
+- **Better Maintenance**: Future developers can understand the logic without memorizing precedence rules
+- **Cross-Language Consistency**: Precedence rules may differ between languages
+- **Improved Readability**: Complex expressions are easier to understand at a glance
+
+### String Usage and Literals
+- Use `string.Empty` instead of `""` for empty string literals
+- Use `string.IsNullOrEmpty()` for checking empty or null strings
+- Use `string.IsNullOrWhiteSpace()` when whitespace should also be considered empty
+- Prefer string interpolation over concatenation for complex strings
+
+```csharp
+// Incorrect - empty string literal
+string sResult = "";
+if (sValue == "")
+{
+    // Process empty string
+}
+
+// Correct - use string.Empty
+string sResult = string.Empty;
+if (sValue == string.Empty)
+{
+    // Process empty string
+}
+
+// Better - use string utility methods for validation
+if (string.IsNullOrEmpty(sValue))
+{
+    // Handle null or empty string
+}
+
+if (string.IsNullOrWhiteSpace(sValue))
+{
+    // Handle null, empty, or whitespace-only string
+}
+
+// Incorrect - string concatenation
+string sMessage = "Error in file " + sFileName + " at line " + iLineNumber.ToString();
+
+// Correct - string interpolation
+string sMessage = $"Error in file {sFileName} at line {iLineNumber}";
+```
+
+#### Benefits of Using string.Empty
+- **Performance**: `string.Empty` is a static readonly field, avoiding repeated string allocations
+- **Readability**: Makes empty string intentions explicit and clear
+- **Consistency**: Provides consistent approach across the codebase
+- **Maintainability**: Single point of reference for empty string representation
+- **IntelliSense**: Easier to discover through IDE autocompletion
+
 ### Well-Named Constants for Method Parameters
 - Use descriptive, well-named constants for boolean and other parameters in method calls
 - This improves code readability, maintainability, and self-documentation

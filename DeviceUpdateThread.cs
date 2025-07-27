@@ -188,7 +188,7 @@ namespace RandomNumberGenerator
         private static IGeneratorForm m_Parent = null;
 
         // Test and color for restoring the info box after update
-        private static string m_sStatusBoxText = "";
+        private static string m_sStatusBoxText = string.Empty;
         private static Color m_StatusBoxTextColor = System.Drawing.SystemColors.WindowText;
         private static Color m_StatusBoxBackColor = System.Drawing.SystemColors.Info;
 

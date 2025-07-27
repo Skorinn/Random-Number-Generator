@@ -256,8 +256,8 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Event handler for stop button
         /// </summary>
-        /// <param="sender">IN - Sender of the event (not used)</param>
-        /// <param="e">IN - The event arguments (not used)</param>
+        /// <param name="sender">IN - Sender of the event (not used)</param>
+        /// <param name="e">IN - The event arguments (not used)</param>
         private void StopButton_Click(object sender, EventArgs e)
         {
             // Discard unused parameters
@@ -362,6 +362,26 @@ namespace RandomNumberGenerator
             _ = sender;
             _ = e;
 
+            // Check if a session is currently running and warn the user
+            if (Running)
+            {
+                const string sSessionRunningCaption = "Session In Progress";
+                const string sSessionRunningMessage = "A session is currently running. Selecting a new data file will end the current session.\n\nDo you want to continue?";
+                DialogResult sessionRunningResult = MessageBox.Show(sSessionRunningMessage, sSessionRunningCaption, MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+
+                // If the user chooses to cancel
+                if (DialogResult.No == sessionRunningResult)
+                {
+                    // Do not continue with file selection
+                    return;
+                }
+                else
+                {
+                    // End the current session
+                    EndSession();
+                }
+            }
+
             // Do not allow a new session while processing action
             FileBrowseActive = true;
 
@@ -408,6 +428,9 @@ namespace RandomNumberGenerator
                 bool bFileExists = File.Exists(sSelectedFile);
                 if (bFileExists)
                 {
+                    // Show loading progress
+                    ShowLoadingProgress(Path.GetFileName(sSelectedFile));
+                    
                     // Load the existing file by setting the file path and triggering a load operation
                     // This approach works through the interface hierarchy rather than directly parsing XML
                     ThreadPool.QueueUserWorkItem(state =>
@@ -474,9 +497,6 @@ namespace RandomNumberGenerator
             m_StatusTextBox.Text = m_sCLOSE_STOP_SESSION;
             StopButton_Click(sender, e);
 
-            // End the current session
-            EndSession();
-
             // Signal the device update thread to stop and wait for it to complete (10 second timeout)
             m_StatusTextBox.Text = m_sCLOSE_STOP_DEVICE_UPDATE;
             m_DeviceUpdateComplete.WaitOne(10000);
@@ -509,14 +529,14 @@ namespace RandomNumberGenerator
         public void GetStatusBoxState(out string sText, out Color textColor, out Color backColor)
         {
             // Initialize output parameters
-            sText = "";
+            sText = string.Empty;
             textColor = System.Drawing.Color.Black;
             backColor = System.Drawing.SystemColors.Info;
 
             // Get UI state on the main thread
             if (InvokeRequired)
             {
-                string tempText = "";
+                string tempText = string.Empty;
                 Color tempTextColor = System.Drawing.Color.Black;
                 Color tempBackColor = System.Drawing.SystemColors.Info;
 
@@ -770,8 +790,11 @@ namespace RandomNumberGenerator
         /// </summary>
         private void SetIdleState()
         {
-            // Stop the read timer if running
-            m_Timer.Stop();
+            // End the current session if running
+            if ((RngGuiStates.Running == m_State) || (RngGuiStates.Paused == m_State))
+            {
+                EndSession();
+            }
 
             // Set the state only if not terminating
             if (RngGuiStates.Terminating != m_State)
@@ -910,8 +933,9 @@ namespace RandomNumberGenerator
             // Stop the read timer if running
             m_Timer.Stop();
 
-            // End the current session
+            // End the current session and clear the selected data file
             m_Data.EndSession();
+            m_FileTextBox.Text = string.Empty;
 
             // Enable the target number field for the next session
             m_TargetComboBox.Enabled = true;
@@ -1026,6 +1050,9 @@ namespace RandomNumberGenerator
         /// <param name="bSuccess">IN - Whether the load operation succeeded</param>
         private void OnFileLoadCompleted(string sFilePath, bool bSuccess)
         {
+            // Hide the progress bar
+            HideLoadingProgress();
+
             // Re-enable UI controls
             FileBrowseActive = false;
 
@@ -1034,8 +1061,11 @@ namespace RandomNumberGenerator
                 // Update the file display
                 m_FileTextBox.Text = Path.GetFileName(sFilePath);
                 
+                // Update all UI elements with the loaded session data
+                UpdateUIFromLoadedSession();
+                
                 // Show success status using helper method
-                SetStatusBoxState($" File selected: {Path.GetFileName(sFilePath)}. Ready for new session.", 
+                SetStatusBoxState($" File loaded: {Path.GetFileName(sFilePath)}. {m_Data.NumDataPoints} data points loaded. Ready for new session.", 
                                 System.Drawing.Color.Black, System.Drawing.Color.LightGreen);
             }
             else
@@ -1043,6 +1073,55 @@ namespace RandomNumberGenerator
                 // Show error status using helper method
                 SetStatusBoxError($" Error accessing file {Path.GetFileName(sFilePath)}. Please verify the file exists and is readable.");
             }
+        }
+
+        /// <summary>
+        /// Updates all UI elements with data from the loaded session
+        /// </summary>
+        private void UpdateUIFromLoadedSession()
+        {
+            // Update the statistics display fields
+            m_CurrentAverageTextBox.Text = CurrentAverage;
+            m_DataPointsTextBox.Text = NumDataPoints;
+            m_MeanDeviationTextBox.Text = MeanDeviation;
+            m_StandardDeviationTextBox.Text = StandardDeviation;
+            m_SessionTimerTextBox.Text = m_Data.SessionTime;
+
+            // Update the target combo box if a target value was loaded
+            if (m_Data.TargetValue != TargetValues.NO_VALUE_SET)
+            {
+                SelectedTarget = m_Data.TargetValue;
+            }
+
+            // Update the simulation toggle to match the loaded session
+            m_SimulateToggle.Checked = m_Data.Simulated;
+
+            // Note: Chart is automatically updated during file loading via DataPointAddedCallback
+            // No need to manually repopulate the chart as it's updated in real-time during the load process
+        }
+
+        /// <summary>
+        /// Shows a progress bar during file loading operations
+        /// </summary>
+        private void ShowLoadingProgress(string fileName)
+        {
+            // Update status to show loading in progress
+            SetStatusBoxState($" Loading file: {fileName}...", 
+                            System.Drawing.Color.Black, System.Drawing.Color.LightBlue);
+            
+            // Set cursor to wait cursor to indicate loading
+            Cursor.Current = Cursors.WaitCursor;
+            this.Cursor = Cursors.WaitCursor;
+        }
+
+        /// <summary>
+        /// Hides the progress indicator when file loading completes
+        /// </summary>
+        private void HideLoadingProgress()
+        {
+            // Restore normal cursor
+            Cursor.Current = Cursors.Default;
+            this.Cursor = Cursors.Default;
         }
 
         /// <summary>
