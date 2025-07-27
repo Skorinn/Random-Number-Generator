@@ -15,6 +15,31 @@ using System.IO;
 namespace RandomNumberGenerator
 {
     /// <summary>
+    /// Interface for the RNG session file writer
+    /// </summary>
+    public interface IRNGSessionFileWriter
+    {
+        string FilePath { get; set; }
+
+        bool WriteDataPoint(IXMLDataPoint dataPoint);
+        bool WriteSessionEnd();
+        bool WriteSessionStart(bool bSimulated, int iTargetValue);
+        bool PrepareForAppend(string sFilePath);
+    }
+
+    /// <summary>
+    /// Interface for the RNG session file reader
+    /// </summary>
+    public interface IRNGSessionFileReader
+    {
+        string FilePath { get; set; }
+        string LastError { get; }
+
+        bool LoadFile(IRNGSessionData sessionData, uint uBatchSize = 1000);
+        void Close();
+    }
+
+    /// <summary>
     /// Interface for the Random Number Generator session data file
     /// </summary>
     public interface IRNGSessionDataFile
@@ -40,7 +65,7 @@ namespace RandomNumberGenerator
         /// Construct with the writer and parent
         /// </summary>
         /// <param name="writer">IN - The XML writer object to use to for the file (cannot be null)</param>
-        public RNGSessionDataFile(IRNGXMLWriter writer)
+        public RNGSessionDataFile(IRNGSessionFileWriter writer)
         {
             // Writer object provided cannot be null
             if (null == writer)
@@ -56,7 +81,7 @@ namespace RandomNumberGenerator
         /// </summary>
         /// <param name="writer">IN - The XML writer object to use for the file (cannot be null)</param>
         /// <param name="reader">IN - The XML reader object to use for the file (can be null)</param>
-        public RNGSessionDataFile(IRNGXMLWriter writer, IRNGXMLReader reader)
+        public RNGSessionDataFile(IRNGSessionFileWriter writer, IRNGSessionFileReader reader)
         {
             // Writer object provided cannot be null
             if (null == writer)
@@ -359,8 +384,8 @@ namespace RandomNumberGenerator
         #endregion
         #region Data Members
 
-        private IRNGXMLWriter m_Writer = null;
-        private IRNGXMLReader m_Reader = null;
+        private IRNGSessionFileWriter m_Writer = null;
+        private IRNGSessionFileReader m_Reader = null;
         private bool m_bSessionInProgress = false;
         private bool m_bFileValidated = false;
 

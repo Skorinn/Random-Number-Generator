@@ -17,21 +17,9 @@ using System.Xml;
 namespace RandomNumberGenerator
 {
     /// <summary>
-    /// Interface for the RNG XML reader
-    /// </summary>
-    public interface IRNGXMLReader
-    {
-        string FilePath { get; set; }
-        string LastError { get; }
-
-        bool LoadFile(IRNGSessionData sessionData, uint uBatchSize = 1000);
-        void Close();
-    }
-
-    /// <summary>
     /// Reads RNG data from an XML file
     /// </summary>
-    public class RNGXMLReader : IRNGXMLReader
+    public class RNGXMLReader : IRNGSessionFileReader
     {
         #region Constructors
 

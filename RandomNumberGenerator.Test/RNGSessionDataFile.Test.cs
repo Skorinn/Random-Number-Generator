@@ -112,8 +112,8 @@ namespace RandomNumberGenerator.Test
             const bool bEXPECTED_VALID = true;
             const bool bEXPECTED_SESSION_IN_PROGRESS = false;
 
-            // Mock the IRNGXMLWriter interface
-            var xmlWriterMock = new Mock<IRNGXMLWriter>();
+            // Mock the IRNGSessionFileWriter interface
+            var xmlWriterMock = new Mock<IRNGSessionFileWriter>();
             xmlWriterMock.Setup(mock => mock.FilePath).Returns(sEXPECTED_FILE_PATH);
 
             //**************************************************************//
@@ -170,8 +170,8 @@ namespace RandomNumberGenerator.Test
             // Arrange
             //**************************************************************//
 
-            // Mock the IRNGXMLWriter interface
-            var xmlWriterMock = new Mock<IRNGXMLWriter>();
+            // Mock the IRNGSessionFileWriter interface
+            var xmlWriterMock = new Mock<IRNGSessionFileWriter>();
             xmlWriterMock.Setup(mock => mock.FilePath).Returns(m_sTEST_FILE_PATH);
             xmlWriterMock.Setup(mock => mock.WriteSessionStart(It.IsAny<bool>(), It.IsAny<int>())).Returns(true);
 
@@ -215,8 +215,8 @@ namespace RandomNumberGenerator.Test
             // Use an invalid file name for the path (empty string)
             const string sEMPTY_PATH = "";
 
-            // Mock the IRNGXMLWriter interface
-            var xmlWriterMock = new Mock<IRNGXMLWriter>();
+            // Mock the IRNGSessionFileWriter interface
+            var xmlWriterMock = new Mock<IRNGSessionFileWriter>();
             xmlWriterMock.Setup(mock => mock.FilePath).Returns(sEMPTY_PATH);
 
             // Create the object under test
@@ -253,8 +253,8 @@ namespace RandomNumberGenerator.Test
             // Arrange
             //**************************************************************//
 
-            // Mock the IRNGXMLWriter interface
-            var xmlWriterMock = new Mock<IRNGXMLWriter>();
+            // Mock the IRNGSessionFileWriter interface
+            var xmlWriterMock = new Mock<IRNGSessionFileWriter>();
             xmlWriterMock.Setup(mock => mock.FilePath).Returns(m_sTEST_FILE_PATH);
 
             // Create the object under test
@@ -285,8 +285,8 @@ namespace RandomNumberGenerator.Test
             // Arrange
             //**************************************************************//
 
-            // Mock the IRNGXMLWriter interface
-            var xmlWriterMock = new Mock<IRNGXMLWriter>();
+            // Mock the IRNGSessionFileWriter interface
+            var xmlWriterMock = new Mock<IRNGSessionFileWriter>();
             xmlWriterMock.Setup(mock => mock.FilePath).Returns(m_sTEST_FILE_PATH);
             xmlWriterMock.Setup(mock => mock.WriteDataPoint(It.IsAny<IXMLDataPoint>())).Returns(true).Verifiable(); ;
 
@@ -325,8 +325,8 @@ namespace RandomNumberGenerator.Test
             // Arrange
             //**************************************************************//
 
-            // Mock the IRNGXMLWriter interface
-            var xmlWriterMock = new Mock<IRNGXMLWriter>();
+            // Mock the IRNGSessionFileWriter interface
+            var xmlWriterMock = new Mock<IRNGSessionFileWriter>();
             xmlWriterMock.Setup(mock => mock.FilePath).Returns(m_sTEST_FILE_PATH);
             xmlWriterMock.Setup(mock => mock.WriteDataPoint(It.IsAny<IXMLDataPoint>())).Returns(true).Verifiable(); ;
 
@@ -369,8 +369,8 @@ namespace RandomNumberGenerator.Test
             // Arrange
             //**************************************************************//
 
-            // Mock the IRNGXMLWriter interface
-            var xmlWriterMock = new Mock<IRNGXMLWriter>();
+            // Mock the IRNGSessionFileWriter interface
+            var xmlWriterMock = new Mock<IRNGSessionFileWriter>();
             xmlWriterMock.Setup(mock => mock.FilePath).Returns(m_sTEST_FILE_PATH);
 
             // Create the object under test
@@ -401,8 +401,8 @@ namespace RandomNumberGenerator.Test
             // Arrange
             //**************************************************************//
 
-            // Mock the IRNGXMLWriter interface
-            var xmlWriterMock = new Mock<IRNGXMLWriter>();
+            // Mock the IRNGSessionFileWriter interface
+            var xmlWriterMock = new Mock<IRNGSessionFileWriter>();
             xmlWriterMock.Setup(mock => mock.FilePath).Returns(m_sTEST_FILE_PATH);
             xmlWriterMock.Setup(mock => mock.WriteSessionEnd()).Returns(true);
 
@@ -439,8 +439,8 @@ namespace RandomNumberGenerator.Test
             // Use an invalid fiel name for the path (empty string)
             const string sEMPTY_PATH = "";
 
-            // Mock the IRNGXMLWriter interface
-            var xmlWriterMock = new Mock<IRNGXMLWriter>();
+            // Mock the IRNGSessionFileWriter interface
+            var xmlWriterMock = new Mock<IRNGSessionFileWriter>();
             xmlWriterMock.Setup(mock => mock.FilePath).Returns(sEMPTY_PATH);
             xmlWriterMock.Setup(mock => mock.WriteSessionEnd()).Returns(false);
 
@@ -477,8 +477,8 @@ namespace RandomNumberGenerator.Test
             // Expected and actual valies for the file path
             const string sEXPECTED_FILE_PATH = "Expected Path";
 
-            // Mock the IRNGXMLWriter interface to set the file path
-            var xmlWriterMock = new Mock<IRNGXMLWriter>();
+            // Mock the IRNGSessionFileWriter interface to set the file path
+            var xmlWriterMock = new Mock<IRNGSessionFileWriter>();
             xmlWriterMock.SetupProperty(mock => mock.FilePath, m_sTEST_FILE_PATH);
 
             // Create the object under test
@@ -510,8 +510,8 @@ namespace RandomNumberGenerator.Test
             // Arrange
             //**************************************************************//
 
-            // Mock the IRNGXMLWriter interface
-            var xmlWriterMock = new Mock<IRNGXMLWriter>();
+            // Mock the IRNGSessionFileWriter interface
+            var xmlWriterMock = new Mock<IRNGSessionFileWriter>();
             xmlWriterMock.Setup(mock => mock.FilePath).Returns(m_sTEST_FILE_PATH);
 
             // Create the object under test
@@ -546,8 +546,8 @@ namespace RandomNumberGenerator.Test
             // Use an invalid fiel name for the path (empty string)
             const string sEMPTY_PATH = "";
 
-            // Mock the IRNGXMLWriter interface
-            var xmlWriterMock = new Mock<IRNGXMLWriter>();
+            // Mock the IRNGSessionFileWriter interface
+            var xmlWriterMock = new Mock<IRNGSessionFileWriter>();
             xmlWriterMock.Setup(mock => mock.FilePath).Returns(sEMPTY_PATH);
 
             // Create the object under test

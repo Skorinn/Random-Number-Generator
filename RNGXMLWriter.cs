@@ -15,22 +15,9 @@ using System.Xml;
 namespace RandomNumberGenerator
 {
     /// <summary>
-    /// Interface for the RNG XML writer
-    /// </summary>
-    public interface IRNGXMLWriter
-    {
-        string FilePath { get; set; }
-
-        bool WriteDataPoint(IXMLDataPoint dataPoint);
-        bool WriteSessionEnd();
-        bool WriteSessionStart(bool bSimulated, int iTargetValue);
-        bool PrepareForAppend(string sFilePath);
-    }
-
-    /// <summary>
     /// Writes RNG data to an XML file
     /// </summary>
-    public class RNGXMLWriter : IRNGXMLWriter
+    public class RNGXMLWriter : IRNGSessionFileWriter
     {
         #region Constructors
 
