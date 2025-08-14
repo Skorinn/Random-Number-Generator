@@ -475,6 +475,13 @@ namespace RandomNumberGenerator
             }
         }
 
+
+
+        private void m_BaselineBrowseButton_Click(object sender, EventArgs e)
+        {
+
+        }
+
         /// <summary>
         /// Event handler for the form closing event
         /// </summary>
