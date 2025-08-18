@@ -1,6 +1,6 @@
 ﻿//*********************************************************************************************************************
-// File Name:      RNGXMLWriter.cs
-// Description:    Handles writing the RNG data to an XML file
+// File Name:      XMLDataPoint.cs
+// Description:    Represents a data point in the XML file structure
 //
 // Copyright (C) 2023-2024 Mike Pullen. All Rights Reserved.
 // Confidential and Proprietary
@@ -64,9 +64,9 @@ namespace RandomNumberGenerator
             // Attmept to write the data point to the file
             try
             {
-                // <DataPoint Value="0.123456789" Average="0.123456789" />
-                writer.WriteStartElement("Data");
-                writer.WriteAttributeString("Time", m_sSessionTime);
+                // <Data Time="01:30:45">0.123456789</Data>
+                writer.WriteStartElement(XMLConstants.DATA_ELEMENT);
+                writer.WriteAttributeString(XMLConstants.TIME_ATTRIBUTE, m_sSessionTime);
                 writer.WriteValue(m_fDataPoint.ToString());
                 writer.WriteEndElement();
                 writer.Flush();

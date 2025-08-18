@@ -110,9 +110,9 @@ namespace RandomNumberGenerator
                     {
                         // <Session Simulated="true" Target="0" />
                         m_Writer.WriteStartDocument();
-                        m_Writer.WriteStartElement("Session");
-                        m_Writer.WriteAttributeString("Simulated", bSimulated.ToString().ToLower());
-                        m_Writer.WriteAttributeString("Target", iTargetValue.ToString());
+                        m_Writer.WriteStartElement(XMLConstants.SESSION_ELEMENT);
+                        m_Writer.WriteAttributeString(XMLConstants.SIMULATED_ATTRIBUTE, bSimulated.ToString().ToLower());
+                        m_Writer.WriteAttributeString(XMLConstants.TARGET_ATTRIBUTE, iTargetValue.ToString());
                         m_Writer.Flush();
                     }
                     catch (InvalidOperationException)
@@ -313,7 +313,7 @@ namespace RandomNumberGenerator
                         {
                             // Write an invisible start element to match the existing <Session> tag
                             // This establishes the element context for the writer without duplicating content
-                            m_Writer.WriteStartElement("Session");
+                            m_Writer.WriteStartElement(XMLConstants.SESSION_ELEMENT);
                         }
                     }
                     else
@@ -364,7 +364,8 @@ namespace RandomNumberGenerator
                 // 1. Sessions with data: <Session Simulated="..." Target="...">...</Session>
                 // 2. Empty sessions: <Session Simulated="..." Target="..." />
                 
-                int lastSessionEndIndex = fileContent.LastIndexOf("</Session>");
+                string closingSessionTag = $"</{XMLConstants.SESSION_ELEMENT}>";
+                int lastSessionEndIndex = fileContent.LastIndexOf(closingSessionTag);
                 if (lastSessionEndIndex > 0)
                 {
                     // Case 1: Session with data points - has closing </Session> tag
@@ -382,16 +383,17 @@ namespace RandomNumberGenerator
                     if (selfClosingSessionIndex > 0)
                     {
                         // Check if this is indeed a Session tag by looking backwards
-                        int sessionStartIndex = fileContent.LastIndexOf("<Session", selfClosingSessionIndex);
+                        string sessionStartTag = $"<{XMLConstants.SESSION_ELEMENT}";
+                        int sessionStartIndex = fileContent.LastIndexOf(sessionStartTag, selfClosingSessionIndex);
                         if ((sessionStartIndex >= 0) && (sessionStartIndex < selfClosingSessionIndex))
                         {
                             // Found a self-closing Session tag - convert it to an open tag
                             // Extract the session attributes part
-                            string sessionAttributes = fileContent.Substring(sessionStartIndex + 8, selfClosingSessionIndex - sessionStartIndex - 8);
+                            string sessionAttributes = fileContent.Substring(sessionStartIndex + sessionStartTag.Length, selfClosingSessionIndex - sessionStartIndex - sessionStartTag.Length);
                             
                             // Replace self-closing tag with opening tag
                             string beforeSession = fileContent.Substring(0, sessionStartIndex);
-                            string openingTag = $"<Session{sessionAttributes}>";
+                            string openingTag = $"<{XMLConstants.SESSION_ELEMENT}{sessionAttributes}>";
                             string modifiedContent = beforeSession + openingTag;
                             
                             // Write the modified content back to the file
@@ -401,7 +403,7 @@ namespace RandomNumberGenerator
                     }
                     
                     // Neither format found - invalid XML structure
-                    throw new InvalidOperationException(" Invalid XML structure: No Session element found in file or file format is not recognized.");
+                    throw new InvalidOperationException($" Invalid XML structure: No {XMLConstants.SESSION_ELEMENT} element found in file or file format is not recognized.");
                 }
             }
             catch (System.IO.IOException)

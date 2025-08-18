@@ -42,13 +42,6 @@ namespace RandomNumberGenerator
         /// </summary>
         private void InitializeComponent()
         {
-            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea3 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
-            System.Windows.Forms.DataVisualization.Charting.Legend legend3 = new System.Windows.Forms.DataVisualization.Charting.Legend();
-            System.Windows.Forms.DataVisualization.Charting.Series series3 = new System.Windows.Forms.DataVisualization.Charting.Series();
-            System.Windows.Forms.DataVisualization.Charting.DataPoint dataPoint2 = new System.Windows.Forms.DataVisualization.Charting.DataPoint(0D, 0.5D);
-            System.Windows.Forms.DataVisualization.Charting.Series series4 = new System.Windows.Forms.DataVisualization.Charting.Series();
-            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea4 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
-            System.Windows.Forms.DataVisualization.Charting.Legend legend4 = new System.Windows.Forms.DataVisualization.Charting.Legend();
             this.m_CurrentAverageLabel = new System.Windows.Forms.Label();
             this.m_CurrentAverageTextBox = new System.Windows.Forms.TextBox();
             this.m_SessionTimerTextBox = new System.Windows.Forms.TextBox();
@@ -246,31 +239,8 @@ namespace RandomNumberGenerator
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.m_ResultChart.BackColor = System.Drawing.Color.Transparent;
-            chartArea3.AxisX.Enabled = System.Windows.Forms.DataVisualization.Charting.AxisEnabled.False;
-            chartArea3.AxisY.Interval = 0.005D;
-            chartArea3.AxisY.Maximum = 0.51D;
-            chartArea3.AxisY.Minimum = 0.49D;
-            chartArea3.Name = "Results";
-            this.m_ResultChart.ChartAreas.Add(chartArea3);
-            legend3.Name = "Legend";
-            this.m_ResultChart.Legends.Add(legend3);
             this.m_ResultChart.Location = new System.Drawing.Point(6, 202);
             this.m_ResultChart.Name = "m_ResultChart";
-            series3.ChartArea = "Results";
-            series3.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Line;
-            series3.Color = System.Drawing.Color.Blue;
-            series3.IsVisibleInLegend = false;
-            series3.Legend = "Legend";
-            series3.Name = "Data Points";
-            series3.Points.Add(dataPoint2);
-            series4.ChartArea = "Results";
-            series4.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Line;
-            series4.Color = System.Drawing.Color.Red;
-            series4.IsVisibleInLegend = false;
-            series4.Legend = "Legend";
-            series4.Name = "Averages";
-            this.m_ResultChart.Series.Add(series3);
-            this.m_ResultChart.Series.Add(series4);
             this.m_ResultChart.Size = new System.Drawing.Size(748, 463);
             this.m_ResultChart.TabIndex = 9;
             this.m_ResultChart.TabStop = false;
@@ -794,14 +764,6 @@ namespace RandomNumberGenerator
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.m_ResultHistogramChart.BackColor = System.Drawing.Color.Transparent;
-            chartArea4.AxisX.Maximum = 1D;
-            chartArea4.AxisX.Minimum = 0D;
-            chartArea4.AxisX.Title = "Value";
-            chartArea4.AxisY.Title = "Frequency";
-            chartArea4.Name = "chartAreaHistogram";
-            this.m_ResultHistogramChart.ChartAreas.Add(chartArea4);
-            legend4.Name = "legendHistogram";
-            this.m_ResultHistogramChart.Legends.Add(legend4);
             this.m_ResultHistogramChart.Location = new System.Drawing.Point(6, 165);
             this.m_ResultHistogramChart.Name = "m_ResultHistogramChart";
             this.m_ResultHistogramChart.Palette = System.Windows.Forms.DataVisualization.Charting.ChartColorPalette.Bright;

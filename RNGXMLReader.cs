@@ -174,12 +174,12 @@ namespace RandomNumberGenerator
             iTargetValue = TargetValues.NO_VALUE_SET;
 
             // Read to the Session element
-            bool bSessionFound = m_Reader.ReadToFollowing("Session");
+            bool bSessionFound = m_Reader.ReadToFollowing(XMLConstants.SESSION_ELEMENT);
             if (bSessionFound)
             {
                 // Parse session attributes
-                string sSimulatedString = m_Reader.GetAttribute("Simulated");
-                string sTargetString = m_Reader.GetAttribute("Target");
+                string sSimulatedString = m_Reader.GetAttribute(XMLConstants.SIMULATED_ATTRIBUTE);
+                string sTargetString = m_Reader.GetAttribute(XMLConstants.TARGET_ATTRIBUTE);
 
                 // Parse simulated flag if present
                 bSimulated = ParseSimulatedValue(sSimulatedString);
@@ -191,7 +191,7 @@ namespace RandomNumberGenerator
             }
             else
             {
-                m_sLastError = $" Invalid XML file format: No 'Session' element found in file '{System.IO.Path.GetFileName(m_sFilePath)}'.";
+                m_sLastError = $" Invalid XML file format: No '{XMLConstants.SESSION_ELEMENT}' element found in file '{System.IO.Path.GetFileName(m_sFilePath)}'.";
                 return false;
             }
         }
@@ -253,8 +253,8 @@ namespace RandomNumberGenerator
             // Load data points in batches for memory efficiency
             List<double> dataBatch = new List<double>((int)uBatchSize);
 
-            bool bDataFound = m_Reader.ReadToFollowing("Data");
-            while (bDataFound)
+            // Use ReadToFollowing to find all Data elements sequentially
+            while (m_Reader.ReadToFollowing(XMLConstants.DATA_ELEMENT))
             {
                 // Process the current data node
                 bool bDataProcessed = ProcessSingleDataNode(dataBatch);
@@ -273,9 +273,6 @@ namespace RandomNumberGenerator
                         dataBatch.Clear();
                     }
                 }
-
-                // Read next data element
-                bDataFound = m_Reader.ReadToFollowing("Data");
             }
 
             // Process any remaining data points in the final batch
@@ -298,8 +295,19 @@ namespace RandomNumberGenerator
         /// <returns>true if data point was successfully parsed and added; otherwise, false</returns>
         private bool ProcessSingleDataNode(List<double> dataBatch)
         {
-            // Get the data value (time attribute not needed for batch loading)
-            string sDataValue = m_Reader.ReadElementContentAsString();
+            // Read the inner text of the Data element
+            string sDataValue = string.Empty;
+            
+            // If we're positioned on a Data element, read its content
+            if (m_Reader.NodeType == XmlNodeType.Element && m_Reader.Name == XMLConstants.DATA_ELEMENT)
+            {
+                // Read the text content of the element
+                bool bReadSuccess = m_Reader.Read();
+                if (bReadSuccess && m_Reader.NodeType == XmlNodeType.Text)
+                {
+                    sDataValue = m_Reader.Value;
+                }
+            }
 
             bool bDataPointParsed = double.TryParse(sDataValue, out double fDataPoint);
             if (bDataPointParsed)
