@@ -17,6 +17,7 @@
 
 using DeviceInterfaces;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
 using System.IO;
@@ -477,9 +478,114 @@ namespace RandomNumberGenerator
 
 
 
-        private void m_BaselineBrowseButton_Click(object sender, EventArgs e)
+        /// <summary>
+        /// Event handler for the baseline browse button
+        /// </summary>
+        /// <param name="sender">IN - Sender of the event (not used)</param>
+        /// <param name="e">IN - The event arguments (not used)</param>
+        private void BaselineBrowseButton_Click(object sender, EventArgs e)
         {
+            // Discard unused parameters
+            _ = sender;
+            _ = e;
 
+            // Prompt the user to select an existing baseline file
+            string sSelectedFile = null;
+            using (OpenFileDialog baselineFileOpenDialog = new OpenFileDialog())
+            {
+                baselineFileOpenDialog.Title = "Select a Random Number Generator baseline file";
+                baselineFileOpenDialog.Filter = "RNG data files (*.rng)|*.rng|All files (*.*)|*.*";
+                baselineFileOpenDialog.DefaultExt = "rng";
+                baselineFileOpenDialog.CheckFileExists = true;
+                baselineFileOpenDialog.CheckPathExists = true;
+                baselineFileOpenDialog.ValidateNames = true;
+                baselineFileOpenDialog.DereferenceLinks = true;
+
+                // Show the file open dialog
+                DialogResult result = baselineFileOpenDialog.ShowDialog();
+                if (DialogResult.OK == result)
+                {
+                    sSelectedFile = baselineFileOpenDialog.FileName;
+                }
+            }
+
+            // If a file was selected
+            if (false == String.IsNullOrEmpty(sSelectedFile))
+            {
+                // Show loading progress
+                ShowLoadingProgress(Path.GetFileName(sSelectedFile));
+
+                // Load the baseline file on a background thread
+                ThreadPool.QueueUserWorkItem(state =>
+                {
+                    bool bLoadSuccess = LoadBaselineFile(sSelectedFile);
+
+                    // Update the UI on the main thread
+                    if (InvokeRequired)
+                    {
+                        Invoke(new Action(() => OnBaselineLoadCompleted(sSelectedFile, bLoadSuccess)));
+                    }
+                    else
+                    {
+                        OnBaselineLoadCompleted(sSelectedFile, bLoadSuccess);
+                    }
+                });
+            }
+        }
+
+        /// <summary>
+        /// Event handler for the result browse button
+        /// </summary>
+        /// <param name="sender">IN - Sender of the event (not used)</param>
+        /// <param name="e">IN - The event arguments (not used)</param>
+        private void ResultBrowseButton_Click(object sender, EventArgs e)
+        {
+            // Discard unused parameters
+            _ = sender;
+            _ = e;
+
+            // Prompt the user to select an existing result file
+            string sSelectedFile = null;
+            using (OpenFileDialog resultFileOpenDialog = new OpenFileDialog())
+            {
+                resultFileOpenDialog.Title = "Select a Random Number Generator result file";
+                resultFileOpenDialog.Filter = "RNG data files (*.rng)|*.rng|All files (*.*)|*.*";
+                resultFileOpenDialog.DefaultExt = "rng";
+                resultFileOpenDialog.CheckFileExists = true;
+                resultFileOpenDialog.CheckPathExists = true;
+                resultFileOpenDialog.ValidateNames = true;
+                resultFileOpenDialog.DereferenceLinks = true;
+
+                // Show the file open dialog
+                DialogResult result = resultFileOpenDialog.ShowDialog();
+                if (DialogResult.OK == result)
+                {
+                    sSelectedFile = resultFileOpenDialog.FileName;
+                }
+            }
+
+            // If a file was selected
+            if (false == String.IsNullOrEmpty(sSelectedFile))
+            {
+                // Show loading progress
+                ShowLoadingProgress(Path.GetFileName(sSelectedFile));
+
+                // Load the result file on a background thread
+                ThreadPool.QueueUserWorkItem(state =>
+                {
+                    bool bLoadSuccess = LoadResultFile(sSelectedFile);
+
+                    // Update the UI on the main thread
+                    if (InvokeRequired)
+                    {
+                        Invoke(new Action(() => OnResultLoadCompleted(sSelectedFile, bLoadSuccess)));
+                    }
+                    else
+                    {
+                        OnResultLoadCompleted(sSelectedFile, bLoadSuccess);
+                    }
+                });
+            }
         }
 
         /// <summary>
@@ -568,8 +674,7 @@ namespace RandomNumberGenerator
 
         /// <summary>
         /// Updates the status box based on the device read status
-        /// </summary>
-        /// <param name="fResult">IN - The result of the read (double max indicates error)</param>
+        /// /// <param name="fResult">IN - The result of the read (double max indicates error)</param>
         public void RecordReadResult(double fResult)
         {
             // Lock the status box object
@@ -1166,6 +1271,396 @@ namespace RandomNumberGenerator
             SetStatusBoxState(sText, System.Drawing.Color.Black, System.Drawing.Color.Red);
         }
 
+        /// <summary>
+        /// Loads baseline data from an existing file using StatisticalAnalysis
+        /// </summary>
+        /// <param name="sFilePath">IN - Path to the baseline file to load</param>
+        /// <returns>true if successful; otherwise, false</returns>
+        private bool LoadBaselineFile(string sFilePath)
+        {
+            bool bStatus = false;
+
+            try
+            {
+                // Create a new statistical analysis object for the baseline
+                m_BaselineAnalysis = new StatisticalAnalysis();
+
+                // Load the baseline file
+                List<double> baselineData = m_BaselineAnalysis.LoadResultFile(sFilePath);
+
+                // Check if data was successfully loaded
+                bStatus = (baselineData != null && baselineData.Count > 0);
+            }
+            catch (ArgumentException argEx)
+            {
+                // Handle argument validation errors
+                SetStatusBoxError($" Baseline file error: {argEx.Message}");
+                bStatus = false;
+            }
+            catch (System.IO.FileNotFoundException)
+            {
+                // Handle file not found errors
+                SetStatusBoxError($" Baseline file not found: {Path.GetFileName(sFilePath)}");
+                bStatus = false;
+            }
+            catch (System.IO.IOException ioEx)
+            {
+                // Handle file I/O errors
+                SetStatusBoxError($" Baseline file I/O error: {ioEx.Message}");
+                bStatus = false;
+            }
+            catch (InvalidOperationException invalidOpEx)
+            {
+                // Handle file loading/parsing errors
+                SetStatusBoxError($" Baseline file loading error: {invalidOpEx.Message}");
+                bStatus = false;
+            }
+            catch (Exception generalEx)
+            {
+                // Handle any other errors
+                SetStatusBoxError($" Unexpected error loading baseline file: {generalEx.Message}");
+                bStatus = false;
+            }
+
+            return bStatus;
+        }
+
+        /// <summary>
+        /// Loads result data from an existing file using StatisticalAnalysis
+        /// </summary>
+        /// <param name="sFilePath">IN - Path to the result file to load</param>
+        /// <returns>true if successful; otherwise, false</returns>
+        private bool LoadResultFile(string sFilePath)
+        {
+            bool bStatus = false;
+
+            try
+            {
+                // Create a new statistical analysis object for the result
+                m_ResultAnalysis = new StatisticalAnalysis();
+
+                // Load the result file
+                List<double> resultData = m_ResultAnalysis.LoadResultFile(sFilePath);
+
+                // Check if data was successfully loaded
+                bStatus = (resultData != null && resultData.Count > 0);
+            }
+            catch (ArgumentException argEx)
+            {
+                // Handle argument validation errors
+                SetStatusBoxError($" Result file error: {argEx.Message}");
+                bStatus = false;
+            }
+            catch (System.IO.FileNotFoundException fileNotFoundEx)
+            {
+                // Handle file not found errors
+                SetStatusBoxError($" Result file not found: {Path.GetFileName(sFilePath)}");
+                bStatus = false;
+            }
+            catch (System.IO.IOException ioEx)
+            {
+                // Handle file I/O errors
+                SetStatusBoxError($" Result file I/O error: {ioEx.Message}");
+                bStatus = false;
+            }
+            catch (InvalidOperationException invalidOpEx)
+            {
+                // Handle file loading/parsing errors
+                SetStatusBoxError($" Result file loading error: {invalidOpEx.Message}");
+                bStatus = false;
+            }
+            catch (Exception generalEx)
+            {
+                // Handle any other errors
+                SetStatusBoxError($" Unexpected error loading result file: {generalEx.Message}");
+                bStatus = false;
+            }
+
+            return bStatus;
+        }
+        /// <summary>
+        /// Called when baseline file loading operation completes (on UI thread)
+        /// </summary>
+        /// <param name="sFilePath">IN - Path to the baseline file that was loaded</param>
+        /// <param name="bSuccess">IN - Whether the load operation succeeded</param>
+        private void OnBaselineLoadCompleted(string sFilePath, bool bSuccess)
+        {
+            // Hide the progress indicator
+            HideLoadingProgress();
+
+            if (bSuccess)
+            {
+                // Update the baseline file display
+                m_BaselineTextBox.Text = Path.GetFileName(sFilePath);
+
+                // Update all baseline statistical fields with data from the loaded baseline analysis
+                UpdateBaselineStatisticalFields();
+
+                // Update the histogram chart with baseline data
+                UpdateHistogramChartWithBaseline();
+
+                // Update comparison statistics if both files are loaded
+                UpdateComparisonStatistics();
+
+                // Show success status
+                SetStatusBoxState($" Baseline file loaded: {Path.GetFileName(sFilePath)}. Ready for analysis.", 
+                                System.Drawing.Color.Black, System.Drawing.Color.LightGreen);
+            }
+            else
+            {
+                // Clear any previous baseline data
+                m_BaselineAnalysis = null;
+                
+                // Clear the baseline UI fields
+                ClearBaselineStatisticalFields();
+                
+                // Show error status - specific error message already set by LoadBaselineFile
+                // Keep the existing error message in the status box
+            }
+        }
+
+        /// <summary>
+        /// Called when result file loading operation completes (on UI thread)
+        /// </summary>
+        /// <param name="sFilePath">IN - Path to the result file that was loaded</param>
+        /// <param name="bSuccess">IN - Whether the load operation succeeded</param>
+        private void OnResultLoadCompleted(string sFilePath, bool bSuccess)
+        {
+            // Hide the progress indicator
+            HideLoadingProgress();
+
+            if (bSuccess)
+            {
+                // Update the result file display
+                m_ResultTextBox.Text = Path.GetFileName(sFilePath);
+
+                // Update all result statistical fields with data from the loaded result analysis
+                UpdateResultStatisticalFields();
+
+                // Update the histogram chart with result data
+                UpdateHistogramChartWithResult();
+
+                // Update comparison statistics if both files are loaded
+                UpdateComparisonStatistics();
+
+                // Show success status
+                SetStatusBoxState($" Result file loaded: {Path.GetFileName(sFilePath)}. Ready for analysis.", 
+                                System.Drawing.Color.Black, System.Drawing.Color.LightGreen);
+            }
+            else
+            {
+                // Clear any previous result data
+                m_ResultAnalysis = null;
+                
+                // Clear the result UI fields
+                ClearResultStatisticalFields();
+                
+                // Show error status - specific error message already set by LoadResultFile
+                // Keep the existing error message in the status box
+            }
+        }
+
+        /// <summary>
+        /// Updates the histogram chart with baseline data
+        /// </summary>
+        private void UpdateHistogramChartWithBaseline()
+        {
+            try
+            {
+                // Check if we have baseline data
+                if (m_BaselineAnalysis?.LoadedFileData != null && m_BaselineAnalysis.LoadedFileData.Count > 0)
+                {
+                    // Get baseline data
+                    List<double> baselineData = m_BaselineAnalysis.LoadedFileData;
+                    string baselineLabel = $"Baseline ({m_BaselineAnalysis.LoadedFileName})";
+
+                    // Check if we also have result data for comparison
+                    if (m_ResultAnalysis?.LoadedFileData != null && m_ResultAnalysis.LoadedFileData.Count > 0)
+                    {
+                        // Plot both baseline and result data
+                        List<double> resultData = m_ResultAnalysis.LoadedFileData;
+                        string resultLabel = $"Result ({m_ResultAnalysis.LoadedFileName})";
+                        
+                        m_ResultHistogramChart.Plot(baselineData, baselineLabel, resultData, resultLabel);
+                    }
+                    else
+                    {
+                        // Plot only baseline data with empty result
+                        List<double> emptyResultData = new List<double>();
+                        
+                        m_ResultHistogramChart.Plot(baselineData, baselineLabel, emptyResultData, "Result (No Data)");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Handle any errors during chart update
+                SetStatusBoxError($" Error updating histogram chart: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Updates the histogram chart with result data
+        /// </summary>
+        private void UpdateHistogramChartWithResult()
+        {
+            try
+            {
+                // Check if we have result data
+                if (m_ResultAnalysis?.LoadedFileData != null && m_ResultAnalysis.LoadedFileData.Count > 0)
+                {
+                    // Get result data
+                    List<double> resultData = m_ResultAnalysis.LoadedFileData;
+                    string resultLabel = $"Result ({m_ResultAnalysis.LoadedFileName})";
+
+                    // Check if we also have baseline data for comparison
+                    if (m_BaselineAnalysis?.LoadedFileData != null && m_BaselineAnalysis.LoadedFileData.Count > 0)
+                    {
+                        // Plot both baseline and result data
+                        List<double> baselineData = m_BaselineAnalysis.LoadedFileData;
+                        string baselineLabel = $"Baseline ({m_BaselineAnalysis.LoadedFileName})";
+                        
+                        m_ResultHistogramChart.Plot(baselineData, baselineLabel, resultData, resultLabel);
+                    }
+                    else
+                    {
+                        // Plot only result data with empty baseline
+                        List<double> emptyBaselineData = new List<double>();
+                        
+                        m_ResultHistogramChart.Plot(emptyBaselineData, "Baseline (No Data)", resultData, resultLabel);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Handle any errors during chart update
+                SetStatusBoxError($" Error updating histogram chart: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Updates all baseline statistical fields with data from the loaded baseline analysis
+        /// </summary>
+        private void UpdateBaselineStatisticalFields()
+        {
+            // Verify baseline analysis data is available
+            if (m_BaselineAnalysis?.LoadedFileStats != null)
+            {
+                var stats = m_BaselineAnalysis.LoadedFileStats;
+
+                // Update the baseline statistical display fields using the same format as the main statistics
+                m_BaselineMeanTextBox.Text = stats.Mean.ToString(m_sFLOAT_FORMAT);
+                m_BaselineStdDevTextBox.Text = stats.StandardDeviation.ToString(m_sEXP_FLOAT_FORMAT);
+                m_BaselineSkewnessTextBox.Text = stats.Skewness.ToString(m_sEXP_FLOAT_FORMAT);
+                m_BaselineKurtosisTextBox.Text = stats.Kurtosis.ToString(m_sEXP_FLOAT_FORMAT);
+            }
+            else
+            {
+                // Clear fields if no data is available
+                ClearBaselineStatisticalFields();
+            }
+        }
+
+        /// <summary>
+        /// Clears all baseline statistical fields
+        /// </summary>
+        private void ClearBaselineStatisticalFields()
+        {
+            m_BaselineTextBox.Text = string.Empty;
+            m_BaselineMeanTextBox.Text = m_sFLOAT_FORMAT;
+            m_BaselineStdDevTextBox.Text = m_sEXP_FLOAT_FORMAT;
+            m_BaselineSkewnessTextBox.Text = m_sEXP_FLOAT_FORMAT;
+            m_BaselineKurtosisTextBox.Text = m_sEXP_FLOAT_FORMAT;
+        }
+
+        /// <summary>
+        /// Updates all result statistical fields with data from the loaded result analysis
+        /// </summary>
+        private void UpdateResultStatisticalFields()
+        {
+            // Verify result analysis data is available
+            if (m_ResultAnalysis?.LoadedFileStats != null)
+            {
+                var stats = m_ResultAnalysis.LoadedFileStats;
+
+                // Update the result statistical display fields using the same format as the main statistics
+                m_ResultMeanTextBox.Text = stats.Mean.ToString(m_sFLOAT_FORMAT);
+                m_ResultStdDevTextBox.Text = stats.StandardDeviation.ToString(m_sEXP_FLOAT_FORMAT);
+                m_ResultSkewnessTextBox.Text = stats.Skewness.ToString(m_sEXP_FLOAT_FORMAT);
+                m_ResultKurtosisTextBox.Text = stats.Kurtosis.ToString(m_sEXP_FLOAT_FORMAT);
+            }
+            else
+            {
+                // Clear fields if no data is available
+                ClearResultStatisticalFields();
+            }
+        }
+
+        /// <summary>
+        /// Clears all result statistical fields
+        /// </summary>
+        private void ClearResultStatisticalFields()
+        {
+            m_ResultTextBox.Text = string.Empty;
+            m_ResultMeanTextBox.Text = m_sFLOAT_FORMAT;
+            m_ResultStdDevTextBox.Text = m_sEXP_FLOAT_FORMAT;
+            m_ResultSkewnessTextBox.Text = m_sEXP_FLOAT_FORMAT;
+            m_ResultKurtosisTextBox.Text = m_sEXP_FLOAT_FORMAT;
+        }
+
+        /// <summary>
+        /// Updates the comparison statistics fields when both baseline and result files are loaded
+        /// </summary>
+        private void UpdateComparisonStatistics()
+        {
+            try
+            {
+                // Check if both baseline and result data are available
+                if (m_BaselineAnalysis?.LoadedFileData != null && m_BaselineAnalysis.LoadedFileData.Count > 0 &&
+                    m_ResultAnalysis?.LoadedFileData != null && m_ResultAnalysis.LoadedFileData.Count > 0)
+                {
+                    // Get the statistical data
+                    var baselineStats = m_BaselineAnalysis.LoadedFileStats;
+                    var resultStats = m_ResultAnalysis.LoadedFileStats;
+
+                    // Calculate mean difference
+                    double fMeanDifference = resultStats.Mean - baselineStats.Mean;
+                    m_MeanDifferenceTextBox.Text = fMeanDifference.ToString(m_sEXP_FLOAT_FORMAT);
+
+                    // Calculate skewness difference
+                    double fSkewnessDifference = resultStats.Skewness - baselineStats.Skewness;
+                    m_SkewnessTextBox.Text = fSkewnessDifference.ToString(m_sEXP_FLOAT_FORMAT);
+
+                    // Update the histogram chart with both datasets
+                    List<double> baselineData = m_BaselineAnalysis.LoadedFileData;
+                    List<double> resultData = m_ResultAnalysis.LoadedFileData;
+                    string baselineLabel = $"Baseline ({m_BaselineAnalysis.LoadedFileName})";
+                    string resultLabel = $"Result ({m_ResultAnalysis.LoadedFileName})";
+                    
+                    m_ResultHistogramChart.Plot(baselineData, baselineLabel, resultData, resultLabel);
+                }
+                else
+                {
+                    // Clear comparison fields if both files are not loaded
+                    ClearComparisonFields();
+                }
+            }
+            catch (Exception ex)
+            {
+                // Handle any errors during comparison update
+                SetStatusBoxError($" Error updating comparison statistics: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Clears all comparison statistical fields
+        /// </summary>
+        private void ClearComparisonFields()
+        {
+            m_MeanDifferenceTextBox.Text = m_sEXP_FLOAT_FORMAT;
+            m_SkewnessTextBox.Text = m_sEXP_FLOAT_FORMAT;
+        }
+
         #endregion
         #region Properties
 
@@ -1300,7 +1795,13 @@ namespace RandomNumberGenerator
         private int m_iSeed = 0;
         private BindingSource m_DeviceBindingSource;
         private ManualResetEvent m_DeviceUpdateComplete = new ManualResetEvent(false);
-        
+
+        // Statistical analysis for baseline data
+        private StatisticalAnalysis m_BaselineAnalysis = null;
+
+        // Statistical analysis for result data
+        private StatisticalAnalysis m_ResultAnalysis = null;
+
         // Display settings
         private const string m_sFLOAT_FORMAT = "0.000000000";
         private const string m_sINTEGER_FORMAT = "0";

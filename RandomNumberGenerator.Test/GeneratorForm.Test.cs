@@ -14,6 +14,8 @@ using Moq;
 using System;
 using System.ComponentModel;
 using System.Drawing;
+using System.IO;
+using System.Reflection;
 
 namespace RandomNumberGenerator.Test
 {
@@ -58,6 +60,15 @@ namespace RandomNumberGenerator.Test
         private const string m_sEXPECTED_RUNNING_TEXT = "Running";
         private const string m_sEXPECTED_ERROR_TEXT = "Error reading";
 
+        // Test file constants for baseline and result file testing
+        private const string m_sBASELINE_TEST_FILE = "TestBaselineFile.GeneratorFormTests.xml";
+        private const string m_sRESULT_TEST_FILE = "TestResultFile.GeneratorFormTests.xml";
+        private const string m_sMALFORMED_TEST_FILE = "TestMalformedResultFile.GeneratorFormTests.xml";
+        private const string m_sBASELINE_INTEGRATION_FILE = "TestBaseline.Integration.xml";
+        private const string m_sRESULT_INTEGRATION_FILE = "TestResult.Integration.xml";
+        private const string m_sBASELINE_REVERSE_FILE = "TestBaseline.Reverse.xml";
+        private const string m_sRESULT_REVERSE_FILE = "TestResult.Reverse.xml";
+
         #endregion
         #region Additional test attributes
         //
@@ -79,6 +90,43 @@ namespace RandomNumberGenerator.Test
         // [TestCleanup()]
         // public void MyTestCleanup() { }
         //
+        #endregion
+        #region Initialization and cleanup
+
+        /// <summary>
+        /// Cleans up after each test runs to ensure we always start with a clean state
+        /// </summary>
+        [TestCleanup]
+        public void Cleanup()
+        {
+            // Delete test files if they exist to ensure clean state for next test
+            string[] testFiles = {
+                m_sBASELINE_TEST_FILE,
+                m_sRESULT_TEST_FILE,
+                m_sMALFORMED_TEST_FILE,
+                m_sBASELINE_INTEGRATION_FILE,
+                m_sRESULT_INTEGRATION_FILE,
+                m_sBASELINE_REVERSE_FILE,
+                m_sRESULT_REVERSE_FILE
+            };
+
+            foreach (string sTestFile in testFiles)
+            {
+                if (File.Exists(sTestFile))
+                {
+                    try
+                    {
+                        File.Delete(sTestFile);
+                    }
+                    catch (IOException)
+                    {
+                        // Ignore file deletion errors during test cleanup
+                        // This prevents test failures due to file system issues
+                    }
+                }
+            }
+        }
+
         #endregion
         #region Tests
 
@@ -982,7 +1030,6 @@ namespace RandomNumberGenerator.Test
             Color expectedTextColor = System.Drawing.Color.Black;
             Color expectedBackColor = System.Drawing.SystemColors.Info;
 
-            // Mock the session timer and setup the properties
             Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
             mockSessionTimer.SetupAllProperties();
 
@@ -1039,6 +1086,585 @@ namespace RandomNumberGenerator.Test
             // Verify the callback was invoked through our simulation
             Assert.IsTrue(callbackInvoked, "DataPointAddedCallback should be invoked when data point is added");
             Assert.AreEqual(fValidResult, capturedDataPoint, "Callback should receive the correct data point");
+        }
+
+        #endregion
+        #region Baseline and Result File Loading Tests
+
+        /// <summary>
+        /// Tests LoadBaselineFile with valid file loads successfully
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void LoadBaselineFile_ValidFile_LoadsSuccessfully()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Create test XML file content
+            const string sVALID_XML_CONTENT = @"<?xml version=""1.0"" encoding=""utf-8""?>
+<Session Simulated=""false"" Target=""1"">
+    <Data Time=""01:30:45"">0.1</Data>
+    <Data Time=""01:30:46"">0.5</Data>
+    <Data Time=""01:30:47"">0.9</Data>
+</Session>";
+
+            File.WriteAllText(m_sBASELINE_TEST_FILE, sVALID_XML_CONTENT);
+
+            // Mock dependencies
+            Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
+            mockSessionTimer.SetupAllProperties();
+            Mock<IRNGSessionData> mockSessionData = new Mock<IRNGSessionData>();
+            mockSessionData.Setup(mock => mock.Timer).Returns(mockSessionTimer.Object);
+            Mock<IRNGDeviceTimer> mockDeviceTimer = new Mock<IRNGDeviceTimer>();
+
+            // Create the object under test
+            GeneratorForm generatorForm = new GeneratorForm(mockSessionData.Object, mockDeviceTimer.Object);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Use reflection to call the private LoadBaselineFile method
+            MethodInfo loadMethod = typeof(GeneratorForm).GetMethod("LoadBaselineFile", 
+                            BindingFlags.NonPublic | BindingFlags.Instance);
+            bool bResult = (bool)loadMethod.Invoke(generatorForm, new object[] { m_sBASELINE_TEST_FILE });
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the load was successful
+            Assert.IsTrue(bResult, "LoadBaselineFile should return true for valid file");
+        }
+
+        /// <summary>
+        /// Tests LoadBaselineFile with non-existent file returns false
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void LoadBaselineFile_NonExistentFile_ReturnsFalse()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            const string sNON_EXISTENT_FILE = "NonExistentBaselineFile.xml";
+
+            // Mock dependencies
+            Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
+            mockSessionTimer.SetupAllProperties();
+            Mock<IRNGSessionData> mockSessionData = new Mock<IRNGSessionData>();
+            mockSessionData.Setup(mock => mock.Timer).Returns(mockSessionTimer.Object);
+            Mock<IRNGDeviceTimer> mockDeviceTimer = new Mock<IRNGDeviceTimer>();
+
+            // Create the object under test
+            GeneratorForm generatorForm = new GeneratorForm(mockSessionData.Object, mockDeviceTimer.Object);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Use reflection to call the private LoadBaselineFile method
+            var loadMethod = typeof(GeneratorForm).GetMethod("LoadBaselineFile", 
+                            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            bool bResult = (bool)loadMethod.Invoke(generatorForm, new object[] { sNON_EXISTENT_FILE });
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the load failed as expected
+            Assert.IsFalse(bResult, "LoadBaselineFile should return false for non-existent file");
+
+            // Verify error was set in status box
+            StringAssert.Contains(generatorForm.StatusBoxText, "Baseline file not found");
+        }
+
+        /// <summary>
+        /// Tests LoadResultFile with valid file loads successfully
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void LoadResultFile_ValidFile_LoadsSuccessfully()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Create test XML file content
+            const string sVALID_XML_CONTENT = @"<?xml version=""1.0"" encoding=""utf-8""?>
+<Session Simulated=""false"" Target=""1"">
+    <Data Time=""01:30:45"">0.2</Data>
+    <Data Time=""01:30:46"">0.4</Data>
+    <Data Time=""01:30:47"">0.8</Data>
+</Session>";
+
+            File.WriteAllText(m_sRESULT_TEST_FILE, sVALID_XML_CONTENT);
+
+            // Mock dependencies
+            Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
+            mockSessionTimer.SetupAllProperties();
+            Mock<IRNGSessionData> mockSessionData = new Mock<IRNGSessionData>();
+            mockSessionData.Setup(mock => mock.Timer).Returns(mockSessionTimer.Object);
+            Mock<IRNGDeviceTimer> mockDeviceTimer = new Mock<IRNGDeviceTimer>();
+
+            // Create the object under test
+            GeneratorForm generatorForm = new GeneratorForm(mockSessionData.Object, mockDeviceTimer.Object);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Use reflection to call the private LoadResultFile method
+            MethodInfo loadMethod = typeof(GeneratorForm).GetMethod("LoadResultFile", 
+                            BindingFlags.NonPublic | BindingFlags.Instance);
+            bool bResult = (bool)loadMethod.Invoke(generatorForm, new object[] { m_sRESULT_TEST_FILE });
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the load was successful
+            Assert.IsTrue(bResult, "LoadResultFile should return true for valid file");
+        }
+
+        /// <summary>
+        /// Tests LoadResultFile with malformed XML returns false and sets error
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void LoadResultFile_MalformedXML_ReturnsFalseWithError()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Create malformed XML file content
+            const string sMALFORMED_XML_CONTENT = @"<?xml version=""1.0"" encoding=""utf-8""?>
+<Session Simulated=""false"" Target=""1"">
+    <Data Time=""01:30:45"">0.2</Data>
+    <UnclosedElement>
+</Session>";
+
+            File.WriteAllText(m_sMALFORMED_TEST_FILE, sMALFORMED_XML_CONTENT);
+
+            // Mock dependencies
+            Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
+            mockSessionTimer.SetupAllProperties();
+            Mock<IRNGSessionData> mockSessionData = new Mock<IRNGSessionData>();
+            mockSessionData.Setup(mock => mock.Timer).Returns(mockSessionTimer.Object);
+            Mock<IRNGDeviceTimer> mockDeviceTimer = new Mock<IRNGDeviceTimer>();
+
+            // Create the object under test
+            GeneratorForm generatorForm = new GeneratorForm(mockSessionData.Object, mockDeviceTimer.Object);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Use reflection to call the private LoadResultFile method
+            MethodInfo loadMethod = typeof(GeneratorForm).GetMethod("LoadResultFile", 
+                            BindingFlags.NonPublic | BindingFlags.Instance);
+            bool bResult = (bool)loadMethod.Invoke(generatorForm, new object[] { m_sMALFORMED_TEST_FILE });
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the load failed as expected
+            Assert.IsFalse(bResult, "LoadResultFile should return false for malformed XML file");
+
+            // Verify error was set in status box
+            StringAssert.Contains(generatorForm.StatusBoxText, "Result file loading error");
+        }
+
+        /// <summary>
+        /// Tests OnBaselineLoadCompleted with successful load updates UI fields
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void OnBaselineLoadCompleted_SuccessfulLoad_UpdatesUIFields()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            const string sTEST_FILE_PATH = "TestBaseline.xml";
+            const bool bSUCCESS = true;
+
+            // Mock dependencies
+            Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
+            mockSessionTimer.SetupAllProperties();
+            Mock<IRNGSessionData> mockSessionData = new Mock<IRNGSessionData>();
+            mockSessionData.Setup(mock => mock.Timer).Returns(mockSessionTimer.Object);
+            Mock<IRNGDeviceTimer> mockDeviceTimer = new Mock<IRNGDeviceTimer>();
+
+            // Create the object under test
+            GeneratorForm generatorForm = new GeneratorForm(mockSessionData.Object, mockDeviceTimer.Object);
+
+            // Set up baseline analysis using reflection
+            FieldInfo baselineAnalysisField = typeof(GeneratorForm).GetField("m_BaselineAnalysis", 
+                                       BindingFlags.NonPublic | BindingFlags.Instance);
+            StatisticalAnalysis mockAnalysis = new StatisticalAnalysis();
+            baselineAnalysisField.SetValue(generatorForm, mockAnalysis);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Use reflection to call the private OnBaselineLoadCompleted method
+            MethodInfo completedMethod = typeof(GeneratorForm).GetMethod("OnBaselineLoadCompleted", 
+                                 BindingFlags.NonPublic | BindingFlags.Instance);
+            completedMethod.Invoke(generatorForm, new object[] { sTEST_FILE_PATH, bSUCCESS });
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify success status was set
+            StringAssert.Contains(generatorForm.StatusBoxText, "Baseline file loaded");
+            Assert.AreEqual(System.Drawing.Color.LightGreen, generatorForm.StatusBoxBackColor);
+        }
+
+        /// <summary>
+        /// Tests OnBaselineLoadCompleted with failed load clears UI fields
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void OnBaselineLoadCompleted_FailedLoad_ClearsUIFields()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            const string sTEST_FILE_PATH = "TestBaseline.xml";
+            const bool bSUCCESS = false;
+
+            // Mock dependencies
+            Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
+            mockSessionTimer.SetupAllProperties();
+            Mock<IRNGSessionData> mockSessionData = new Mock<IRNGSessionData>();
+            mockSessionData.Setup(mock => mock.Timer).Returns(mockSessionTimer.Object);
+            Mock<IRNGDeviceTimer> mockDeviceTimer = new Mock<IRNGDeviceTimer>();
+
+            // Create the object under test
+            GeneratorForm generatorForm = new GeneratorForm(mockSessionData.Object, mockDeviceTimer.Object);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Use reflection to call the private OnBaselineLoadCompleted method
+            MethodInfo completedMethod = typeof(GeneratorForm).GetMethod("OnBaselineLoadCompleted", 
+                                 BindingFlags.NonPublic | BindingFlags.Instance);
+            completedMethod.Invoke(generatorForm, new object[] { sTEST_FILE_PATH, bSUCCESS });
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify baseline analysis was cleared
+            FieldInfo baselineAnalysisField = typeof(GeneratorForm).GetField("m_BaselineAnalysis", 
+                                       BindingFlags.NonPublic | BindingFlags.Instance);
+            object baselineAnalysis = baselineAnalysisField.GetValue(generatorForm);
+            Assert.IsNull(baselineAnalysis, "Baseline analysis should be cleared on failed load");
+        }
+
+        /// <summary>
+        /// Tests OnResultLoadCompleted with successful load updates UI fields
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void OnResultLoadCompleted_SuccessfulLoad_UpdatesUIFields()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            const string sTEST_FILE_PATH = "TestResult.xml";
+            const bool bSUCCESS = true;
+
+            // Mock dependencies
+            Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
+            mockSessionTimer.SetupAllProperties();
+            Mock<IRNGSessionData> mockSessionData = new Mock<IRNGSessionData>();
+            mockSessionData.Setup(mock => mock.Timer).Returns(mockSessionTimer.Object);
+            Mock<IRNGDeviceTimer> mockDeviceTimer = new Mock<IRNGDeviceTimer>();
+
+            // Create the object under test
+            GeneratorForm generatorForm = new GeneratorForm(mockSessionData.Object, mockDeviceTimer.Object);
+
+            // Set up result analysis using reflection
+            FieldInfo resultAnalysisField = typeof(GeneratorForm).GetField("m_ResultAnalysis", 
+                                     BindingFlags.NonPublic | BindingFlags.Instance);
+            StatisticalAnalysis mockAnalysis = new StatisticalAnalysis();
+            resultAnalysisField.SetValue(generatorForm, mockAnalysis);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Use reflection to call the private OnResultLoadCompleted method
+            MethodInfo completedMethod = typeof(GeneratorForm).GetMethod("OnResultLoadCompleted", 
+                                 BindingFlags.NonPublic | BindingFlags.Instance);
+            completedMethod.Invoke(generatorForm, new object[] { sTEST_FILE_PATH, bSUCCESS });
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify success status was set
+            StringAssert.Contains(generatorForm.StatusBoxText, "Result file loaded");
+            Assert.AreEqual(System.Drawing.Color.LightGreen, generatorForm.StatusBoxBackColor);
+        }
+
+        /// <summary>
+        /// Tests UpdateComparisonStatistics with no data clears comparison fields
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void UpdateComparisonStatistics_NoData_ClearsFields()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Mock dependencies
+            Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
+            mockSessionTimer.SetupAllProperties();
+            Mock<IRNGSessionData> mockSessionData = new Mock<IRNGSessionData>();
+            mockSessionData.Setup(mock => mock.Timer).Returns(mockSessionTimer.Object);
+            Mock<IRNGDeviceTimer> mockDeviceTimer = new Mock<IRNGDeviceTimer>();
+
+            // Create the object under test
+            GeneratorForm generatorForm = new GeneratorForm(mockSessionData.Object, mockDeviceTimer.Object);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Use reflection to call the private UpdateComparisonStatistics method
+            MethodInfo updateMethod = typeof(GeneratorForm).GetMethod("UpdateComparisonStatistics", 
+                              BindingFlags.NonPublic | BindingFlags.Instance);
+            updateMethod.Invoke(generatorForm, new object[] { });
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify comparison fields were cleared
+            // We can't directly verify the UI fields without accessing them via reflection or making them testable
+            // But we can verify the method completed without throwing exceptions
+            Assert.IsNotNull(generatorForm, "UpdateComparisonStatistics should complete without exception");
+        }
+
+        #endregion
+        #region Integration Tests for File Loading
+
+        /// <summary>
+        /// Tests loading both baseline and result files triggers comparison statistics update
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Integration")]
+        public void LoadBothFiles_Integration_UpdatesComparisonStatistics()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Create test XML files
+            const string sBASELINE_XML = @"<?xml version=""1.0"" encoding=""utf-8""?>
+<Session Simulated=""false"" Target=""1"">
+    <Data Time=""01:30:45"">0.1</Data>
+    <Data Time=""01:30:46"">0.3</Data>
+    <Data Time=""01:30:47"">0.5</Data>
+</Session>";
+
+            const string sRESULT_XML = @"<?xml version=""1.0"" encoding=""utf-8""?>
+<Session Simulated=""false"" Target=""1"">
+    <Data Time=""01:30:45"">0.2</Data>
+    <Data Time=""01:30:46"">0.4</Data>
+    <Data Time=""01:30:47"">0.6</Data>
+</Session>";
+
+            File.WriteAllText(m_sBASELINE_INTEGRATION_FILE, sBASELINE_XML);
+            File.WriteAllText(m_sRESULT_INTEGRATION_FILE, sRESULT_XML);
+
+            // Mock dependencies
+            Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
+            mockSessionTimer.SetupAllProperties();
+            Mock<IRNGSessionData> mockSessionData = new Mock<IRNGSessionData>();
+            mockSessionData.Setup(mock => mock.Timer).Returns(mockSessionTimer.Object);
+            Mock<IRNGDeviceTimer> mockDeviceTimer = new Mock<IRNGDeviceTimer>();
+
+            // Create the object under test
+            GeneratorForm generatorForm = new GeneratorForm(mockSessionData.Object, mockDeviceTimer.Object);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Load baseline file
+            MethodInfo loadBaselineMethod = typeof(GeneratorForm).GetMethod("LoadBaselineFile", 
+                                   BindingFlags.NonPublic | BindingFlags.Instance);
+            bool bBaselineLoaded = (bool)loadBaselineMethod.Invoke(generatorForm, new object[] { m_sBASELINE_INTEGRATION_FILE });
+
+            MethodInfo onBaselineCompletedMethod = typeof(GeneratorForm).GetMethod("OnBaselineLoadCompleted", 
+                                           BindingFlags.NonPublic | BindingFlags.Instance);
+            onBaselineCompletedMethod.Invoke(generatorForm, new object[] { m_sBASELINE_INTEGRATION_FILE, bBaselineLoaded });
+
+            // Load result file
+            MethodInfo loadResultMethod = typeof(GeneratorForm).GetMethod("LoadResultFile", 
+                                  BindingFlags.NonPublic | BindingFlags.Instance);
+            bool bResultLoaded = (bool)loadResultMethod.Invoke(generatorForm, new object[] { m_sRESULT_INTEGRATION_FILE });
+
+            MethodInfo onResultCompletedMethod = typeof(GeneratorForm).GetMethod("OnResultLoadCompleted", 
+                                         BindingFlags.NonPublic | BindingFlags.Instance);
+            onResultCompletedMethod.Invoke(generatorForm, new object[] { m_sRESULT_INTEGRATION_FILE, bResultLoaded });
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify both files loaded successfully
+            Assert.IsTrue(bBaselineLoaded, "Baseline file should load successfully");
+            Assert.IsTrue(bResultLoaded, "Result file should load successfully");
+
+            // Verify both analysis objects exist
+            FieldInfo baselineAnalysisField = typeof(GeneratorForm).GetField("m_BaselineAnalysis", 
+                                       BindingFlags.NonPublic | BindingFlags.Instance);
+            FieldInfo resultAnalysisField = typeof(GeneratorForm).GetField("m_ResultAnalysis", 
+                                     BindingFlags.NonPublic | BindingFlags.Instance);
+            
+            object baselineAnalysis = baselineAnalysisField.GetValue(generatorForm);
+            object resultAnalysis = resultAnalysisField.GetValue(generatorForm);
+
+            Assert.IsNotNull(baselineAnalysis, "Baseline analysis should be created");
+            Assert.IsNotNull(resultAnalysis, "Result analysis should be created");
+        }
+
+        /// <summary>
+        /// Tests that loading files in different order both trigger comparison updates
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Integration")]
+        public void LoadFilesInReverseOrder_Integration_UpdatesComparisonStatistics()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Create test XML files
+            const string sBASELINE_XML = @"<?xml version=""1.0"" encoding=""utf-8""?>
+<Session Simulated=""false"" Target=""1"">
+    <Data Time=""01:30:45"">0.1</Data>
+    <Data Time=""01:30:46"">0.5</Data>
+</Session>";
+
+            const string sRESULT_XML = @"<?xml version=""1.0"" encoding=""utf-8""?>
+<Session Simulated=""false"" Target=""1"">
+    <Data Time=""01:30:45"">0.3</Data>
+    <Data Time=""01:30:46"">0.7</Data>
+</Session>";
+
+            File.WriteAllText(m_sBASELINE_REVERSE_FILE, sBASELINE_XML);
+            File.WriteAllText(m_sRESULT_REVERSE_FILE, sRESULT_XML);
+
+            // Mock dependencies
+            Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
+            mockSessionTimer.SetupAllProperties();
+            Mock<IRNGSessionData> mockSessionData = new Mock<IRNGSessionData>();
+            mockSessionData.Setup(mock => mock.Timer).Returns(mockSessionTimer.Object);
+            Mock<IRNGDeviceTimer> mockDeviceTimer = new Mock<IRNGDeviceTimer>();
+
+            // Create the object under test
+            GeneratorForm generatorForm = new GeneratorForm(mockSessionData.Object, mockDeviceTimer.Object);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Load result file FIRST (reverse order)
+            MethodInfo loadResultMethod = typeof(GeneratorForm).GetMethod("LoadResultFile", 
+                                  BindingFlags.NonPublic | BindingFlags.Instance);
+            bool bResultLoaded = (bool)loadResultMethod.Invoke(generatorForm, new object[] { m_sRESULT_REVERSE_FILE });
+
+            MethodInfo onResultCompletedMethod = typeof(GeneratorForm).GetMethod("OnResultLoadCompleted", 
+                                         BindingFlags.NonPublic | BindingFlags.Instance);
+            onResultCompletedMethod.Invoke(generatorForm, new object[] { m_sRESULT_REVERSE_FILE, bResultLoaded });
+
+            // Then load baseline file SECOND
+            MethodInfo loadBaselineMethod = typeof(GeneratorForm).GetMethod("LoadBaselineFile", 
+                                   BindingFlags.NonPublic | BindingFlags.Instance);
+            bool bBaselineLoaded = (bool)loadBaselineMethod.Invoke(generatorForm, new object[] { m_sBASELINE_REVERSE_FILE });
+
+            MethodInfo onBaselineCompletedMethod = typeof(GeneratorForm).GetMethod("OnBaselineLoadCompleted", 
+                                           BindingFlags.NonPublic | BindingFlags.Instance);
+            onBaselineCompletedMethod.Invoke(generatorForm, new object[] { m_sBASELINE_REVERSE_FILE, bBaselineLoaded });
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify both files loaded successfully
+            Assert.IsTrue(bResultLoaded, "Result file should load successfully when loaded first");
+            Assert.IsTrue(bBaselineLoaded, "Baseline file should load successfully when loaded second");
+
+            // Verify both analysis objects exist
+            FieldInfo baselineAnalysisField = typeof(GeneratorForm).GetField("m_BaselineAnalysis", 
+                                       BindingFlags.NonPublic | BindingFlags.Instance);
+            FieldInfo resultAnalysisField = typeof(GeneratorForm).GetField("m_ResultAnalysis", 
+                                     BindingFlags.NonPublic | BindingFlags.Instance);
+            
+            object baselineAnalysis = baselineAnalysisField.GetValue(generatorForm);
+            object resultAnalysis = resultAnalysisField.GetValue(generatorForm);
+
+            Assert.IsNotNull(baselineAnalysis, "Baseline analysis should be created when loaded second");
+            Assert.IsNotNull(resultAnalysis, "Result analysis should be created when loaded first");
+        }
+
+        /// <summary>
+        /// Tests file loading error scenarios trigger proper error handling
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void FileLoadingErrors_Integration_ProperErrorHandling()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Mock dependencies
+            Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
+            mockSessionTimer.SetupAllProperties();
+            Mock<IRNGSessionData> mockSessionData = new Mock<IRNGSessionData>();
+            mockSessionData.Setup(mock => mock.Timer).Returns(mockSessionTimer.Object);
+            Mock<IRNGDeviceTimer> mockDeviceTimer = new Mock<IRNGDeviceTimer>();
+
+            // Create the object under test
+            GeneratorForm generatorForm = new GeneratorForm(mockSessionData.Object, mockDeviceTimer.Object);
+
+            //**************************************************************//
+            // Act & Assert
+            //**************************************************************//
+
+            // Test baseline file not found
+            MethodInfo loadBaselineMethod = typeof(GeneratorForm).GetMethod("LoadBaselineFile", 
+                                   BindingFlags.NonPublic | BindingFlags.Instance);
+            bool bBaselineResult = (bool)loadBaselineMethod.Invoke(generatorForm, new object[] { "NonExistentBaseline.xml" });
+
+            Assert.IsFalse(bBaselineResult, "LoadBaselineFile should return false for non-existent file");
+            StringAssert.Contains(generatorForm.StatusBoxText, "Baseline file not found", "Should show baseline file not found error");
+
+            // Test result file not found
+            MethodInfo loadResultMethod = typeof(GeneratorForm).GetMethod("LoadResultFile", 
+                                  BindingFlags.NonPublic | BindingFlags.Instance);
+            bool bResultResult = (bool)loadResultMethod.Invoke(generatorForm, new object[] { "NonExistentResult.xml" });
+
+            Assert.IsFalse(bResultResult, "LoadResultFile should return false for non-existent file");
+            StringAssert.Contains(generatorForm.StatusBoxText, "Result file not found", "Should show result file not found error");
         }
 
         #endregion

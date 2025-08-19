@@ -72,6 +72,11 @@ namespace RandomNumberGenerator
             this.m_DataPointsTextBox = new System.Windows.Forms.TextBox();
             this.m_DataPointsLabel = new System.Windows.Forms.Label();
             this.AnalyzeTabPage = new System.Windows.Forms.TabPage();
+            this.m_ComparisonGroupBox = new System.Windows.Forms.GroupBox();
+            this.m_SkewnessTextBox = new System.Windows.Forms.TextBox();
+            this.m_SkewnessLabel = new System.Windows.Forms.Label();
+            this.m_MeanDifferenceTextBox = new System.Windows.Forms.TextBox();
+            this.m_MeanDifferenceLabel = new System.Windows.Forms.Label();
             this.m_ResultGroupBox = new System.Windows.Forms.GroupBox();
             this.m_ResultKurtosisTextBox = new System.Windows.Forms.TextBox();
             this.m_ResultKurtosisLabel = new System.Windows.Forms.Label();
@@ -97,21 +102,16 @@ namespace RandomNumberGenerator
             this.m_BaselineLabel = new System.Windows.Forms.Label();
             this.m_BaselineTextBox = new System.Windows.Forms.TextBox();
             this.m_ResultHistogramChart = new RandomNumberGenerator.HistogramChart();
-            this.m_ComparisonGroupBox = new System.Windows.Forms.GroupBox();
-            this.m_MeanDifferenceLabel = new System.Windows.Forms.Label();
-            this.m_MeanDifferenceTextBox = new System.Windows.Forms.TextBox();
-            this.m_SkewnessLabel = new System.Windows.Forms.Label();
-            this.m_SkewnessTextBox = new System.Windows.Forms.TextBox();
             ((System.ComponentModel.ISupportInitialize)(this.m_ResultChart)).BeginInit();
             this.MainTabControl.SuspendLayout();
             this.ExecuteTabPage.SuspendLayout();
             this.m_SetupGroupBox.SuspendLayout();
             this.m_StatisticsGroupBox.SuspendLayout();
             this.AnalyzeTabPage.SuspendLayout();
+            this.m_ComparisonGroupBox.SuspendLayout();
             this.m_ResultGroupBox.SuspendLayout();
             this.m_BaselineGroupBox.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.m_ResultHistogramChart)).BeginInit();
-            this.m_ComparisonGroupBox.SuspendLayout();
             this.SuspendLayout();
             // 
             // m_CurrentAverageLabel
@@ -487,6 +487,55 @@ namespace RandomNumberGenerator
             this.AnalyzeTabPage.Text = "Analyze";
             this.AnalyzeTabPage.UseVisualStyleBackColor = true;
             // 
+            // m_ComparisonGroupBox
+            // 
+            this.m_ComparisonGroupBox.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.m_ComparisonGroupBox.Controls.Add(this.m_SkewnessTextBox);
+            this.m_ComparisonGroupBox.Controls.Add(this.m_SkewnessLabel);
+            this.m_ComparisonGroupBox.Controls.Add(this.m_MeanDifferenceTextBox);
+            this.m_ComparisonGroupBox.Controls.Add(this.m_MeanDifferenceLabel);
+            this.m_ComparisonGroupBox.Location = new System.Drawing.Point(0, 105);
+            this.m_ComparisonGroupBox.Name = "m_ComparisonGroupBox";
+            this.m_ComparisonGroupBox.Size = new System.Drawing.Size(757, 54);
+            this.m_ComparisonGroupBox.TabIndex = 18;
+            this.m_ComparisonGroupBox.TabStop = false;
+            this.m_ComparisonGroupBox.Text = "Comparison";
+            // 
+            // m_SkewnessTextBox
+            // 
+            this.m_SkewnessTextBox.Location = new System.Drawing.Point(503, 19);
+            this.m_SkewnessTextBox.Name = "m_SkewnessTextBox";
+            this.m_SkewnessTextBox.ReadOnly = true;
+            this.m_SkewnessTextBox.Size = new System.Drawing.Size(244, 20);
+            this.m_SkewnessTextBox.TabIndex = 3;
+            // 
+            // m_SkewnessLabel
+            // 
+            this.m_SkewnessLabel.AutoSize = true;
+            this.m_SkewnessLabel.Location = new System.Drawing.Point(389, 22);
+            this.m_SkewnessLabel.Name = "m_SkewnessLabel";
+            this.m_SkewnessLabel.Size = new System.Drawing.Size(108, 13);
+            this.m_SkewnessLabel.TabIndex = 2;
+            this.m_SkewnessLabel.Text = "Skewness Difference";
+            // 
+            // m_MeanDifferenceTextBox
+            // 
+            this.m_MeanDifferenceTextBox.Location = new System.Drawing.Point(102, 19);
+            this.m_MeanDifferenceTextBox.Name = "m_MeanDifferenceTextBox";
+            this.m_MeanDifferenceTextBox.ReadOnly = true;
+            this.m_MeanDifferenceTextBox.Size = new System.Drawing.Size(272, 20);
+            this.m_MeanDifferenceTextBox.TabIndex = 1;
+            // 
+            // m_MeanDifferenceLabel
+            // 
+            this.m_MeanDifferenceLabel.AutoSize = true;
+            this.m_MeanDifferenceLabel.Location = new System.Drawing.Point(7, 22);
+            this.m_MeanDifferenceLabel.Name = "m_MeanDifferenceLabel";
+            this.m_MeanDifferenceLabel.Size = new System.Drawing.Size(89, 13);
+            this.m_MeanDifferenceLabel.TabIndex = 0;
+            this.m_MeanDifferenceLabel.Text = "Mean Difference:";
+            // 
             // m_ResultGroupBox
             // 
             this.m_ResultGroupBox.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
@@ -602,6 +651,7 @@ namespace RandomNumberGenerator
             this.m_ResultBrowseButton.TabIndex = 5;
             this.m_ResultBrowseButton.Text = "...";
             this.m_ResultBrowseButton.UseVisualStyleBackColor = true;
+            this.m_ResultBrowseButton.Click += new System.EventHandler(this.ResultBrowseButton_Click);
             // 
             // m_ResultLabel
             // 
@@ -737,7 +787,7 @@ namespace RandomNumberGenerator
             this.m_BaselineBrowseButton.TabIndex = 5;
             this.m_BaselineBrowseButton.Text = "...";
             this.m_BaselineBrowseButton.UseVisualStyleBackColor = true;
-            this.m_BaselineBrowseButton.Click += new System.EventHandler(this.m_BaselineBrowseButton_Click);
+            this.m_BaselineBrowseButton.Click += new System.EventHandler(this.BaselineBrowseButton_Click);
             // 
             // m_BaselineLabel
             // 
@@ -771,53 +821,6 @@ namespace RandomNumberGenerator
             this.m_ResultHistogramChart.TabIndex = 9;
             this.m_ResultHistogramChart.TabStop = false;
             // 
-            // m_ComparisonGroupBox
-            // 
-            this.m_ComparisonGroupBox.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.m_ComparisonGroupBox.Controls.Add(this.m_SkewnessTextBox);
-            this.m_ComparisonGroupBox.Controls.Add(this.m_SkewnessLabel);
-            this.m_ComparisonGroupBox.Controls.Add(this.m_MeanDifferenceTextBox);
-            this.m_ComparisonGroupBox.Controls.Add(this.m_MeanDifferenceLabel);
-            this.m_ComparisonGroupBox.Location = new System.Drawing.Point(0, 105);
-            this.m_ComparisonGroupBox.Name = "m_ComparisonGroupBox";
-            this.m_ComparisonGroupBox.Size = new System.Drawing.Size(757, 54);
-            this.m_ComparisonGroupBox.TabIndex = 18;
-            this.m_ComparisonGroupBox.TabStop = false;
-            this.m_ComparisonGroupBox.Text = "Comparison";
-            // 
-            // m_MeanDifferenceLabel
-            // 
-            this.m_MeanDifferenceLabel.AutoSize = true;
-            this.m_MeanDifferenceLabel.Location = new System.Drawing.Point(7, 22);
-            this.m_MeanDifferenceLabel.Name = "m_MeanDifferenceLabel";
-            this.m_MeanDifferenceLabel.Size = new System.Drawing.Size(89, 13);
-            this.m_MeanDifferenceLabel.TabIndex = 0;
-            this.m_MeanDifferenceLabel.Text = "Mean Difference:";
-            // 
-            // m_MeanDifferenceTextBox
-            // 
-            this.m_MeanDifferenceTextBox.Location = new System.Drawing.Point(102, 19);
-            this.m_MeanDifferenceTextBox.Name = "m_MeanDifferenceTextBox";
-            this.m_MeanDifferenceTextBox.Size = new System.Drawing.Size(272, 20);
-            this.m_MeanDifferenceTextBox.TabIndex = 1;
-            // 
-            // m_SkewnessLabel
-            // 
-            this.m_SkewnessLabel.AutoSize = true;
-            this.m_SkewnessLabel.Location = new System.Drawing.Point(389, 22);
-            this.m_SkewnessLabel.Name = "m_SkewnessLabel";
-            this.m_SkewnessLabel.Size = new System.Drawing.Size(108, 13);
-            this.m_SkewnessLabel.TabIndex = 2;
-            this.m_SkewnessLabel.Text = "Skewness Difference";
-            // 
-            // m_SkewnessTextBox
-            // 
-            this.m_SkewnessTextBox.Location = new System.Drawing.Point(503, 19);
-            this.m_SkewnessTextBox.Name = "m_SkewnessTextBox";
-            this.m_SkewnessTextBox.Size = new System.Drawing.Size(244, 20);
-            this.m_SkewnessTextBox.TabIndex = 3;
-            // 
             // GeneratorForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -842,13 +845,13 @@ namespace RandomNumberGenerator
             this.m_StatisticsGroupBox.ResumeLayout(false);
             this.m_StatisticsGroupBox.PerformLayout();
             this.AnalyzeTabPage.ResumeLayout(false);
+            this.m_ComparisonGroupBox.ResumeLayout(false);
+            this.m_ComparisonGroupBox.PerformLayout();
             this.m_ResultGroupBox.ResumeLayout(false);
             this.m_ResultGroupBox.PerformLayout();
             this.m_BaselineGroupBox.ResumeLayout(false);
             this.m_BaselineGroupBox.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.m_ResultHistogramChart)).EndInit();
-            this.m_ComparisonGroupBox.ResumeLayout(false);
-            this.m_ComparisonGroupBox.PerformLayout();
             this.ResumeLayout(false);
 
         }

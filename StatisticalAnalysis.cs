@@ -75,6 +75,7 @@ namespace RandomNumberGenerator
                     {
                         m_LoadedFileStats = new DescriptiveStatistics(resultData);
                         m_sLoadedFileName = System.IO.Path.GetFileName(sFilePath);
+                        m_LoadedFileData = new List<double>(resultData); // Store a copy of the data
                     }
                 }
                 else
@@ -228,6 +229,11 @@ namespace RandomNumberGenerator
         /// </summary>
         public DescriptiveStatistics StatsB { get => m_StatsB; }
 
+        /// <summary>
+        /// Gets the raw data points from the last loaded file (read-only)
+        /// </summary>
+        public List<double> LoadedFileData { get => m_LoadedFileData; }
+
         #endregion
         #region Data Members
 
@@ -238,6 +244,9 @@ namespace RandomNumberGenerator
         // Statistics and name for loaded file data
         private DescriptiveStatistics m_LoadedFileStats;
         private string m_sLoadedFileName = string.Empty;
+
+        // Raw data points from loaded file
+        private List<double> m_LoadedFileData;
 
         #endregion
     }
