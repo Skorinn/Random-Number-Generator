@@ -601,6 +601,11 @@ namespace RandomNumberGenerator.Test
 
             // Mock session data
             var mockSessionData = new Mock<IRNGSessionData>();
+            mockSessionData.Setup(mock => mock.Reset()).Verifiable();
+            mockSessionData.SetupProperty(mock => mock.TargetValue);
+            mockSessionData.SetupProperty(mock => mock.Simulated);
+            mockSessionData.SetupProperty(mock => mock.FilePath);
+            mockSessionData.SetupGet(mock => mock.NumDataPoints).Returns(0);
 
             // Create the object under test
             RNGXMLReader xmlReader = new RNGXMLReader(m_sTEST_FILE_PATH);
@@ -616,9 +621,9 @@ namespace RandomNumberGenerator.Test
             // Assert
             //**************************************************************//
 
-            // Verify the load failed with XML parsing error
+            // Verify the load failed with appropriate error about file corruption
             Assert.IsFalse(bResult);
-            StringAssert.Contains(xmlReader.LastError, "XML parsing error");
+            StringAssert.Contains(xmlReader.LastError, "XML file appears to be incomplete or corrupted");
         }
 
         #endregion

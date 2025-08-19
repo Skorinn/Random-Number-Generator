@@ -253,26 +253,35 @@ namespace RandomNumberGenerator
             // Load data points in batches for memory efficiency
             List<double> dataBatch = new List<double>((int)uBatchSize);
 
-            // Use ReadToFollowing to find all Data elements sequentially
-            while (m_Reader.ReadToFollowing(XMLConstants.DATA_ELEMENT))
+            try
             {
-                // Process the current data node
-                bool bDataProcessed = ProcessSingleDataNode(dataBatch);
-                if (bDataProcessed)
+                // Use ReadToFollowing to find all Data elements sequentially
+                while (m_Reader.ReadToFollowing(XMLConstants.DATA_ELEMENT))
                 {
-                    // Process batch when it reaches the specified size
-                    if (dataBatch.Count >= uBatchSize)
+                    // Process the current data node
+                    bool bDataProcessed = ProcessSingleDataNode(dataBatch);
+                    if (bDataProcessed)
                     {
-                        bool bBatchLoaded = sessionData.LoadDataPointsBatch(dataBatch, uBatchSize);
-                        if (false == bBatchLoaded)
+                        // Process batch when it reaches the specified size
+                        if (dataBatch.Count >= uBatchSize)
                         {
-                            m_sLastError = " Failed to load data points batch into session.";
-                            bStatus = false;
-                            break;
+                            bool bBatchLoaded = sessionData.LoadDataPointsBatch(dataBatch, uBatchSize);
+                            if (false == bBatchLoaded)
+                            {
+                                m_sLastError = " Failed to load data points batch into session.";
+                                bStatus = false;
+                                break;
+                            }
+                            dataBatch.Clear();
                         }
-                        dataBatch.Clear();
                     }
                 }
+            }
+            catch (XmlException xmlEx)
+            {
+                // Handle malformed XML gracefully - load what we can
+                m_sLastError = $" XML file appears to be incomplete or corrupted. Loaded {sessionData.NumDataPoints} data points successfully before encountering: {xmlEx.Message}";
+                bStatus = false;
             }
 
             // Process any remaining data points in the final batch

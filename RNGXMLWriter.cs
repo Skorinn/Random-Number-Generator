@@ -219,21 +219,29 @@ namespace RandomNumberGenerator
                 {
                     try
                     {
-                        // Close the session tag
-                        m_Writer.WriteEndElement();
-
-                        // Only close the document if we're NOT in append mode
-                        // Append mode uses fragment conformance which doesn't support WriteEndDocument()
+                        // Only write the closing session tag if we're NOT in append mode
+                        // In append mode, we never wrote a WriteStartElement, so we can't write WriteEndElement
                         if (!m_bAppendMode)
                         {
+                            // Close the session tag (matches the WriteStartElement from WriteSessionStart)
+                            m_Writer.WriteEndElement();
+                            
                             // Close the document
                             m_Writer.WriteEndDocument();
+                        }
+                        else
+                        {
+                            // In append mode, we need to write the closing session tag manually
+                            // since we never opened it with WriteStartElement
+                            m_Writer.WriteRaw($"</{XMLConstants.SESSION_ELEMENT}>");
                         }
 
                         // Close the writer and clear the selected file
                         m_Writer.Flush();
                         m_Writer.Close();
+                        m_Writer = null; // Ensure clean state for next operation
                         m_sFilePath = "";
+                        m_bAppendMode = false; // Reset append mode flag
                         bStatus = true;
                     }
                     catch (InvalidOperationException)
@@ -307,14 +315,9 @@ namespace RandomNumberGenerator
                             throw new InvalidOperationException(" Unable to create XML writer after preparing file for append.");
                         }
                         
-                        // IMPORTANT: Tell the XML writer that we're inside a Session element
-                        // This prevents the "WriteEndElement called when there is no open start element" exception
-                        if (null != m_Writer)
-                        {
-                            // Write an invisible start element to match the existing <Session> tag
-                            // This establishes the element context for the writer without duplicating content
-                            m_Writer.WriteStartElement(XMLConstants.SESSION_ELEMENT);
-                        }
+                        // DO NOT write a new Session start element here!
+                        // The existing session is already open and we're just appending data to it.
+                        // Writing another WriteStartElement would create a duplicate <Session> tag.
                     }
                     else
                     {

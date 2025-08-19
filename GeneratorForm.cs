@@ -1351,7 +1351,7 @@ namespace RandomNumberGenerator
                 SetStatusBoxError($" Result file error: {argEx.Message}");
                 bStatus = false;
             }
-            catch (System.IO.FileNotFoundException fileNotFoundEx)
+            catch (System.IO.FileNotFoundException)
             {
                 // Handle file not found errors
                 SetStatusBoxError($" Result file not found: {Path.GetFileName(sFilePath)}");
