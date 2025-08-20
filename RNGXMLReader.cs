@@ -19,7 +19,7 @@ namespace RandomNumberGenerator
     /// <summary>
     /// Reads RNG data from an XML file
     /// </summary>
-    public class RNGXMLReader : IRNGSessionFileReader
+    public class RNGXMLReader : IRNGSessionFileReader, IDisposable
     {
         #region Constructors
 
@@ -66,7 +66,7 @@ namespace RandomNumberGenerator
         /// </summary>
         ~RNGXMLReader()
         {
-            Close();
+            Dispose(false);
         }
 
         #endregion
@@ -425,6 +425,34 @@ namespace RandomNumberGenerator
         private XmlReader m_Reader = null;
         private XmlReaderSettings m_Settings = null;
         private string m_sLastError = "";
+
+        #endregion
+
+        #region IDisposable Members
+
+        /// <summary>
+        /// Disposes the resources used by the RNGXMLReader
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Releases unmanaged resources and performs other cleanup operations
+        /// </summary>
+        /// <param name="disposing">true if called from Dispose method; false if called from finalizer</param>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                // Free managed resources
+                Close();
+            }
+
+            // Free unmanaged resources if any
+        }
 
         #endregion
     }

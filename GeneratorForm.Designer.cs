@@ -489,8 +489,6 @@ namespace RandomNumberGenerator
             // 
             // m_ComparisonGroupBox
             // 
-            this.m_ComparisonGroupBox.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
             this.m_ComparisonGroupBox.Controls.Add(this.m_SkewnessTextBox);
             this.m_ComparisonGroupBox.Controls.Add(this.m_SkewnessLabel);
             this.m_ComparisonGroupBox.Controls.Add(this.m_MeanDifferenceTextBox);
@@ -538,8 +536,6 @@ namespace RandomNumberGenerator
             // 
             // m_ResultGroupBox
             // 
-            this.m_ResultGroupBox.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
             this.m_ResultGroupBox.Controls.Add(this.m_ResultKurtosisTextBox);
             this.m_ResultGroupBox.Controls.Add(this.m_ResultKurtosisLabel);
             this.m_ResultGroupBox.Controls.Add(this.m_ResultSkewnessTextBox);
@@ -674,8 +670,6 @@ namespace RandomNumberGenerator
             // 
             // m_BaselineGroupBox
             // 
-            this.m_BaselineGroupBox.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
             this.m_BaselineGroupBox.Controls.Add(this.m_BaselineKurtosisTextBox);
             this.m_BaselineGroupBox.Controls.Add(this.m_BaselineKurtosisLabel);
             this.m_BaselineGroupBox.Controls.Add(this.m_BaselineSkewnessTextBox);

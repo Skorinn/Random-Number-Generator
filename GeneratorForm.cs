@@ -888,6 +888,9 @@ namespace RandomNumberGenerator
             // Check if the target number has changed
             CheckTargetChanged();
 
+            // Clear the chart
+            m_ResultChart.Clear();
+
             // Update button statuses
             m_StartButton.Enabled = false;
             m_StopButton.Enabled = true;

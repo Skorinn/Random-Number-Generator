@@ -17,7 +17,7 @@ namespace RandomNumberGenerator
     /// <summary>
     /// Writes RNG data to an XML file
     /// </summary>
-    public class RNGXMLWriter : IRNGSessionFileWriter
+    public class RNGXMLWriter : IRNGSessionFileWriter, IDisposable
     {
         #region Constructors
 
@@ -64,10 +64,7 @@ namespace RandomNumberGenerator
         /// </summary>
         ~RNGXMLWriter()
         {
-            if (m_Writer != null)
-            {
-                m_Writer.Close();
-            }
+            Dispose(false);
         }
 
         #endregion
@@ -236,10 +233,20 @@ namespace RandomNumberGenerator
                             m_Writer.WriteRaw($"</{XMLConstants.SESSION_ELEMENT}>");
                         }
 
-                        // Close the writer and clear the selected file
+                        // Close the writer and any associated file stream
                         m_Writer.Flush();
                         m_Writer.Close();
+                        m_Writer.Dispose();
                         m_Writer = null; // Ensure clean state for next operation
+                        
+                        // Dispose of file stream if it exists (append mode)
+                        if (null != m_FileStream)
+                        {
+                            m_FileStream.Close();
+                            m_FileStream.Dispose();
+                            m_FileStream = null;
+                        }
+                        
                         m_sFilePath = "";
                         m_bAppendMode = false; // Reset append mode flag
                         bStatus = true;
@@ -291,11 +298,19 @@ namespace RandomNumberGenerator
                     // Set the file path member
                     m_sFilePath = sFilePath;
 
-                    // Close any existing writer
+                    // Close any existing writer and file stream
                     if (null != m_Writer)
                     {
                         m_Writer.Close();
+                        m_Writer.Dispose();
                         m_Writer = null;
+                    }
+                    
+                    if (null != m_FileStream)
+                    {
+                        m_FileStream.Close();
+                        m_FileStream.Dispose();
+                        m_FileStream = null;
                     }
 
                     // For appending to XML files, we need to:
@@ -462,6 +477,14 @@ namespace RandomNumberGenerator
                         m_Writer.Close();
                         m_Writer.Dispose();
                         m_Writer = null;
+                        
+                        // Also dispose any existing file stream
+                        if (null != m_FileStream)
+                        {
+                            m_FileStream.Close();
+                            m_FileStream.Dispose();
+                            m_FileStream = null;
+                        }
                     }
 
                     // Validate file path is set
@@ -479,18 +502,29 @@ namespace RandomNumberGenerator
 
                         try
                         {
-                            // Create a FileStream in append mode
-                            var fileStream = new System.IO.FileStream(m_sFilePath, System.IO.FileMode.Append, System.IO.FileAccess.Write);
+                            // Create a FileStream in append mode with proper disposal tracking
+                            m_FileStream = new System.IO.FileStream(m_sFilePath, System.IO.FileMode.Append, System.IO.FileAccess.Write);
                             
                             // Modify settings for appending (no declaration, fragment mode)
                             m_Settings.OmitXmlDeclaration = true; // Don't write XML declaration when appending
                             m_Settings.ConformanceLevel = ConformanceLevel.Fragment; // Allow fragments for appending
                             
                             // Create the writer with the file stream
-                            m_Writer = XmlWriter.Create(fileStream, m_Settings);
+                            m_Writer = XmlWriter.Create(m_FileStream, m_Settings);
                             
                             // Track that we're in append mode
                             m_bAppendMode = true;
+                        }
+                        catch
+                        {
+                            // If anything fails, clean up the file stream
+                            if (null != m_FileStream)
+                            {
+                                m_FileStream.Close();
+                                m_FileStream.Dispose();
+                                m_FileStream = null;
+                            }
+                            throw;
                         }
                         finally
                         {
@@ -506,6 +540,9 @@ namespace RandomNumberGenerator
                         
                         // Track that we're NOT in append mode
                         m_bAppendMode = false;
+                        
+                        // No separate file stream in normal mode
+                        m_FileStream = null;
                     }
 
                     bStatus = (m_Writer != null);
@@ -550,6 +587,40 @@ namespace RandomNumberGenerator
             return bStatus;
         }
 
+        /// <summary>
+        /// Disposes of the XML writer resources
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Protected dispose method for proper disposal pattern
+        /// </summary>
+        /// <param name="disposing">IN - True if disposing managed resources</param>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                // Dispose managed resources
+                if (m_Writer != null)
+                {
+                    m_Writer.Close();
+                    m_Writer.Dispose();
+                    m_Writer = null;
+                }
+                
+                if (m_FileStream != null)
+                {
+                    m_FileStream.Close();
+                    m_FileStream.Dispose();
+                    m_FileStream = null;
+                }
+            }
+        }
+
         #endregion
         #region Properties
 
@@ -565,6 +636,7 @@ namespace RandomNumberGenerator
         private XmlWriter m_Writer = null;
         private XmlWriterSettings m_Settings = null;
         private bool m_bAppendMode = false; // Track if we're in append mode
+        private System.IO.FileStream m_FileStream = null; // Track file stream for proper disposal
 
         #endregion
     }

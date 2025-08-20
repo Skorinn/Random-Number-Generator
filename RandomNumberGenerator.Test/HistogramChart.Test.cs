@@ -53,6 +53,22 @@ namespace RandomNumberGenerator.Test
         private readonly List<double> m_lstWIDE_RANGE = new List<double> { -100.0, -50.0, 0.0, 50.0, 100.0 };
         private readonly List<double> m_lstSINGLE_VALUE = new List<double> { 0.5 };
 
+        // Test data sets for dynamic Y-axis scaling tests
+        private readonly List<double> m_lstHIGH_FREQUENCY_DATA = new List<double> 
+        { 
+            0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,  // 10 values at 0.1
+            0.2, 0.2, 0.2, 0.2, 0.2,                              // 5 values at 0.2
+            0.3                                                    // 1 value at 0.3
+        };
+        private readonly List<double> m_lstLOW_FREQUENCY_DATA = new List<double> { 0.1, 0.2, 0.3, 0.4, 0.5 };
+        private readonly List<double> m_lstMIXED_FREQUENCY_DATA = new List<double> 
+        { 
+            0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,    // 10 values at 0.5
+            0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,    // 20 total at 0.5
+            0.6, 0.7, 0.8, 0.9                                     // 1 each at other values
+        };
+        private readonly List<double> m_lstLARGE_DATASET = new List<double>();
+
         // Test labels
         private const string m_sTEST_LABEL_1 = "Test Series 1";
         private const string m_sTEST_LABEL_2 = "Test Series 2";
@@ -60,8 +76,15 @@ namespace RandomNumberGenerator.Test
 
         // Test bin counts
         private const int m_iTEST_BIN_COUNT = 10;
+        private const int m_iSMALL_BIN_COUNT = 5;
+        private const int m_iLARGE_BIN_COUNT = 20;
         private const int m_iINVALID_BIN_COUNT_ZERO = 0;
         private const int m_iINVALID_BIN_COUNT_NEGATIVE = -5;
+
+        // Y-axis scaling test constants
+        private const double m_fEXPECTED_Y_AXIS_TOLERANCE = 0.01; // Tolerance for Y-axis value comparisons
+        private const double m_fDEFAULT_Y_MINIMUM = 0.0;
+        private const double m_fDEFAULT_Y_MAXIMUM_EMPTY = 10.0;
 
         #endregion
         #region Additional test attributes
@@ -84,6 +107,24 @@ namespace RandomNumberGenerator.Test
         // [TestCleanup()]
         // public void MyTestCleanup() { }
         //
+        #endregion
+        #region Initialization and cleanup
+
+        /// <summary>
+        /// Initializes test data before running tests
+        /// </summary>
+        [TestInitialize]
+        public void TestInitialize()
+        {
+            // Initialize the large dataset with 1000 points for performance testing
+            m_lstLARGE_DATASET.Clear();
+            Random random = new Random(42); // Fixed seed for consistent test results
+            for (int i = 0; i < 1000; i++)
+            {
+                m_lstLARGE_DATASET.Add(random.NextDouble());
+            }
+        }
+
         #endregion
         #region Tests
 
@@ -503,6 +544,370 @@ namespace RandomNumberGenerator.Test
             {
                 Assert.Fail($"Plot method should support multiple calls. Exception: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Tests that Y-axis scales dynamically based on bin frequencies with high frequency data
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void Plot_HighFrequencyData_YAxisScalesDynamically()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            HistogramChart histogramChart = new HistogramChart();
+            List<double> emptyData = new List<double>();
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Plot high frequency data which should result in Y-axis maximum > 10
+            histogramChart.Plot(m_lstHIGH_FREQUENCY_DATA, m_sTEST_LABEL_1, emptyData, m_sTEST_LABEL_2, m_iSMALL_BIN_COUNT);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify chart area was created
+            Assert.IsTrue((histogramChart.ChartAreas.Count > 0), "Chart area should be created");
+
+            // Get Y-axis range
+            var chartArea = histogramChart.ChartAreas[0];
+            double fYAxisMinimum = chartArea.AxisY.Minimum;
+            double fYAxisMaximum = chartArea.AxisY.Maximum;
+
+            // Verify Y-axis minimum is set to default (0.0)
+            Assert.AreEqual(m_fDEFAULT_Y_MINIMUM, fYAxisMinimum, m_fEXPECTED_Y_AXIS_TOLERANCE, 
+                           "Y-axis minimum should be set to default value for frequency data");
+
+            // Verify Y-axis maximum scales beyond default to accommodate high frequency
+            Assert.IsTrue((fYAxisMaximum > m_fDEFAULT_Y_MAXIMUM_EMPTY), 
+                         $"Y-axis maximum should scale beyond default {m_fDEFAULT_Y_MAXIMUM_EMPTY} for high frequency data. Actual: {fYAxisMaximum}");
+
+            // Verify Y-axis interval is set appropriately
+            double fYAxisInterval = chartArea.AxisY.Interval;
+            Assert.IsTrue((fYAxisInterval >= 1.0), 
+                         $"Y-axis interval should be at least 1.0 for frequency data. Actual: {fYAxisInterval}");
+        }
+
+        /// <summary>
+        /// Tests that Y-axis scales appropriately for low frequency data
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void Plot_LowFrequencyData_YAxisScalesAppropriately()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            HistogramChart histogramChart = new HistogramChart();
+            List<double> emptyData = new List<double>();
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Plot low frequency data which should result in modest Y-axis scaling
+            histogramChart.Plot(m_lstLOW_FREQUENCY_DATA, m_sTEST_LABEL_1, emptyData, m_sTEST_LABEL_2, m_iTEST_BIN_COUNT);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify chart area was created
+            Assert.IsTrue((histogramChart.ChartAreas.Count > 0), "Chart area should be created");
+
+            // Get Y-axis range
+            var chartArea = histogramChart.ChartAreas[0];
+            double fYAxisMinimum = chartArea.AxisY.Minimum;
+            double fYAxisMaximum = chartArea.AxisY.Maximum;
+
+            // Verify Y-axis minimum is set to default (0.0)
+            Assert.AreEqual(m_fDEFAULT_Y_MINIMUM, fYAxisMinimum, m_fEXPECTED_Y_AXIS_TOLERANCE, 
+                           "Y-axis minimum should be set to default value for frequency data");
+
+            // Verify Y-axis maximum is reasonable for low frequency data (should be modest)
+            Assert.IsTrue((fYAxisMaximum > m_fDEFAULT_Y_MINIMUM && fYAxisMaximum <= 10.0), 
+                         $"Y-axis maximum should scale modestly for low frequency data. Actual: {fYAxisMaximum}");
+
+            // Verify Y-axis interval is set appropriately
+            double fYAxisInterval = chartArea.AxisY.Interval;
+            Assert.IsTrue((fYAxisInterval >= 1.0), 
+                         $"Y-axis interval should be at least 1.0 for frequency data. Actual: {fYAxisInterval}");
+        }
+
+        /// <summary>
+        /// Tests that Y-axis uses default range when both data sets are empty
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void Plot_EmptyDataSets_YAxisUsesDefaultRange()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            HistogramChart histogramChart = new HistogramChart();
+            List<double> emptyData1 = new List<double>();
+            List<double> emptyData2 = new List<double>();
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Plot empty data sets
+            histogramChart.Plot(emptyData1, m_sTEST_LABEL_1, emptyData2, m_sTEST_LABEL_2, m_iTEST_BIN_COUNT);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify chart area was created
+            Assert.IsTrue((histogramChart.ChartAreas.Count > 0), "Chart area should be created");
+
+            // Get Y-axis range
+            var chartArea = histogramChart.ChartAreas[0];
+            double fYAxisMinimum = chartArea.AxisY.Minimum;
+            double fYAxisMaximum = chartArea.AxisY.Maximum;
+
+            // Verify Y-axis uses default range for empty data
+            Assert.AreEqual(m_fDEFAULT_Y_MINIMUM, fYAxisMinimum, m_fEXPECTED_Y_AXIS_TOLERANCE, 
+                           "Y-axis minimum should use default value for empty data");
+            Assert.AreEqual(m_fDEFAULT_Y_MAXIMUM_EMPTY, fYAxisMaximum, m_fEXPECTED_Y_AXIS_TOLERANCE, 
+                           "Y-axis maximum should use default value for empty data");
+        }
+
+        /// <summary>
+        /// Tests that Y-axis scales correctly when comparing two data sets with different frequencies
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void Plot_TwoDataSetsWithDifferentFrequencies_YAxisScalesToAccommodateBoth()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            HistogramChart histogramChart = new HistogramChart();
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Plot mixed frequency data sets - should scale to accommodate the highest frequency
+            histogramChart.Plot(m_lstMIXED_FREQUENCY_DATA, m_sTEST_LABEL_1, m_lstLOW_FREQUENCY_DATA, m_sTEST_LABEL_2, m_iSMALL_BIN_COUNT);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify chart area was created
+            Assert.IsTrue((histogramChart.ChartAreas.Count > 0), "Chart area should be created");
+
+            // Get Y-axis range
+            var chartArea = histogramChart.ChartAreas[0];
+            double fYAxisMinimum = chartArea.AxisY.Minimum;
+            double fYAxisMaximum = chartArea.AxisY.Maximum;
+
+            // Verify Y-axis minimum is set to default (0.0)
+            Assert.AreEqual(m_fDEFAULT_Y_MINIMUM, fYAxisMinimum, m_fEXPECTED_Y_AXIS_TOLERANCE, 
+                           "Y-axis minimum should be set to default value");
+
+            // Verify Y-axis maximum scales to accommodate the highest frequency from either data set
+            // Mixed frequency data has 20 values at 0.5, so Y-axis should scale significantly
+            Assert.IsTrue((fYAxisMaximum > 15.0), 
+                         $"Y-axis maximum should scale to accommodate highest frequency. Actual: {fYAxisMaximum}");
+
+            // Verify both series were created
+            Assert.AreEqual(2, histogramChart.Series.Count, "Two series should be created for the data sets");
+        }
+
+        /// <summary>
+        /// Tests that Y-axis scaling works correctly with large data sets
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void Plot_LargeDataSet_YAxisScalesAppropriately()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            HistogramChart histogramChart = new HistogramChart();
+            List<double> emptyData = new List<double>();
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Plot large data set
+            histogramChart.Plot(m_lstLARGE_DATASET, m_sTEST_LABEL_1, emptyData, m_sTEST_LABEL_2, m_iLARGE_BIN_COUNT);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify chart area was created
+            Assert.IsTrue((histogramChart.ChartAreas.Count > 0), "Chart area should be created");
+
+            // Get Y-axis range
+            var chartArea = histogramChart.ChartAreas[0];
+            double fYAxisMinimum = chartArea.AxisY.Minimum;
+            double fYAxisMaximum = chartArea.AxisY.Maximum;
+
+            // Verify Y-axis minimum is set to default (0.0)
+            Assert.AreEqual(m_fDEFAULT_Y_MINIMUM, fYAxisMinimum, m_fEXPECTED_Y_AXIS_TOLERANCE, 
+                           "Y-axis minimum should be set to default value");
+
+            // Verify Y-axis maximum scales appropriately for large data set
+            // With 1000 data points and 20 bins, expect significant frequency counts
+            Assert.IsTrue((fYAxisMaximum > 20.0), 
+                         $"Y-axis maximum should scale appropriately for large data set. Actual: {fYAxisMaximum}");
+
+            // Verify Y-axis interval is reasonable
+            double fYAxisInterval = chartArea.AxisY.Interval;
+            Assert.IsTrue((fYAxisInterval >= 1.0), 
+                         $"Y-axis interval should be at least 1.0 for frequency data. Actual: {fYAxisInterval}");
+        }
+
+        /// <summary>
+        /// Tests that Y-axis scaling adds appropriate padding to the maximum frequency
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void Plot_WithPadding_YAxisMaximumExceedsMaximumFrequency()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            HistogramChart histogramChart = new HistogramChart();
+            List<double> emptyData = new List<double>();
+
+            // Create data with known maximum frequency
+            List<double> knownFrequencyData = new List<double> 
+            { 
+                0.5, 0.5, 0.5, 0.5, 0.5  // 5 values in one bin
+            };
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Plot data with 5 bins, so all values will be in one bin with frequency = 5
+            histogramChart.Plot(knownFrequencyData, m_sTEST_LABEL_1, emptyData, m_sTEST_LABEL_2, m_iSMALL_BIN_COUNT);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify chart area was created
+            Assert.IsTrue((histogramChart.ChartAreas.Count > 0), "Chart area should be created");
+
+            // Get Y-axis range
+            var chartArea = histogramChart.ChartAreas[0];
+            double fYAxisMaximum = chartArea.AxisY.Maximum;
+
+            // Verify Y-axis maximum includes padding beyond the maximum frequency (5)
+            // Should be at least 7 (5 + minimum padding of 2.0) due to padding
+            Assert.IsTrue((fYAxisMaximum >= 7.0), 
+                         $"Y-axis maximum should include padding beyond maximum frequency of 5. Actual: {fYAxisMaximum}");
+            
+            // Verify it's actually greater than the raw frequency value
+            Assert.IsTrue((fYAxisMaximum > 5.0), 
+                         $"Y-axis maximum should exceed the raw maximum frequency of 5. Actual: {fYAxisMaximum}");
+        }
+
+        /// <summary>
+        /// Tests that Y-axis interval calculation works correctly for different frequency ranges
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void Plot_DifferentFrequencyRanges_YAxisIntervalCalculatedCorrectly()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            HistogramChart histogramChart = new HistogramChart();
+            List<double> emptyData = new List<double>();
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Plot high frequency data to test interval calculation
+            histogramChart.Plot(m_lstHIGH_FREQUENCY_DATA, m_sTEST_LABEL_1, emptyData, m_sTEST_LABEL_2, m_iSMALL_BIN_COUNT);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify chart area was created
+            Assert.IsTrue((histogramChart.ChartAreas.Count > 0), "Chart area should be created");
+
+            // Get Y-axis properties
+            var chartArea = histogramChart.ChartAreas[0];
+            double fYAxisMaximum = chartArea.AxisY.Maximum;
+            double fYAxisInterval = chartArea.AxisY.Interval;
+
+            // Verify interval is appropriate for the frequency range
+            Assert.IsTrue((fYAxisInterval >= 1.0), 
+                         $"Y-axis interval should be at least 1.0 for frequency data. Actual: {fYAxisInterval}");
+
+            // Verify interval creates reasonable number of tick marks (approximately 5-10)
+            double fNumberOfIntervals = fYAxisMaximum / fYAxisInterval;
+            Assert.IsTrue((fNumberOfIntervals >= 3.0 && fNumberOfIntervals <= 15.0), 
+                         $"Y-axis should have reasonable number of intervals (3-15). Actual: {fNumberOfIntervals}");
+        }
+
+        /// <summary>
+        /// Tests that X-axis and Y-axis scaling work together correctly
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void Plot_BothAxisScaling_XAndYAxisScaleIndependently()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            HistogramChart histogramChart = new HistogramChart();
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Plot wide range data with mixed frequencies
+            histogramChart.Plot(m_lstWIDE_RANGE, m_sTEST_LABEL_1, m_lstMIXED_FREQUENCY_DATA, m_sTEST_LABEL_2, m_iTEST_BIN_COUNT);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify chart area was created
+            Assert.IsTrue((histogramChart.ChartAreas.Count > 0), "Chart area should be created");
+
+            // Get axis properties
+            var chartArea = histogramChart.ChartAreas[0];
+            double fXAxisMinimum = chartArea.AxisX.Minimum;
+            double fXAxisMaximum = chartArea.AxisX.Maximum;
+            double fYAxisMinimum = chartArea.AxisY.Minimum;
+            double fYAxisMaximum = chartArea.AxisY.Maximum;
+
+            // Verify X-axis scales to accommodate wide range data (-100 to 100)
+            Assert.IsTrue((fXAxisMinimum < -50.0), $"X-axis minimum should accommodate wide range data. Actual: {fXAxisMinimum}");
+            Assert.IsTrue((fXAxisMaximum > 50.0), $"X-axis maximum should accommodate wide range data. Actual: {fXAxisMaximum}");
+
+            // Verify Y-axis scales independently based on frequency data
+            Assert.AreEqual(m_fDEFAULT_Y_MINIMUM, fYAxisMinimum, m_fEXPECTED_Y_AXIS_TOLERANCE, 
+                           "Y-axis minimum should be independent of X-axis range");
+            Assert.IsTrue((fYAxisMaximum > m_fDEFAULT_Y_MAXIMUM_EMPTY), 
+                         $"Y-axis maximum should scale based on frequency, not X-axis range. Actual: {fYAxisMaximum}");
         }
 
         #endregion

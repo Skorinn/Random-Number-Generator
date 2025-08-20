@@ -85,9 +85,6 @@ namespace RandomNumberGenerator
             // Calculate dynamic x-axis range based on actual data
             (double fMinValue, double fMaxValue) = CalculateDataRange(data1, data2);
 
-            // Update the chart area with dynamic x-axis range
-            UpdateChartAxisRange(fMinValue, fMaxValue);
-
             // Calculate bin width based on data range
             double fDataRange = fMaxValue - fMinValue;
             double fBinWidth = (fDataRange > 0) ? fDataRange / binCount : m_fDEFAULT_BIN_WIDTH;
@@ -107,6 +104,12 @@ namespace RandomNumberGenerator
                 int iBinIndex = CalculateBinIndexWithRange(fValue, binCount, fMinValue, fMaxValue);
                 iBins2[iBinIndex]++;
             }
+
+            // Calculate dynamic y-axis range based on bin frequencies
+            (double fMinYValue, double fMaxYValue) = CalculateFrequencyRange(iBins1, iBins2);
+
+            // Update the chart area with dynamic x-axis and y-axis ranges
+            UpdateChartAxisRange(fMinValue, fMaxValue, fMinYValue, fMaxYValue);
 
             // Create series for first data set
             Series firstSeries = CreateHistogramSeries(label1, m_iSERIES1_ALPHA, Color.Blue);
@@ -187,22 +190,35 @@ namespace RandomNumberGenerator
         }
 
         /// <summary>
-        /// Updates the chart area with the specified x-axis range
+        /// Updates the chart area with the specified x-axis and y-axis ranges
         /// </summary>
-        /// <param name="fMinValue">IN - Minimum x-axis value</param>
-        /// <param name="fMaxValue">IN - Maximum x-axis value</param>
-        private void UpdateChartAxisRange(double fMinValue, double fMaxValue)
+        /// <param name="fMinXValue">IN - Minimum x-axis value</param>
+        /// <param name="fMaxXValue">IN - Maximum x-axis value</param>
+        /// <param name="fMinYValue">IN - Minimum y-axis value</param>
+        /// <param name="fMaxYValue">IN - Maximum y-axis value</param>
+        private void UpdateChartAxisRange(double fMinXValue, double fMaxXValue, double fMinYValue, double fMaxYValue)
         {
             if (this.ChartAreas.Count > 0)
             {
                 ChartArea mainChartArea = this.ChartAreas[0];
-                mainChartArea.AxisX.Minimum = fMinValue;
-                mainChartArea.AxisX.Maximum = fMaxValue;
+                
+                // Set X-axis range and interval
+                mainChartArea.AxisX.Minimum = fMinXValue;
+                mainChartArea.AxisX.Maximum = fMaxXValue;
 
-                // Optionally set interval for better tick marks
-                double fRange = fMaxValue - fMinValue;
-                double fInterval = CalculateOptimalInterval(fRange);
-                mainChartArea.AxisX.Interval = fInterval;
+                // Set optimal interval for X-axis tick marks
+                double fXRange = fMaxXValue - fMinXValue;
+                double fXInterval = CalculateOptimalInterval(fXRange);
+                mainChartArea.AxisX.Interval = fXInterval;
+
+                // Set Y-axis range with dynamic scaling
+                mainChartArea.AxisY.Minimum = fMinYValue;
+                mainChartArea.AxisY.Maximum = fMaxYValue;
+
+                // Set optimal interval for Y-axis tick marks
+                double fYRange = fMaxYValue - fMinYValue;
+                double fYInterval = CalculateOptimalYInterval(fYRange);
+                mainChartArea.AxisY.Interval = fYInterval;
             }
         }
 
@@ -233,6 +249,48 @@ namespace RandomNumberGenerator
             }
 
             return fBaseInterval * Math.Pow(10, fPowerOf10);
+        }
+
+        /// <summary>
+        /// Calculates an optimal interval for y-axis tick marks based on the frequency range
+        /// </summary>
+        /// <param name="fYRange">IN - The frequency range</param>
+        /// <returns>Optimal interval for Y-axis tick marks</returns>
+        private double CalculateOptimalYInterval(double fYRange)
+        {
+            // For frequency data, we want nice round numbers for intervals
+            if (fYRange <= 0)
+            {
+                return m_fDEFAULT_Y_INTERVAL;
+            }
+
+            // Calculate power of 10 that gives us approximately 5-10 intervals
+            double fLogRange = Math.Log10(fYRange);
+            double fPowerOf10 = Math.Floor(fLogRange);
+            double fNormalizedRange = fYRange / Math.Pow(10, fPowerOf10);
+
+            double fBaseInterval;
+            if (fNormalizedRange <= 1.0)
+            {
+                fBaseInterval = 0.1;
+            }
+            else if (fNormalizedRange <= 2.0)
+            {
+                fBaseInterval = 0.2;
+            }
+            else if (fNormalizedRange <= 5.0)
+            {
+                fBaseInterval = 0.5;
+            }
+            else
+            {
+                fBaseInterval = 1.0;
+            }
+
+            double fCalculatedInterval = fBaseInterval * Math.Pow(10, fPowerOf10);
+            
+            // Ensure the interval is at least 1 for frequency data (since frequencies are integers)
+            return Math.Max(fCalculatedInterval, m_fMINIMUM_Y_INTERVAL);
         }
 
         /// <summary>
@@ -287,6 +345,58 @@ namespace RandomNumberGenerator
             return histogramSeries;
         }
 
+        /// <summary>
+        /// Calculates the frequency range from both bin arrays for dynamic Y-axis scaling
+        /// </summary>
+        /// <param name="iBins1">IN - First bin array</param>
+        /// <param name="iBins2">IN - Second bin array</param>
+        /// <returns>Tuple containing minimum and maximum frequency values</returns>
+        private (double fMinYValue, double fMaxYValue) CalculateFrequencyRange(int[] iBins1, int[] iBins2)
+        {
+            int iMaxFrequency = 0;
+
+            // Find the maximum frequency from both bin arrays
+            foreach (int iFrequency in iBins1)
+            {
+                if (iFrequency > iMaxFrequency)
+                {
+                    iMaxFrequency = iFrequency;
+                }
+            }
+
+            foreach (int iFrequency in iBins2)
+            {
+                if (iFrequency > iMaxFrequency)
+                {
+                    iMaxFrequency = iFrequency;
+                }
+            }
+
+            // Calculate Y-axis range with padding
+            double fMinYValue = m_fDEFAULT_Y_AXIS_MINIMUM;
+            double fMaxYValue;
+
+            if (iMaxFrequency == 0)
+            {
+                // No data points - use default range
+                fMaxYValue = m_fDEFAULT_Y_AXIS_MAXIMUM;
+            }
+            else
+            {
+                // Add padding to the maximum frequency for better visualization
+                double fPadding = iMaxFrequency * m_fY_RANGE_PADDING_FACTOR;
+                fMaxYValue = iMaxFrequency + fPadding;
+                
+                // Ensure minimum padding
+                if (fMaxYValue < (iMaxFrequency + m_fMINIMUM_Y_PADDING))
+                {
+                    fMaxYValue = iMaxFrequency + m_fMINIMUM_Y_PADDING;
+                }
+            }
+
+            return (fMinYValue, fMaxYValue);
+        }
+
         #endregion
         #region Constants
 
@@ -303,6 +413,14 @@ namespace RandomNumberGenerator
         private const double m_fMINIMUM_RANGE_THRESHOLD = 1e-6;
         private const double m_fRANGE_PADDING_FACTOR = 0.05; // 5% padding on each side
         private const double m_fBIN_CENTER_OFFSET = 0.5;
+
+        // Y-axis dynamic scaling constants
+        private const double m_fDEFAULT_Y_AXIS_MINIMUM = 0.0;
+        private const double m_fDEFAULT_Y_AXIS_MAXIMUM = 10.0;
+        private const double m_fY_RANGE_PADDING_FACTOR = 0.1; // 10% padding for Y-axis
+        private const double m_fMINIMUM_Y_PADDING = 2.0; // Minimum padding for Y-axis
+        private const double m_fDEFAULT_Y_INTERVAL = 1.0;
+        private const double m_fMINIMUM_Y_INTERVAL = 1.0; // Minimum interval for frequency data
 
         // Series color alpha values
         private const int m_iSERIES1_ALPHA = 120;
