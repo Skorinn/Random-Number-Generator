@@ -109,7 +109,7 @@ namespace RandomNumberGenerator.Test
         // Default values for the RNGSessionData class
         private const double m_fDEFAULT_AVERAGE = 0.0;
         private const int m_iDEFAULT_DATA_POINTS_SIZE = 0;
-        private const int m_iDEFAULT_DATA_WINDOWS_SIZE = 4096;
+        private const int m_iDEFAULT_DATA_WINDOWS_SIZE = 6144; // Updated to match new data window size
         private const int m_iDEFAULT_TARGET = TargetValues.NO_VALUE_SET;
         private const bool m_bDEFAULT_SIMULATED = false;
 

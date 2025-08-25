@@ -699,7 +699,9 @@ namespace RandomNumberGenerator
         private double m_fMeanDeviation = 0.0;
         private double m_fStandardDeviation = 0.0;
         private ConcurrentQueue<double> m_DataPoints = new ConcurrentQueue<double>();
-        private int m_iDataWindowSize = 4096;
+        // Moderately increase data window to compensate for reduced sample rate
+        // Since timer is now 10x slower, we can afford some increase here
+        private int m_iDataWindowSize = 6144; // Increased from 4096 to 6144 (1.5x increase)
 
         // Data lock object
         private object m_DataLock = new object();

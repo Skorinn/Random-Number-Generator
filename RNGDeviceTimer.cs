@@ -52,11 +52,11 @@ namespace RandomNumberGenerator
         #region Constructors
 
         /// <summary>
-        /// Default constructor. Defaults interval to 10ms.
+        /// Default constructor. Defaults interval to 100ms for improved performance.
         /// </summary>
         public RNGDeviceTimer()
         {
-            m_Timer.Interval = 10; // Default interval to 10ms
+            m_Timer.Interval = 100; // Change from 10ms to 100ms (10x decimation)
             m_Timer.Tick += new System.EventHandler(this.Ticked);
         }
 

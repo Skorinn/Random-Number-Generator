@@ -78,8 +78,9 @@ namespace RNGInterfaces
         // Default the return value
         bool bStatus = true;
 
-        // The number of samples to average
-        constexpr size_t iNUM_SAMPLES = 4094;
+        // Increase samples to compensate for reduced timer rate (10x decimation)
+        // This happens only once per timer tick (now every 100ms instead of 10ms)
+        constexpr size_t iNUM_SAMPLES = 16384; // Increased from 4094 to 16384 (4x increase)
 
         // Get the samples
         rfResult = 0;

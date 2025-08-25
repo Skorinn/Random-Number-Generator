@@ -32,7 +32,8 @@ namespace RNGInterfaces
         virtual bool GetBitAverage(double& rResult);
 
     private:
-        static const size_t mc_iTRURNGPRO_BUFFER_SIZE = 4096;// Size of buffer used to read from the device. Determines number of bytes per read.
+        // Increase buffer size to compensate for reduced sample rate
+        static const size_t mc_iTRURNGPRO_BUFFER_SIZE = 32768; // Increased from 4096 to 32768 (8x increase)
         unsigned char m_Buffer[mc_iTRURNGPRO_BUFFER_SIZE]; // Buffer for reading from the device
         RandomFromTrueRNG* m_pTruRNGProInterface; // 3rd party interface that wraps the COM port setup and reads
     };

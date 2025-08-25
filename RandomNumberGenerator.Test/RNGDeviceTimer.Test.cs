@@ -109,7 +109,7 @@ namespace RandomNumberGenerator.Test
             //**************************************************************//
 
             // Expected default values
-            const int iEXPECTED_INTERVAL = 10;
+            const int iEXPECTED_INTERVAL = 100;
 
             //**************************************************************//
             // Act
