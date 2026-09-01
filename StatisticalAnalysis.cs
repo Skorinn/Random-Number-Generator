@@ -8,6 +8,7 @@
 // Revision History: 
 //====================================================================================================================
 // 2025/08/13 - Mike Pullen - Original implementation.
+// 2026/09/01 - Mike Pullen - Collect the data points for analysis directly and dispose the reader
 //*********************************************************************************************************************
 
 using System;
@@ -51,40 +52,39 @@ namespace RandomNumberGenerator
 
             try
             {
-                // Create the XML reader for loading the result file
-                RNGXMLReader xmlReader = new RNGXMLReader(sFilePath);
-
-                // Collect the data points directly rather than loading them into a session. A session holds
-                // a fixed size window of the most recent data, so analysing a file through one would report
-                // on the end of a long session rather than on all of it.
-                DataPointCollector collector = new DataPointCollector();
-
-                // Load the file data into the collector
-                const uint iBATCH_SIZE = 10000; // Use large batch size for efficient loading
-                bool bLoadSuccess = xmlReader.LoadFile(collector, iBATCH_SIZE);
-
-                if (bLoadSuccess)
+                // Create the XML reader for loading the result file. It is disposed however this block is
+                // left, as leaving it to be collected would hold the file open.
+                using (RNGXMLReader xmlReader = new RNGXMLReader(sFilePath))
                 {
-                    // Take the data points that were collected
-                    resultData = collector.CollectedPoints;
+                    // Collect the data points directly rather than loading them into a session. A session
+                    // holds a fixed size window of the most recent data, so analysing a file through one
+                    // would report on the end of a long session rather than on all of it.
+                    DataPointCollector collector = new DataPointCollector();
 
-                    // Create statistical analysis for the loaded data and store it
-                    if (resultData.Count > 0)
+                    // Load the file data into the collector
+                    const uint iBATCH_SIZE = 10000; // Use large batch size for efficient loading
+                    bool bLoadSuccess = xmlReader.LoadFile(collector, iBATCH_SIZE);
+
+                    if (bLoadSuccess)
                     {
-                        m_LoadedFileStats = new DescriptiveStatistics(resultData);
-                        m_sLoadedFileName = System.IO.Path.GetFileName(sFilePath);
-                        m_LoadedFileData = new List<double>(resultData); // Store a copy of the data
+                        // Take the data points that were collected
+                        resultData = collector.CollectedPoints;
+
+                        // Create statistical analysis for the loaded data and store it
+                        if (resultData.Count > 0)
+                        {
+                            m_LoadedFileStats = new DescriptiveStatistics(resultData);
+                            m_sLoadedFileName = System.IO.Path.GetFileName(sFilePath);
+                            m_LoadedFileData = new List<double>(resultData); // Store a copy of the data
+                        }
+                    }
+                    else
+                    {
+                        // Get the specific error message from the reader
+                        string sErrorMessage = string.IsNullOrEmpty(xmlReader.LastError) ? "Unknown error" : xmlReader.LastError;
+                        throw new InvalidOperationException($"Failed to load result file '{System.IO.Path.GetFileName(sFilePath)}': {sErrorMessage}");
                     }
                 }
-                else
-                {
-                    // Get the specific error message from the reader
-                    string sErrorMessage = string.IsNullOrEmpty(xmlReader.LastError) ? "Unknown error" : xmlReader.LastError;
-                    throw new InvalidOperationException($"Failed to load result file '{System.IO.Path.GetFileName(sFilePath)}': {sErrorMessage}");
-                }
-
-                // Clean up the reader
-                xmlReader.Close();
             }
             catch (System.Xml.XmlException xmlEx)
             {

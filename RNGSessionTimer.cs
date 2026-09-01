@@ -8,7 +8,8 @@
 // Revision History:
 //====================================================================================================================
 // 2024/02/03 - Mike Pullen - Original implementation.
-// 2026/09/01 - Mike Pullen - Corrected the file header and rolled the session time over at 60 rather than 61
+// 2026/09/01 - Mike Pullen - Corrected the file header, rolled the session time over at 60 rather than 61, and
+//                            replaced the destructor with a dispose
 //*********************************************************************************************************************
 using System;
 using System.Windows.Forms;
@@ -32,7 +33,7 @@ namespace RandomNumberGenerator
     /// <summary>
     /// Class representing the timer for a random number generator session
     /// </summary>
-    public class RNGSessionTimer : IRNGSessionTimer
+    public class RNGSessionTimer : IRNGSessionTimer, IDisposable
     {
         #region Constructors
 
@@ -59,12 +60,18 @@ namespace RandomNumberGenerator
         }
 
         /// <summary>
-        /// Destructor. Stops the timer and disposes of it.
+        /// Stops the timer and disposes of it.
+        /// NOTE: This replaces a destructor, which ran on the finalizer thread where the timer may already
+        /// have been finalized and where a failure would bring the process down. The timer held here has a
+        /// finalizer of its own, so there is nothing left that needs one here.
         /// </summary>
-        ~RNGSessionTimer()
+        public void Dispose()
         {
-            m_Timer.Stop();
-            m_Timer.Dispose();
+            if (null != m_Timer)
+            {
+                m_Timer.Stop();
+                m_Timer.Dispose();
+            }
         }
 
         #endregion
@@ -235,7 +242,7 @@ namespace RandomNumberGenerator
                 lock (m_TimerLock)
                 {
                     // Build and return the formatted string representation of the updated session time
-                    sTimerText = m_iSessionHours.ToString("00") + ":" + m_iSessionMinutes.ToString("00") + ":" + m_iSessionSeconds.ToString("00");
+                    sTimerText = $"{m_iSessionHours:00}:{m_iSessionMinutes:00}:{m_iSessionSeconds:00}";
                 }
 
                 return sTimerText;

@@ -220,7 +220,7 @@ namespace RandomNumberGenerator
         #endregion
         #region Constants
 
-        private const int m_iMAX_DATA_SIZE = 1000 * 1024; // 1000 * 1024 * 4  = 4 MB
+        private const int m_iMAX_DATA_SIZE = 1000 * 1024; // Maximum number of points held on the chart
         private const double m_fYAXIS_INCREMENT = 0.01;
         private const double m_fYAXIS_TICK_INTERVAL = 0.005;
         private const double m_fCENTER = 0.5; // Statistical mean of the data, which the chart is centered on

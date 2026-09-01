@@ -61,7 +61,7 @@ namespace RandomNumberGenerator
             // Default status to success
             bool bStatus = true;
 
-            // Attmept to write the data point to the file
+            // Attempt to write the data point to the file
             try
             {
                 // <Data Time="01:30:45">0.123456789</Data>
@@ -99,7 +99,7 @@ namespace RandomNumberGenerator
         #endregion
         #region Data Members
 
-        private string m_sSessionTime = "";
+        private string m_sSessionTime = string.Empty;
         private double m_fDataPoint = 0.0;
 
         #endregion

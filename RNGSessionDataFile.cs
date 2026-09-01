@@ -100,9 +100,19 @@ namespace RandomNumberGenerator
         /// </summary>
         ~RNGSessionDataFile()
         {
-            if (m_bSessionInProgress)
+            // Closing the session writes to the file, which can fail. An exception escaping a finalizer
+            // brings the process down, so a failure here is given up on rather than reported, leaving the
+            // file to be recovered when it is next opened.
+            try
             {
-                EndSession();
+                if (m_bSessionInProgress)
+                {
+                    EndSession();
+                }
+            }
+            catch (Exception)
+            {
+                // Nothing can be done about it at this point
             }
         }
 

@@ -43,7 +43,7 @@ namespace RandomNumberGenerator
         /// Gets the value for the specified string
         /// </summary>
         /// <param name="sTargetValue">IN - The string for which to get the value</param>
-        /// <returns>Value for string if found; otherwise, null</returns>
+        /// <returns>Value for string if found; otherwise, NO_VALUE_SET</returns>
         public static int ToInt(string sTargetValue)
         {
             int iResult = NO_VALUE_SET;
@@ -80,7 +80,7 @@ namespace RandomNumberGenerator
         /// Gets the value at the specified index
         /// </summary>
         /// <param name="iIndex">IN - Index for the value to get</param>
-        /// <returns>Value if index is valid; otherwise, null</returns>
+        /// <returns>Value if index is valid; otherwise, NO_VALUE_SET</returns>
         public static int GetValueAt(uint iIndex)
         {
             int iResult = NO_VALUE_SET;
@@ -96,7 +96,7 @@ namespace RandomNumberGenerator
         /// <summary>
         /// The list of string representations of the possible values set
         /// </summary>
-        public static string[] TargetStrings { get; } = { "None", "0", "1" }; // string respresentation of possible targets
+        public static string[] TargetStrings { get; } = { "None", "0", "1" }; // string representation of possible targets
 
         /// <summary>
         /// Constant used when no value has been set
