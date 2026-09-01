@@ -565,6 +565,163 @@ namespace RandomNumberGenerator.Test
             Assert.AreEqual(sEXPECTED_RESULT, xmlWriter.FilePath);
         }
 
+        /// <summary>
+        /// Tests appending to a session file that was never closed, as left by the application being stopped
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void PrepareForAppend_UnterminatedSession_ContinuesTheSession()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // A session file with no closing tag, holding one complete data point
+            const string sUNTERMINATED_XML = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n" +
+                                             "<Session Simulated=\"false\" Target=\"1\">\r\n" +
+                                             "\t<Data Time=\"01:30:45\">0.111</Data>";
+            File.WriteAllText(m_sTEST_FILE_PATH, sUNTERMINATED_XML);
+
+            RNGXMLWriter xmlWriter = new RNGXMLWriter();
+            XMLDataPoint dataPoint = new XMLDataPoint("01:30:46", 0.222);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            bool bPrepared = xmlWriter.PrepareForAppend(m_sTEST_FILE_PATH);
+            bool bWritten = xmlWriter.WriteDataPoint(dataPoint);
+            bool bEnded = xmlWriter.WriteSessionEnd();
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            Assert.IsTrue(bPrepared);
+            Assert.IsTrue(bWritten);
+            Assert.IsTrue(bEnded);
+
+            // Verify the result is a complete file holding both the original and the appended data
+            string sFileContent = File.ReadAllText(m_sTEST_FILE_PATH);
+            XmlDocument document = new XmlDocument();
+            document.LoadXml(sFileContent);
+            Assert.AreEqual(XMLConstants.SESSION_ELEMENT, document.DocumentElement.Name);
+            Assert.AreEqual(2, document.DocumentElement.ChildNodes.Count);
+        }
+
+        /// <summary>
+        /// Tests appending to a closed session does not leave a gap where the closing tag was
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void PrepareForAppend_ClosedSession_AppendedDataMatchesLayout()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Write a session the same way the application does, then close it
+            RNGXMLWriter firstWriter = new RNGXMLWriter(m_sTEST_FILE_PATH);
+            firstWriter.WriteSessionStart(false, 1);
+            firstWriter.WriteDataPoint(new XMLDataPoint("01:30:45", 0.111));
+            firstWriter.WriteSessionEnd();
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Reopen it and append to it the way loading an existing file does
+            RNGXMLWriter appendWriter = new RNGXMLWriter();
+            appendWriter.PrepareForAppend(m_sTEST_FILE_PATH);
+            appendWriter.WriteDataPoint(new XMLDataPoint("01:30:46", 0.222));
+            appendWriter.WriteSessionEnd();
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the appended data is laid out the same as data written in one session
+            string sFileContent = File.ReadAllText(m_sTEST_FILE_PATH);
+            StringAssert.Contains(sFileContent, "\t<Data Time=\"01:30:46\">0.222</Data>");
+            Assert.IsFalse(sFileContent.Contains("\r\n\r\n"), "Appending should not leave a blank line in the file");
+
+            // Verify the file is still valid and holds both points
+            XmlDocument document = new XmlDocument();
+            document.LoadXml(sFileContent);
+            Assert.AreEqual(2, document.DocumentElement.ChildNodes.Count);
+        }
+
+        /// <summary>
+        /// Tests a session with no target selected records that rather than the value used internally
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void WriteSessionStart_NoTargetSet_RecordsNoTarget()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            const string sEXPECTED_TARGET = "-1";
+            RNGXMLWriter xmlWriter = new RNGXMLWriter(m_sTEST_FILE_PATH);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            xmlWriter.WriteSessionStart(false, TargetValues.NO_VALUE_SET);
+            xmlWriter.WriteSessionEnd();
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the recorded target is a real target value rather than the internal one
+            XmlDocument document = new XmlDocument();
+            document.Load(m_sTEST_FILE_PATH);
+            string sRecordedTarget = document.DocumentElement.GetAttribute(XMLConstants.TARGET_ATTRIBUTE);
+            Assert.AreEqual(sEXPECTED_TARGET, sRecordedTarget);
+        }
+
+        /// <summary>
+        /// Tests the file can be read while a session is being written to it
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void WriteDataPoint_SessionInProgress_FileCanBeRead()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            RNGXMLWriter xmlWriter = new RNGXMLWriter(m_sTEST_FILE_PATH);
+            xmlWriter.WriteSessionStart(false, 1);
+            xmlWriter.WriteDataPoint(new XMLDataPoint("01:30:45", 0.111));
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Read the file while the session is still open, as a backup or another tool would
+            string sFileContent = string.Empty;
+            using (FileStream readStream = new FileStream(m_sTEST_FILE_PATH, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            {
+                using (StreamReader reader = new StreamReader(readStream))
+                {
+                    sFileContent = reader.ReadToEnd();
+                }
+            }
+
+            xmlWriter.WriteSessionEnd();
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the data recorded so far was readable while the session was in progress
+            StringAssert.Contains(sFileContent, "0.111");
+        }
+
         #endregion
     }
 }

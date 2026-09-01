@@ -9,8 +9,10 @@
 //====================================================================================================================
 // 2022/09/10 - Mike Pullen - Original implementation.
 // 2022/10/30 - Mike Pullen - Recreated under VS2022 and added ARM64 support.
-// 2022/03/08 - Mike Pullen - Forcing simulator mode for the example as the TruRNGpro header was removed due to unclear
+// 2024/03/08 - Mike Pullen - Forced simulator mode for the example as the TruRNGpro header was removed due to unclear
 //                            licensing.
+// 2026/08/31 - Mike Pullen - Removed the note about forced simulator mode, as the device interface is selected at
+//                            runtime and the simulator is no longer forced.
 //*********************************************************************************************************************
 using System;
 using System.Windows.Forms;

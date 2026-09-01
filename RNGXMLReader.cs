@@ -8,6 +8,7 @@
 // Revision History: 
 //====================================================================================================================
 // 2024/12/18 - Mike Pullen - Original implementation.
+// 2026/08/31 - Mike Pullen - Keep the data recovered from a file that was not closed properly
 //*********************************************************************************************************************
 using System;
 using System.Collections.Generic;
@@ -114,8 +115,12 @@ namespace RandomNumberGenerator
                             sessionData.TargetValue = iTargetValue;
                             sessionData.Simulated = bSimulated;
 
+                            // Establish whether the session was closed before reading the data, so a file
+                            // left unfinished by the application stopping can be told apart from a damaged one
+                            bool bSessionUnterminated = (false == HasClosingSessionTag());
+
                             // Load all data points in batches
-                            bStatus = ReadDataNodes(sessionData, uBatchSize);
+                            bStatus = ReadDataNodes(sessionData, uBatchSize, bSessionUnterminated);
 
                             // If successful, set the file path
                             if (bStatus)
@@ -159,6 +164,53 @@ namespace RandomNumberGenerator
             }
 
             return bStatus;
+        }
+
+        /// <summary>
+        /// Checks whether the file closes the session it contains. A session file is written as the data is
+        /// recorded and the closing tag is only written when the session ends, so a file without one was left
+        /// unfinished by the application being stopped rather than being damaged.
+        /// </summary>
+        /// <returns>true if the closing session tag is present; otherwise, false</returns>
+        private bool HasClosingSessionTag()
+        {
+            bool bClosingTagFound = false;
+
+            try
+            {
+                // The closing tag is the last thing in the file, so only the end of it has to be read
+                using (FileStream fileStream = new FileStream(m_sFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    const int iSEARCH_BLOCK_SIZE = 8192;
+                    int iBlockSize = (int)Math.Min(fileStream.Length, iSEARCH_BLOCK_SIZE);
+                    byte[] block = new byte[iBlockSize];
+
+                    fileStream.Position = fileStream.Length - iBlockSize;
+                    int iTotalRead = 0;
+                    while (iTotalRead < iBlockSize)
+                    {
+                        int iBytesRead = fileStream.Read(block, iTotalRead, iBlockSize - iTotalRead);
+                        if (0 == iBytesRead)
+                        {
+                            break;
+                        }
+
+                        iTotalRead += iBytesRead;
+                    }
+
+                    // The tags are ASCII, so decoding the block cannot split the text being searched for
+                    string sBlockText = System.Text.Encoding.UTF8.GetString(block, 0, iTotalRead);
+                    bClosingTagFound = sBlockText.Contains($"</{XMLConstants.SESSION_ELEMENT}>");
+                }
+            }
+            catch (Exception)
+            {
+                // The file cannot be examined, so treat the session as closed and let the parsing report
+                // whatever is wrong with it
+                bClosingTagFound = true;
+            }
+
+            return bClosingTagFound;
         }
 
         /// <summary>
@@ -246,9 +298,13 @@ namespace RandomNumberGenerator
         /// <param name="sessionData">INOUT - Session data object to load data into</param>
         /// <param name="uBatchSize">IN - Number of data points to process in each batch</param>
         /// <returns>true if successful; otherwise, false</returns>
-        private bool ReadDataNodes(IRNGSessionData sessionData, uint uBatchSize)
+        private bool ReadDataNodes(IRNGSessionData sessionData, uint uBatchSize, bool bSessionUnterminated)
         {
             bool bStatus = true;
+
+            // Records a file that ends part way through so it can be reported once the data is loaded
+            bool bFileIncomplete = false;
+            string sIncompleteDetail = string.Empty;
 
             // Load data points in batches for memory efficiency
             List<double> dataBatch = new List<double>((int)uBatchSize);
@@ -277,14 +333,27 @@ namespace RandomNumberGenerator
                     }
                 }
             }
-            catch (XmlException xmlEx)
+            catch (XmlException xmlException)
             {
-                // Handle malformed XML gracefully - load what we can
-                m_sLastError = $" XML file appears to be incomplete or corrupted. Loaded {sessionData.NumDataPoints} data points successfully before encountering: {xmlEx.Message}";
-                bStatus = false;
+                if (bSessionUnterminated)
+                {
+                    // The session was never closed, which is what a session file looks like when the
+                    // application is stopped while recording. Every data point read up to that point is
+                    // complete and is kept, so the file is recovered rather than rejected.
+                    bFileIncomplete = true;
+                    sIncompleteDetail = xmlException.Message;
+                }
+                else
+                {
+                    // The session was closed but the file still does not parse, so it is damaged rather
+                    // than simply unfinished and is not something that can be recovered from
+                    m_sLastError = $" XML file appears to be incomplete or corrupted. Loaded {sessionData.NumDataPoints} data points successfully before encountering: {xmlException.Message}";
+                    bStatus = false;
+                }
             }
 
-            // Process any remaining data points in the final batch
+            // Process any remaining data points in the final batch. This has to include the points read
+            // before an incomplete file ended, otherwise recovered data would be discarded here.
             if (bStatus && (dataBatch.Count > 0))
             {
                 bStatus = sessionData.LoadDataPointsBatch(dataBatch, (uint)dataBatch.Count);
@@ -292,6 +361,14 @@ namespace RandomNumberGenerator
                 {
                     m_sLastError = " Failed to load final data points batch into session.";
                 }
+            }
+
+            // Report an incomplete file as a warning, as the data that was recovered is still usable
+            if (bStatus && bFileIncomplete)
+            {
+                string sFileName = System.IO.Path.GetFileName(m_sFilePath);
+                m_sLastError = $" File '{sFileName}' was not closed properly, which happens when the application is" +
+                               $" stopped while recording. Recovered {sessionData.NumDataPoints} data points ({sIncompleteDetail})";
             }
 
             return bStatus;
@@ -339,6 +416,14 @@ namespace RandomNumberGenerator
                 m_Reader.Dispose();
                 m_Reader = null;
             }
+
+            // The reader does not own the stream it was given, so it has to be closed here
+            if (null != m_FileStream)
+            {
+                m_FileStream.Close();
+                m_FileStream.Dispose();
+                m_FileStream = null;
+            }
         }
 
         /// <summary>
@@ -373,8 +458,10 @@ namespace RandomNumberGenerator
                         return false;
                     }
 
-                    // Attempt to create the reader
-                    m_Reader = XmlReader.Create(m_sFilePath, m_Settings);
+                    // Attempt to create the reader. The stream is opened here rather than letting the reader
+                    // open the path so a file that is currently being recorded to can still be read.
+                    m_FileStream = new FileStream(m_sFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                    m_Reader = XmlReader.Create(m_FileStream, m_Settings);
                     bStatus = (m_Reader != null);
                     
                     if (false == bStatus)
@@ -424,6 +511,7 @@ namespace RandomNumberGenerator
         private string m_sFilePath = "";
         private XmlReader m_Reader = null;
         private XmlReaderSettings m_Settings = null;
+        private FileStream m_FileStream = null; // Track the file stream for proper disposal
         private string m_sLastError = "";
 
         #endregion

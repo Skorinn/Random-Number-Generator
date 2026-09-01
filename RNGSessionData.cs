@@ -8,6 +8,8 @@
 // Revision History: 
 //====================================================================================================================
 // 2023/12/04 - Mike Pullen - Original implementation.
+// 2026/08/31 - Mike Pullen - Report no value for the data extremes when there is no data and account for written
+//                            data points individually
 //*********************************************************************************************************************
 using System;
 using System.Collections.Concurrent;
@@ -37,6 +39,7 @@ namespace RandomNumberGenerator
         ConcurrentQueue<double> DataPoints { get; set; }
         int DataWindowSize { get; set; }
         string FilePath { get; set; }
+        string LastError { get; }
         bool InProgress { get; }
         double MaxPoint { get; }
         double MinPoint { get; }
@@ -354,19 +357,20 @@ namespace RandomNumberGenerator
                 for (uint uIndex = 0; uIndex < uPointsToWrite; uIndex++)
                 {
                     XMLDataPoint dataPoint = new XMLDataPoint(sSessionTime, pendingDataPoints[uIndex]);
-                    
+
                     bStatus = m_DataFile.WriteDataPoint(dataPoint);
-                    
+
                     if (!bStatus)
                     {
                         throw new InvalidOperationException($" Failed to write data point {uIndex + 1} of {uPointsToWrite} to file.");
                     }
-                }
-                
-                // Reset the counter only if all writes were successful
-                if (bStatus)
-                {
-                    m_iPendingDataPointCounter = 0;
+
+                    // Account for each point as it is written rather than all of them at the end, so a write
+                    // that fails part way through does not leave written points to be written a second time
+                    if (0 < m_iPendingDataPointCounter)
+                    {
+                        --m_iPendingDataPointCounter;
+                    }
                 }
             }
             else if (uPointsToWrite == 0)
@@ -505,39 +509,8 @@ namespace RandomNumberGenerator
         }
 
         /// <summary>
-        /// Updates all calculated statistics for the current data set
-        /// </summary>
-        private void UpdateStatistics()
-        {
-            // Update the current average and count
-            Interlocked.Exchange(ref m_fCurrentAverage, m_DataPoints.Average());
-            Interlocked.Exchange(ref m_iNumDataPoints, m_DataPoints.Count);
-
-            // Calculate the mean deviation
-            double fMeanDev = 0.5 - m_fCurrentAverage;
-            fMeanDev = Math.Abs(fMeanDev);
-            Interlocked.Exchange(ref m_fMeanDeviation, fMeanDev);
-
-            // Calculate the standard deviation
-            double fStandardDev = CalculateStandardDeviation();
-            Interlocked.Exchange(ref m_fStandardDeviation, fStandardDev);
-        }
-
-        /// <summary>
-        /// Calculates the deviation from the statistical mean for the current data set
-        /// </summary>
-        /// <returns>Deviation from statistical mean</returns>
-        private double CalculateMeanDeviation()
-        {
-            double fMeanDev = 0.5 - m_fCurrentAverage;
-            fMeanDev = Math.Abs(fMeanDev);
-            return fMeanDev;
-        }
-
-        /// <summary>
         /// Calculates the standard deviation of a set of data points
         /// </summary>
-        /// <param name="dataPoints">The data points</param>
         /// <returns>The standard deviation</returns>
         private double CalculateStandardDeviation()
         {
@@ -606,19 +579,46 @@ namespace RandomNumberGenerator
         }
 
         /// <summary>
+        /// Description of anything that needs to be reported about the last file that was loaded, such as the
+        /// file not having been closed properly. Empty when there is nothing to report (read-only).
+        /// </summary>
+        public string LastError { get => (null == m_DataFile) ? string.Empty : m_DataFile.LastError; }
+
+        /// <summary>
         /// Whether or not the session is currently in progress (read-only)
         /// </summary>
         public bool InProgress { get => (null == m_Timer) ? false : m_Timer.InProgress; }
 
         /// <summary>
-        /// Gets the maximum data value (read-only)
+        /// Gets the maximum data value, or double.NaN when there is no data (read-only)
         /// </summary>
-        public double MaxPoint { get => (null == m_DataPoints) ? int.MaxValue : m_DataPoints.Max(); }
+        public double MaxPoint
+        {
+            get
+            {
+                // Work from a snapshot so the set cannot be emptied while it is being examined
+                double[] dataPoints = DataPointSnapshot;
+                return (0 == dataPoints.Length) ? double.NaN : dataPoints.Max();
+            }
+        }
 
         /// <summary>
-        /// Gets the minimum data value (read-only)
+        /// Gets the minimum data value, or double.NaN when there is no data (read-only)
         /// </summary>
-        public double MinPoint { get => (null == m_DataPoints) ? int.MinValue : m_DataPoints.Min(); }
+        public double MinPoint
+        {
+            get
+            {
+                // Work from a snapshot so the set cannot be emptied while it is being examined
+                double[] dataPoints = DataPointSnapshot;
+                return (0 == dataPoints.Length) ? double.NaN : dataPoints.Min();
+            }
+        }
+
+        /// <summary>
+        /// Gets a snapshot of the current data points (read-only)
+        /// </summary>
+        private double[] DataPointSnapshot { get => (null == m_DataPoints) ? new double[0] : m_DataPoints.ToArray(); }
 
         /// <summary>
         /// Formated session time string (read-only)
@@ -686,7 +686,11 @@ namespace RandomNumberGenerator
         #region Constants
 
         /// <summary>
-        /// Interval at which data should be record to the file (if used)
+        /// Number of data points to accumulate before writing to the data file.
+        /// NOTE: Every data point is always written; this only controls how many are buffered per
+        /// write, so a value of 1 keeps the file complete after every read at the cost of one
+        /// write per data point. Raising it batches writes but risks losing that many points if
+        /// the application terminates unexpectedly.
         /// </summary>
         private const uint WRITE_FILE_INTERVAL = 1;
 

@@ -12,6 +12,7 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Xml;
 
@@ -581,7 +582,107 @@ namespace RandomNumberGenerator.Test
         }
 
         /// <summary>
-        /// Tests LoadFile with malformed XML throws XmlException and handles it appropriately
+        /// Tests LoadFile recovers the data from a session file that was never closed
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void LoadFile_UnterminatedSession_RecoversDataPoints()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // A session file that the application never got to close, as happens when it is stopped while
+            // recording. The data points in it are complete and have to be recovered rather than discarded.
+            const string sUNTERMINATED_XML = @"<?xml version=""1.0"" encoding=""utf-8""?>
+<Session Simulated=""false"" Target=""1"">
+	<Data Time=""01:30:45"">0.123456</Data>
+	<Data Time=""01:30:46"">0.789012</Data>";
+            File.WriteAllText(m_sTEST_FILE_PATH, sUNTERMINATED_XML);
+
+            // Mock session data that records the points loaded into it
+            List<double> loadedPoints = new List<double>();
+            var mockSessionData = new Mock<IRNGSessionData>();
+            mockSessionData.Setup(mock => mock.Reset()).Verifiable();
+            mockSessionData.SetupProperty(mock => mock.TargetValue);
+            mockSessionData.SetupProperty(mock => mock.Simulated);
+            mockSessionData.SetupProperty(mock => mock.FilePath);
+            mockSessionData.Setup(mock => mock.LoadDataPointsBatch(It.IsAny<IEnumerable<double>>(), It.IsAny<uint>()))
+                           .Callback<IEnumerable<double>, uint>((points, uMaxCount) =>
+                           {
+                               _ = uMaxCount;
+                               loadedPoints.AddRange(points);
+                           })
+                           .Returns(true);
+            mockSessionData.SetupGet(mock => mock.NumDataPoints).Returns(() => loadedPoints.Count);
+
+            // Create the object under test
+            RNGXMLReader xmlReader = new RNGXMLReader(m_sTEST_FILE_PATH);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            bool bResult = xmlReader.LoadFile(mockSessionData.Object);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the file loaded and every complete data point in it was recovered
+            Assert.IsTrue(bResult);
+            Assert.AreEqual(2, loadedPoints.Count);
+            Assert.AreEqual(m_fTEST_DATA_POINT_1, loadedPoints[0]);
+            Assert.AreEqual(m_fTEST_DATA_POINT_2, loadedPoints[1]);
+
+            // Verify the file being unfinished is still reported so it can be raised to the user
+            StringAssert.Contains(xmlReader.LastError, "was not closed properly");
+        }
+
+        /// <summary>
+        /// Tests loading a file that is currently being written to by another writer
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void LoadFile_FileOpenForWriting_LoadsData()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            File.WriteAllText(m_sTEST_FILE_PATH, m_sVALID_XML_CONTENT);
+
+            var mockSessionData = new Mock<IRNGSessionData>();
+            mockSessionData.Setup(mock => mock.Reset()).Verifiable();
+            mockSessionData.SetupProperty(mock => mock.TargetValue);
+            mockSessionData.SetupProperty(mock => mock.Simulated);
+            mockSessionData.SetupProperty(mock => mock.FilePath);
+            mockSessionData.Setup(mock => mock.LoadDataPointsBatch(It.IsAny<IEnumerable<double>>(), It.IsAny<uint>())).Returns(true);
+            mockSessionData.SetupGet(mock => mock.NumDataPoints).Returns(2);
+
+            RNGXMLReader xmlReader = new RNGXMLReader(m_sTEST_FILE_PATH);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Hold the file open for writing, as a session in progress does, while it is read
+            bool bResult;
+            using (FileStream writeStream = new FileStream(m_sTEST_FILE_PATH, FileMode.Open, FileAccess.Write, FileShare.Read))
+            {
+                bResult = xmlReader.LoadFile(mockSessionData.Object);
+            }
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the file was read even though it was open for writing
+            Assert.IsTrue(bResult);
+        }
+
+        /// <summary>
+        /// Tests loading a malformed XML file
         /// </summary>
         [TestMethod]
         [TestCategory("Component")]

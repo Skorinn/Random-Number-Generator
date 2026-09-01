@@ -8,6 +8,7 @@
 // Revision History: 
 //====================================================================================================================
 // 2023/12/04 - Mike Pullen - Original implementation.
+// 2026/08/31 - Mike Pullen - Report anything that needs raising about a loaded file through LastError
 //*********************************************************************************************************************
 using System;
 using System.IO;
@@ -45,6 +46,7 @@ namespace RandomNumberGenerator
     public interface IRNGSessionDataFile
     {
         string FilePath { get; set; }
+        string LastError { get; }
         bool SessionInProgress { get; set; }
 
         bool EndSession();
@@ -375,6 +377,12 @@ namespace RandomNumberGenerator
                 }
             }
         }
+
+        /// <summary>
+        /// Description of the last problem encountered reading the file, which is also set when a file was
+        /// loaded but something about it needs to be reported. Empty when there is nothing to report.
+        /// </summary>
+        public string LastError { get => (null == m_Reader) ? string.Empty : m_Reader.LastError; }
 
         /// <summary>
         /// Specifies if a session is in progress (start has been written but not end)

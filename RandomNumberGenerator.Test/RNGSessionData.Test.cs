@@ -1029,6 +1029,74 @@ namespace RandomNumberGenerator.Test
             }
         }
 
+        /// <summary>
+        /// Tests the data extremes report no value when there is no data rather than throwing
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void MaxAndMinPoint_NoDataPoints_ReturnsNaN()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Mock the data file and timer objects
+            var mockDataFile = new Mock<IRNGSessionDataFile>();
+            var mockSessionTimer = new Mock<IRNGSessionTimer>();
+
+            // Create the object under test, which starts with no data recorded in it
+            RNGSessionData sessionData = new RNGSessionData(mockDataFile.Object, mockSessionTimer.Object);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            double fMaxPoint = sessionData.MaxPoint;
+            double fMinPoint = sessionData.MinPoint;
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            Assert.IsTrue(double.IsNaN(fMaxPoint), "MaxPoint should report no value when there is no data");
+            Assert.IsTrue(double.IsNaN(fMinPoint), "MinPoint should report no value when there is no data");
+        }
+
+        /// <summary>
+        /// Tests the data extremes report no value after the session data has been reset
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void MaxAndMinPoint_AfterReset_ReturnsNaN()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Mock the data file and timer objects
+            var mockDataFile = new Mock<IRNGSessionDataFile>();
+            mockDataFile.Setup(mock => mock.WriteDataPoint(It.IsAny<IXMLDataPoint>())).Returns(true);
+            var mockSessionTimer = new Mock<IRNGSessionTimer>();
+
+            // Create the object under test and record some data in it
+            RNGSessionData sessionData = new RNGSessionData(mockDataFile.Object, mockSessionTimer.Object);
+            sessionData.AddDataPoint(0.25);
+            sessionData.AddDataPoint(0.75);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            sessionData.Reset();
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            Assert.IsTrue(double.IsNaN(sessionData.MaxPoint), "MaxPoint should report no value after a reset");
+            Assert.IsTrue(double.IsNaN(sessionData.MinPoint), "MinPoint should report no value after a reset");
+        }
+
         #endregion
     }
 }

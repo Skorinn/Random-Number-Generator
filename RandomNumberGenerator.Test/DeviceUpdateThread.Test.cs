@@ -8,6 +8,7 @@
 // Revision History: 
 //====================================================================================================================
 // 2025/07/21 - Mike Pullen - Original implementation.
+// 2026/08/31 - Mike Pullen - Added coverage for the info box only being restored when it is unchanged
 //*********************************************************************************************************************
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
@@ -54,6 +55,7 @@ namespace RandomNumberGenerator.Test
         private readonly Color m_TEST_STATUS_TEXT_COLOR = Color.Blue;
         private readonly Color m_TEST_STATUS_BACK_COLOR = Color.Yellow;
         private const string m_sREADING_DEVICES_MESSAGE = " Checking attached devices and updating port list...";
+        private const string m_sSESSION_RUNNING_MESSAGE = " Running session";
 
         #endregion
         #region Additional test attributes
@@ -287,11 +289,13 @@ namespace RandomNumberGenerator.Test
             // Assert
             //**************************************************************//
 
-            // Verify status box backup was called
-            mockParent.Verify(mock => mock.GetStatusBoxState(out It.Ref<string>.IsAny, out It.Ref<Color>.IsAny, out It.Ref<Color>.IsAny), Times.Once);
+            // Verify the status box was read twice - once to back it up and once to check it before restoring
+            mockParent.Verify(mock => mock.GetStatusBoxState(out It.Ref<string>.IsAny, out It.Ref<Color>.IsAny, out It.Ref<Color>.IsAny), Times.Exactly(2));
 
-            // Verify status box was updated (at least twice - reading message and restore)
-            mockParent.Verify(mock => mock.SetStatusBoxState(It.IsAny<string>(), It.IsAny<Color>(), It.IsAny<Color>()), Times.AtLeast(2));
+            // Verify only the reading message was displayed. The mock reports a different message is displayed
+            // when the update completes, so the backed up message must not be restored over the top of it.
+            mockParent.Verify(mock => mock.SetStatusBoxState(It.IsAny<string>(), It.IsAny<Color>(), It.IsAny<Color>()), Times.Once);
+            mockParent.Verify(mock => mock.SetStatusBoxState(m_sREADING_DEVICES_MESSAGE, It.IsAny<Color>(), It.IsAny<Color>()), Times.Once);
 
             // Verify Invoke was called to update device list
             mockParent.Verify(mock => mock.Invoke(It.IsAny<Action>()), Times.Once);
@@ -455,10 +459,13 @@ namespace RandomNumberGenerator.Test
                 threads[i].Start();
             }
 
-            // Wait for all threads to complete
+            // Wait for all threads to complete. The timeout has to allow for every thread to run a full device
+            // search in turn, as a thread still running when the test ends interferes with the tests that follow.
+            const int iJOIN_TIMEOUT = 60000; // 60 second timeout
             for (int i = 0; i < iNumThreads; i++)
             {
-                threads[i].Join(5000); // 5 second timeout
+                bool bThreadCompleted = threads[i].Join(iJOIN_TIMEOUT);
+                Assert.IsTrue(bThreadCompleted, "ThreadProc threads must complete before the test ends");
             }
 
             //**************************************************************//
@@ -467,6 +474,132 @@ namespace RandomNumberGenerator.Test
 
             // Verify that only one thread executed at a time (synchronization working)
             Assert.AreEqual(1, iMaxConcurrentExecutions, "ThreadProc should allow only one concurrent execution due to locking");
+        }
+
+        /// <summary>
+        /// Tests the info box is restored when nothing has been displayed since the reading devices message
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void ThreadProc_InfoBoxUnchanged_RestoresPreviousMessage()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Create mock parent form
+            var mockParent = new Mock<IGeneratorForm>();
+            mockParent.Setup(mock => mock.State).Returns(GeneratorForm.RngGuiStates.Idle);
+            mockParent.Setup(mock => mock.InvokeRequired).Returns(false);
+
+            // Track the message displayed in the info box so the mock behaves like the real status box
+            string sDisplayedText = m_sTEST_STATUS_TEXT;
+
+            mockParent.Setup(mock => mock.GetStatusBoxState(out It.Ref<string>.IsAny, out It.Ref<Color>.IsAny, out It.Ref<Color>.IsAny))
+                      .Callback(new GetStatusBoxStateCallback((out string text, out Color textColor, out Color backColor) =>
+                      {
+                          text = sDisplayedText;
+                          textColor = m_TEST_STATUS_TEXT_COLOR;
+                          backColor = m_TEST_STATUS_BACK_COLOR;
+                      }));
+
+            mockParent.Setup(mock => mock.SetStatusBoxState(It.IsAny<string>(), It.IsAny<Color>(), It.IsAny<Color>()))
+                      .Callback<string, Color, Color>((text, textColor, backColor) =>
+                      {
+                          // Discard the unused colors
+                          _ = textColor;
+                          _ = backColor;
+
+                          sDisplayedText = text;
+                      });
+
+            mockParent.SetupSet(mock => mock.DeviceList = It.IsAny<BindingList<IRNGDevice>>()).Verifiable();
+
+            // Set the parent
+            DeviceUpdateThread.Parent = mockParent.Object;
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Execute the thread procedure
+            DeviceUpdateThread.ThreadProc(null);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the message displayed before the update was restored
+            Assert.AreEqual(m_sTEST_STATUS_TEXT, sDisplayedText);
+            mockParent.Verify(mock => mock.SetStatusBoxState(m_sTEST_STATUS_TEXT, m_TEST_STATUS_TEXT_COLOR, m_TEST_STATUS_BACK_COLOR), Times.Once);
+        }
+
+        /// <summary>
+        /// Tests a message displayed while the devices are being read is not overwritten by the restore.
+        /// NOTE: Covers the info box being left with a stale message when a session is started during an update.
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void ThreadProc_InfoBoxChangedDuringUpdate_NewerMessageKept()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Create mock parent form
+            var mockParent = new Mock<IGeneratorForm>();
+            mockParent.Setup(mock => mock.State).Returns(GeneratorForm.RngGuiStates.Idle);
+            mockParent.Setup(mock => mock.InvokeRequired).Returns(false);
+
+            // Track the message displayed in the info box so the mock behaves like the real status box
+            string sDisplayedText = m_sTEST_STATUS_TEXT;
+
+            mockParent.Setup(mock => mock.GetStatusBoxState(out It.Ref<string>.IsAny, out It.Ref<Color>.IsAny, out It.Ref<Color>.IsAny))
+                      .Callback(new GetStatusBoxStateCallback((out string text, out Color textColor, out Color backColor) =>
+                      {
+                          text = sDisplayedText;
+                          textColor = m_TEST_STATUS_TEXT_COLOR;
+                          backColor = m_TEST_STATUS_BACK_COLOR;
+                      }));
+
+            mockParent.Setup(mock => mock.SetStatusBoxState(It.IsAny<string>(), It.IsAny<Color>(), It.IsAny<Color>()))
+                      .Callback<string, Color, Color>((text, textColor, backColor) =>
+                      {
+                          // Discard the unused colors
+                          _ = textColor;
+                          _ = backColor;
+
+                          sDisplayedText = text;
+                      });
+
+            // Simulate the GUI displaying a newer message while the device search is still running. The device
+            // list is updated at the end of the search, immediately before the info box is restored.
+            mockParent.SetupSet(mock => mock.DeviceList = It.IsAny<BindingList<IRNGDevice>>())
+                      .Callback<BindingList<IRNGDevice>>(deviceList =>
+                      {
+                          // Discard the unused device list
+                          _ = deviceList;
+
+                          sDisplayedText = m_sSESSION_RUNNING_MESSAGE;
+                      });
+
+            // Set the parent
+            DeviceUpdateThread.Parent = mockParent.Object;
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Execute the thread procedure
+            DeviceUpdateThread.ThreadProc(null);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the newer message was left displayed rather than being replaced by the backup
+            Assert.AreEqual(m_sSESSION_RUNNING_MESSAGE, sDisplayedText);
+            mockParent.Verify(mock => mock.SetStatusBoxState(m_sTEST_STATUS_TEXT, It.IsAny<Color>(), It.IsAny<Color>()), Times.Never);
         }
 
         #endregion

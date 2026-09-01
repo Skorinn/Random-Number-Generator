@@ -10,6 +10,8 @@
 // 2022/09/10 - Mike Pullen - Original implementation.
 // 2022/10/30 - Mike Pullen - Recreated under VS2022 and added ARM64 support.
 // 2023/12/02 - Mike Pullen - Added simulate, pause, and target value
+// 2026/08/31 - Mike Pullen - Report recovered files, dispose through the standard pattern, and keep processing
+//                            messages while waiting for the device update to finish on close
 //*********************************************************************************************************************
 
 // Enable to dump the USB device information
@@ -612,7 +614,7 @@ namespace RandomNumberGenerator
 
             // Signal the device update thread to stop and wait for it to complete (10 second timeout)
             m_StatusTextBox.Text = m_sCLOSE_STOP_DEVICE_UPDATE;
-            m_DeviceUpdateComplete.WaitOne(10000);
+            WaitForDeviceUpdate();
         }
 
         #endregion
@@ -627,13 +629,44 @@ namespace RandomNumberGenerator
         }
 
         /// <summary>
-        /// Override of the dispose method from Form
+        /// Waits for the device update to finish while continuing to process messages.
+        /// NOTE: The device update thread reports its results by invoking on this thread, so simply blocking
+        /// here would stop it from being able to finish and hold the close up until the wait timed out.
         /// </summary>
-        public new void Dispose()
+        private void WaitForDeviceUpdate()
         {
-            // Record the GUI is terminating and execute the base class dispose
+            // Do not accept any further input while shutting down, as messages are still being processed
+            Enabled = false;
+
+            // Wait in slices, processing messages between them so any pending update can complete
+            const int iWAIT_SLICE = 50;
+            const int iWAIT_TIMEOUT = 10000;
+            int iWaited = 0;
+            bool bUpdateComplete = m_DeviceUpdateComplete.WaitOne(0);
+            while ((false == bUpdateComplete) && (iWaited < iWAIT_TIMEOUT))
+            {
+                Application.DoEvents();
+                bUpdateComplete = m_DeviceUpdateComplete.WaitOne(iWAIT_SLICE);
+                iWaited += iWAIT_SLICE;
+            }
+        }
+
+        /// <summary>
+        /// Override of the dispose method from Form. Declared here rather than in the designer file so the
+        /// state is recorded no matter which reference the form is disposed through.
+        /// </summary>
+        /// <param name="disposing">IN - True when disposing managed resources</param>
+        protected override void Dispose(bool disposing)
+        {
+            // Record the GUI is terminating so any running device update stops touching the controls
             m_State = RngGuiStates.Terminating;
-            base.Dispose();
+
+            if (disposing && (null != components))
+            {
+                components.Dispose();
+            }
+
+            base.Dispose(disposing);
         }
 
         /// <summary>
@@ -1178,10 +1211,22 @@ namespace RandomNumberGenerator
                 
                 // Update all UI elements with the loaded session data
                 UpdateUIFromLoadedSession();
-                
-                // Show success status using helper method
-                SetStatusBoxState($" File loaded: {Path.GetFileName(sFilePath)}. {m_Data.NumDataPoints} data points loaded. Ready for new session.", 
-                                System.Drawing.Color.Black, System.Drawing.Color.LightGreen);
+
+                // A file can load successfully and still have something worth reporting, such as having been
+                // recovered after the application was stopped while recording
+                string sLoadWarning = m_Data.LastError;
+                bool bWarningReported = (false == string.IsNullOrEmpty(sLoadWarning));
+                if (bWarningReported)
+                {
+                    // Show the warning rather than the plain success message
+                    SetStatusBoxState(sLoadWarning, System.Drawing.Color.Black, System.Drawing.Color.Khaki);
+                }
+                else
+                {
+                    // Show success status using helper method
+                    SetStatusBoxState($" File loaded: {Path.GetFileName(sFilePath)}. {m_Data.NumDataPoints} data points loaded. Ready for new session.",
+                                    System.Drawing.Color.Black, System.Drawing.Color.LightGreen);
+                }
             }
             else
             {

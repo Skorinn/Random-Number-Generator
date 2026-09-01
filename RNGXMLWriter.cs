@@ -8,6 +8,8 @@
 // Revision History: 
 //====================================================================================================================
 // 2023/12/06 - Mike Pullen - Original implementation.
+// 2026/08/31 - Mike Pullen - Append without rewriting the whole file, allow the file to be read while recording,
+//                            and continue a session that was left open by the application stopping
 //*********************************************************************************************************************
 using System;
 using System.Xml;
@@ -105,11 +107,15 @@ namespace RandomNumberGenerator
                 {
                     try
                     {
+                        // A session with no target selected is recorded as having no target rather than
+                        // writing out the value used internally to mean nothing has been set yet
+                        int iRecordedTarget = (TargetValues.NO_VALUE_SET == iTargetValue) ? m_iNO_TARGET : iTargetValue;
+
                         // <Session Simulated="true" Target="0" />
                         m_Writer.WriteStartDocument();
                         m_Writer.WriteStartElement(XMLConstants.SESSION_ELEMENT);
                         m_Writer.WriteAttributeString(XMLConstants.SIMULATED_ATTRIBUTE, bSimulated.ToString().ToLower());
-                        m_Writer.WriteAttributeString(XMLConstants.TARGET_ATTRIBUTE, iTargetValue.ToString());
+                        m_Writer.WriteAttributeString(XMLConstants.TARGET_ATTRIBUTE, iRecordedTarget.ToString());
                         m_Writer.Flush();
                     }
                     catch (InvalidOperationException)
@@ -165,6 +171,13 @@ namespace RandomNumberGenerator
             {
                 try
                 {
+                    // When appending, the indentation is written directly as the writer indents from the start
+                    // of the fragment rather than from the position within the session
+                    if (m_bAppendMode)
+                    {
+                        m_Writer.WriteRaw(m_sAPPEND_INDENT);
+                    }
+
                     // Attempt to write the data point to the file
                     bool bStatus = dataPoint.WriteDataPoint(m_Writer);
                     if (!bStatus)
@@ -230,7 +243,7 @@ namespace RandomNumberGenerator
                         {
                             // In append mode, we need to write the closing session tag manually
                             // since we never opened it with WriteStartElement
-                            m_Writer.WriteRaw($"</{XMLConstants.SESSION_ELEMENT}>");
+                            m_Writer.WriteRaw($"{m_sAPPEND_NEWLINE}</{XMLConstants.SESSION_ELEMENT}>");
                         }
 
                         // Close the writer and any associated file stream
@@ -375,53 +388,75 @@ namespace RandomNumberGenerator
         {
             try
             {
-                // Read the entire file content
-                string fileContent = System.IO.File.ReadAllText(m_sFilePath);
-                
-                // Check for two possible session formats:
-                // 1. Sessions with data: <Session Simulated="..." Target="...">...</Session>
-                // 2. Empty sessions: <Session Simulated="..." Target="..." />
-                
-                string closingSessionTag = $"</{XMLConstants.SESSION_ELEMENT}>";
-                int lastSessionEndIndex = fileContent.LastIndexOf(closingSessionTag);
-                if (lastSessionEndIndex > 0)
+                // Only the ends of the file are examined rather than the whole of it, as a session file grows
+                // by around 2MB an hour and rewriting all of it to append to it does not scale
+                using (System.IO.FileStream fileStream = new System.IO.FileStream(m_sFilePath, System.IO.FileMode.Open,
+                                                                                 System.IO.FileAccess.ReadWrite, System.IO.FileShare.None))
                 {
-                    // Case 1: Session with data points - has closing </Session> tag
-                    // Remove everything after the last data point
-                    fileContent = fileContent.Substring(0, lastSessionEndIndex);
-                    
-                    // Write the modified content back to the file
-                    System.IO.File.WriteAllText(m_sFilePath, fileContent);
-                    return true;
-                }
-                else
-                {
-                    // Case 2: Empty session - look for self-closing Session tag
-                    int selfClosingSessionIndex = fileContent.LastIndexOf(" />");
-                    if (selfClosingSessionIndex > 0)
+                    long lFileLength = fileStream.Length;
+
+                    // Three possible session formats have to be handled:
+                    // 1. A closed session:      <Session ...>...</Session>
+                    // 2. An empty session:      <Session ... />
+                    // 3. An unterminated session, left by the application stopping while recording: <Session ...>...
+
+                    // Case 1: read the end of the file and remove the closing tag to continue the session
+                    long lEndBlockStart = Math.Max(0, lFileLength - m_iSEARCH_BLOCK_SIZE);
+                    byte[] endBlock = ReadFileBlock(fileStream, lEndBlockStart, m_iSEARCH_BLOCK_SIZE);
+                    byte[] closingTag = System.Text.Encoding.UTF8.GetBytes($"</{XMLConstants.SESSION_ELEMENT}>");
+                    int iClosingIndex = FindLastPattern(endBlock, closingTag);
+
+                    // The application always writes the closing tag last, but a file that has been edited
+                    // elsewhere could hold more after it, so the whole file is searched before the session is
+                    // treated as one that was never closed
+                    if ((0 > iClosingIndex) && (0 < lEndBlockStart))
                     {
-                        // Check if this is indeed a Session tag by looking backwards
-                        string sessionStartTag = $"<{XMLConstants.SESSION_ELEMENT}";
-                        int sessionStartIndex = fileContent.LastIndexOf(sessionStartTag, selfClosingSessionIndex);
-                        if ((sessionStartIndex >= 0) && (sessionStartIndex < selfClosingSessionIndex))
-                        {
-                            // Found a self-closing Session tag - convert it to an open tag
-                            // Extract the session attributes part
-                            string sessionAttributes = fileContent.Substring(sessionStartIndex + sessionStartTag.Length, selfClosingSessionIndex - sessionStartIndex - sessionStartTag.Length);
-                            
-                            // Replace self-closing tag with opening tag
-                            string beforeSession = fileContent.Substring(0, sessionStartIndex);
-                            string openingTag = $"<{XMLConstants.SESSION_ELEMENT}{sessionAttributes}>";
-                            string modifiedContent = beforeSession + openingTag;
-                            
-                            // Write the modified content back to the file
-                            System.IO.File.WriteAllText(m_sFilePath, modifiedContent);
-                            return true;
-                        }
+                        lEndBlockStart = 0;
+                        endBlock = ReadFileBlock(fileStream, 0, (int)Math.Min(lFileLength, m_iMAX_SEARCH_SIZE));
+                        iClosingIndex = FindLastPattern(endBlock, closingTag);
                     }
-                    
-                    // Neither format found - invalid XML structure
-                    throw new InvalidOperationException($" Invalid XML structure: No {XMLConstants.SESSION_ELEMENT} element found in file or file format is not recognized.");
+
+                    if (0 <= iClosingIndex)
+                    {
+                        // Discard the closing tag and anything after it so data can be written in its place.
+                        // The whitespace written in front of the closing tag goes as well, otherwise it is left
+                        // behind as a blank line between the existing data and the data appended to it.
+                        int iTruncateIndex = iClosingIndex;
+                        while ((0 < iTruncateIndex) && IsWhitespace(endBlock[iTruncateIndex - 1]))
+                        {
+                            --iTruncateIndex;
+                        }
+
+                        fileStream.SetLength(lEndBlockStart + iTruncateIndex);
+                        return true;
+                    }
+
+                    // The remaining cases are identified by the session start tag at the beginning of the file
+                    byte[] startBlock = ReadFileBlock(fileStream, 0, m_iSEARCH_BLOCK_SIZE);
+                    byte[] sessionTag = System.Text.Encoding.UTF8.GetBytes($"<{XMLConstants.SESSION_ELEMENT}");
+                    int iSessionIndex = FindLastPattern(startBlock, sessionTag);
+                    if (0 > iSessionIndex)
+                    {
+                        // No session element at all, so this is not a session file
+                        throw new InvalidOperationException($" Invalid XML structure: No {XMLConstants.SESSION_ELEMENT} element found in file or file format is not recognized.");
+                    }
+
+                    // Case 2: an empty session closes itself, so the tag is reopened to hold the new data
+                    byte[] selfClosingTag = System.Text.Encoding.UTF8.GetBytes(" />");
+                    int iSelfClosingIndex = FindLastPattern(startBlock, selfClosingTag);
+                    if (iSessionIndex < iSelfClosingIndex)
+                    {
+                        // Replace the self closing tag with an open one
+                        byte[] openTag = System.Text.Encoding.UTF8.GetBytes(">");
+                        fileStream.SetLength(iSelfClosingIndex);
+                        fileStream.Position = iSelfClosingIndex;
+                        fileStream.Write(openTag, 0, openTag.Length);
+                        return true;
+                    }
+
+                    // Case 3: the session was never closed, so the file is already open for the data to be
+                    // appended to it and nothing has to be changed
+                    return true;
                 }
             }
             catch (System.IO.IOException)
@@ -439,6 +474,84 @@ namespace RandomNumberGenerator
                 // Wrap other exceptions as IO errors since this is a file operation
                 throw new System.IO.IOException($" Error reading or writing file during append preparation: {ex.Message}", ex);
             }
+        }
+
+        /// <summary>
+        /// Reads a block of the file, of up to the search block size, from the specified position
+        /// </summary>
+        /// <param name="fileStream">IN - The open file to read from</param>
+        /// <param name="lStartPosition">IN - Position in the file to read from</param>
+        /// <param name="iMaxSize">IN - Maximum number of bytes to read</param>
+        /// <returns>The block that was read, which is shorter than the block size at the end of the file</returns>
+        private static byte[] ReadFileBlock(System.IO.FileStream fileStream, long lStartPosition, int iMaxSize)
+        {
+            // Limit the block to what remains in the file from the start position
+            long lRemaining = fileStream.Length - lStartPosition;
+            int iBlockSize = (int)Math.Min(lRemaining, iMaxSize);
+            byte[] block = new byte[iBlockSize];
+
+            // Read the block, allowing for a read to be satisfied a part at a time
+            fileStream.Position = lStartPosition;
+            int iTotalRead = 0;
+            while (iTotalRead < iBlockSize)
+            {
+                int iBytesRead = fileStream.Read(block, iTotalRead, iBlockSize - iTotalRead);
+                if (0 == iBytesRead)
+                {
+                    break;
+                }
+
+                iTotalRead += iBytesRead;
+            }
+
+            return block;
+        }
+
+        /// <summary>
+        /// Checks whether a byte is one of the whitespace characters used to lay the file out
+        /// </summary>
+        /// <param name="value">IN - The byte to check</param>
+        /// <returns>true if the byte is whitespace; otherwise, false</returns>
+        private static bool IsWhitespace(byte value)
+        {
+            const byte bySPACE = 0x20;
+            const byte byTAB = 0x09;
+            const byte byCARRIAGE_RETURN = 0x0D;
+            const byte byLINE_FEED = 0x0A;
+
+            return ((bySPACE == value) || (byTAB == value) || (byCARRIAGE_RETURN == value) || (byLINE_FEED == value));
+        }
+
+        /// <summary>
+        /// Finds the last occurrence of a pattern of bytes in a block.
+        /// NOTE: The tags searched for are all ASCII, so the search is done on the bytes rather than on
+        /// decoded text to keep the result usable as a position in the file.
+        /// </summary>
+        /// <param name="block">IN - The block to search</param>
+        /// <param name="pattern">IN - The pattern of bytes to search for</param>
+        /// <returns>Index of the last occurrence in the block; -1 if the pattern is not present</returns>
+        private static int FindLastPattern(byte[] block, byte[] pattern)
+        {
+            // Walk backwards through the block so the last occurrence is found first
+            for (int iIndex = (block.Length - pattern.Length); iIndex >= 0; iIndex--)
+            {
+                bool bPatternMatched = true;
+                for (int iOffset = 0; iOffset < pattern.Length; iOffset++)
+                {
+                    if (block[iIndex + iOffset] != pattern[iOffset])
+                    {
+                        bPatternMatched = false;
+                        break;
+                    }
+                }
+
+                if (bPatternMatched)
+                {
+                    return iIndex;
+                }
+            }
+
+            return -1;
         }
 
         /// <summary>
@@ -499,19 +612,26 @@ namespace RandomNumberGenerator
                         // Store original settings values to restore later
                         bool originalOmitDeclaration = m_Settings.OmitXmlDeclaration;
                         ConformanceLevel originalConformanceLevel = m_Settings.ConformanceLevel;
+                        bool originalIndent = m_Settings.Indent;
 
                         try
                         {
-                            // Create a FileStream in append mode with proper disposal tracking
-                            m_FileStream = new System.IO.FileStream(m_sFilePath, System.IO.FileMode.Append, System.IO.FileAccess.Write);
-                            
+                            // Create a FileStream in append mode with proper disposal tracking. Sharing the file
+                            // for reading allows a session in progress to be inspected or backed up.
+                            m_FileStream = new System.IO.FileStream(m_sFilePath, System.IO.FileMode.Append,
+                                                                    System.IO.FileAccess.Write, System.IO.FileShare.Read);
+
                             // Modify settings for appending (no declaration, fragment mode)
                             m_Settings.OmitXmlDeclaration = true; // Don't write XML declaration when appending
                             m_Settings.ConformanceLevel = ConformanceLevel.Fragment; // Allow fragments for appending
-                            
+
+                            // The writer indents from the start of the fragment rather than from the position in
+                            // the session, so the indentation of appended data is written directly instead
+                            m_Settings.Indent = false;
+
                             // Create the writer with the file stream
                             m_Writer = XmlWriter.Create(m_FileStream, m_Settings);
-                            
+
                             // Track that we're in append mode
                             m_bAppendMode = true;
                         }
@@ -531,18 +651,20 @@ namespace RandomNumberGenerator
                             // Restore original settings
                             m_Settings.OmitXmlDeclaration = originalOmitDeclaration;
                             m_Settings.ConformanceLevel = originalConformanceLevel;
+                            m_Settings.Indent = originalIndent;
                         }
                     }
                     else
                     {
-                        // Normal mode - create new file or overwrite existing
-                        m_Writer = XmlWriter.Create(m_sFilePath, m_Settings);
-                        
+                        // Normal mode - create new file or overwrite existing. The stream is created here rather
+                        // than letting the writer open the path so the file can be shared for reading, which
+                        // allows a session in progress to be inspected or backed up.
+                        m_FileStream = new System.IO.FileStream(m_sFilePath, System.IO.FileMode.Create,
+                                                                System.IO.FileAccess.Write, System.IO.FileShare.Read);
+                        m_Writer = XmlWriter.Create(m_FileStream, m_Settings);
+
                         // Track that we're NOT in append mode
                         m_bAppendMode = false;
-                        
-                        // No separate file stream in normal mode
-                        m_FileStream = null;
                     }
 
                     bStatus = (m_Writer != null);
@@ -628,6 +750,22 @@ namespace RandomNumberGenerator
         /// Path to the XML file
         /// </summary>
         public string FilePath { get => m_sFilePath; set => m_sFilePath = value; }
+
+        #endregion
+        #region Constants
+
+        // Size of the blocks read from the ends of the file when preparing it for appending
+        private const int m_iSEARCH_BLOCK_SIZE = 8192;
+
+        // Limit on searching a whole file, which is only reached by a file not written by the application
+        private const int m_iMAX_SEARCH_SIZE = 64 * 1024 * 1024;
+
+        // Indentation written before appended data, matching what the writer produces for a new file
+        private const string m_sAPPEND_NEWLINE = "\r\n";
+        private const string m_sAPPEND_INDENT = m_sAPPEND_NEWLINE + "\t";
+
+        // Target recorded for a session that has no target selected
+        private const int m_iNO_TARGET = -1;
 
         #endregion
         #region Data members

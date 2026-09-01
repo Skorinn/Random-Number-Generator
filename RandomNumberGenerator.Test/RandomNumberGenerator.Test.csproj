@@ -76,6 +76,7 @@
     <Compile Include="GeneratorForm.Test.cs" />
     <Compile Include="HistogramChart.Test.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="RNGChart.Test.cs" />
     <Compile Include="RNGDevice.Test.cs" />
     <Compile Include="RNGDeviceTimer.Test.cs" />
     <Compile Include="RNGSessionDataFile.Test.cs" />

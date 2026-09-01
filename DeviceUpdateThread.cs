@@ -9,6 +9,7 @@
 //====================================================================================================================
 // 2023/12/03 - Mike Pullen - Original implementation.
 // 2023/12/06 - Mike Pullen - Changed from an always-running watchdog to a thread pool
+// 2026/08/31 - Mike Pullen - Only restore the info box when the reading devices message is still displayed
 //*********************************************************************************************************************
 using System;
 using System.ComponentModel;
@@ -43,7 +44,7 @@ namespace RandomNumberGenerator
                 UpdateDeviceList();
 
                 // Restore the previous info box message
-                UpdateInfoBox(m_sStatusBoxText, m_StatusBoxTextColor, m_StatusBoxBackColor);
+                RestoreInfoBox();
             }
         }
 
@@ -162,6 +163,36 @@ namespace RandomNumberGenerator
             {
                 // Use parent's method which already handles invoke requirements
                 m_Parent.SetStatusBoxState(sText, textColor, backColor);
+            }
+        }
+
+        /// <summary>
+        /// Restores the info box to the state recorded by the backup, but only if the message displayed while
+        /// reading the devices is still the one shown. The device search runs for several seconds, during which
+        /// the user can start a session or an error can be reported, and restoring unconditionally would replace
+        /// those newer messages with a message captured before the search started.
+        /// </summary>
+        private static void RestoreInfoBox()
+        {
+            // Make sure the parent is valid and not terminating early
+            if ((null != m_Parent) && (false == Terminating))
+            {
+                // Get the message currently displayed in the info box
+                string sCurrentText;
+                Color currentTextColor;
+                Color currentBackColor;
+                m_Parent.GetStatusBoxState(out sCurrentText, out currentTextColor, out currentBackColor);
+
+                // Discard the current colors as only the message identifies who owns the info box
+                _ = currentTextColor;
+                _ = currentBackColor;
+
+                // Only restore if nothing has been displayed since the reading devices message
+                bool bInfoBoxUnchanged = (m_sREADING_DEVICES_MESSAGE == sCurrentText);
+                if (bInfoBoxUnchanged)
+                {
+                    UpdateInfoBox(m_sStatusBoxText, m_StatusBoxTextColor, m_StatusBoxBackColor);
+                }
             }
         }
 
