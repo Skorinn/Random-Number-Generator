@@ -436,18 +436,17 @@ namespace RandomNumberGenerator
                     
                     // Load the existing file by setting the file path and triggering a load operation
                     // This approach works through the interface hierarchy rather than directly parsing XML
+                    BeginFileLoad();
                     ThreadPool.QueueUserWorkItem(state =>
                     {
-                        bool bLoadSuccess = LoadExistingSessionFile(sSelectedFile);
-                        
-                        // Update the UI on the main thread
-                        if (InvokeRequired)
+                        try
                         {
-                            Invoke(new Action(() => OnFileLoadCompleted(sSelectedFile, bLoadSuccess)));
+                            bool bLoadSuccess = LoadExistingSessionFile(sSelectedFile);
+                            ReportFileLoadCompleted(() => OnFileLoadCompleted(sSelectedFile, bLoadSuccess));
                         }
-                        else
+                        finally
                         {
-                            OnFileLoadCompleted(sSelectedFile, bLoadSuccess);
+                            EndFileLoad();
                         }
                     });
                 }
@@ -518,18 +517,17 @@ namespace RandomNumberGenerator
                 ShowLoadingProgress(Path.GetFileName(sSelectedFile));
 
                 // Load the baseline file on a background thread
+                BeginFileLoad();
                 ThreadPool.QueueUserWorkItem(state =>
                 {
-                    bool bLoadSuccess = LoadBaselineFile(sSelectedFile);
-
-                    // Update the UI on the main thread
-                    if (InvokeRequired)
+                    try
                     {
-                        Invoke(new Action(() => OnBaselineLoadCompleted(sSelectedFile, bLoadSuccess)));
+                        bool bLoadSuccess = LoadBaselineFile(sSelectedFile);
+                        ReportFileLoadCompleted(() => OnBaselineLoadCompleted(sSelectedFile, bLoadSuccess));
                     }
-                    else
+                    finally
                     {
-                        OnBaselineLoadCompleted(sSelectedFile, bLoadSuccess);
+                        EndFileLoad();
                     }
                 });
             }
@@ -573,18 +571,17 @@ namespace RandomNumberGenerator
                 ShowLoadingProgress(Path.GetFileName(sSelectedFile));
 
                 // Load the result file on a background thread
+                BeginFileLoad();
                 ThreadPool.QueueUserWorkItem(state =>
                 {
-                    bool bLoadSuccess = LoadResultFile(sSelectedFile);
-
-                    // Update the UI on the main thread
-                    if (InvokeRequired)
+                    try
                     {
-                        Invoke(new Action(() => OnResultLoadCompleted(sSelectedFile, bLoadSuccess)));
+                        bool bLoadSuccess = LoadResultFile(sSelectedFile);
+                        ReportFileLoadCompleted(() => OnResultLoadCompleted(sSelectedFile, bLoadSuccess));
                     }
-                    else
+                    finally
                     {
-                        OnResultLoadCompleted(sSelectedFile, bLoadSuccess);
+                        EndFileLoad();
                     }
                 });
             }
@@ -608,13 +605,16 @@ namespace RandomNumberGenerator
             m_StatusTextBox.ForeColor = System.Drawing.Color.Black;
             m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
 
-            // Make sure any running session is stoped
+            // Make sure any session is closed out. The session is ended directly rather than through the
+            // idle transition, which only ends a session while the state is running or paused and so would
+            // not end one now that the state is terminating, nor one left open for appending by a load.
             m_StatusTextBox.Text = m_sCLOSE_STOP_SESSION;
-            StopButton_Click(sender, e);
+            m_Timer.Stop();
+            EndSession();
 
-            // Signal the device update thread to stop and wait for it to complete (10 second timeout)
+            // Signal the background work to stop and wait for it to complete (10 second timeout)
             m_StatusTextBox.Text = m_sCLOSE_STOP_DEVICE_UPDATE;
-            WaitForDeviceUpdate();
+            WaitForBackgroundWork();
         }
 
         #endregion
@@ -629,25 +629,73 @@ namespace RandomNumberGenerator
         }
 
         /// <summary>
-        /// Waits for the device update to finish while continuing to process messages.
-        /// NOTE: The device update thread reports its results by invoking on this thread, so simply blocking
-        /// here would stop it from being able to finish and hold the close up until the wait timed out.
+        /// Waits for the background work to finish while continuing to process messages.
+        /// NOTE: The device update and the file loads report their results by invoking on this thread, so
+        /// simply blocking here would stop them from being able to finish and hold the close up until the
+        /// wait timed out. Waiting for them also keeps the controls alive until nothing is using them.
         /// </summary>
-        private void WaitForDeviceUpdate()
+        private void WaitForBackgroundWork()
         {
             // Do not accept any further input while shutting down, as messages are still being processed
             Enabled = false;
 
-            // Wait in slices, processing messages between them so any pending update can complete
+            // Wait in slices, processing messages between them so any pending work can complete
             const int iWAIT_SLICE = 50;
             const int iWAIT_TIMEOUT = 10000;
             int iWaited = 0;
-            bool bUpdateComplete = m_DeviceUpdateComplete.WaitOne(0);
-            while ((false == bUpdateComplete) && (iWaited < iWAIT_TIMEOUT))
+            bool bWorkComplete = (m_DeviceUpdateComplete.WaitOne(0) && m_FileLoadComplete.WaitOne(0));
+            while ((false == bWorkComplete) && (iWaited < iWAIT_TIMEOUT))
             {
                 Application.DoEvents();
-                bUpdateComplete = m_DeviceUpdateComplete.WaitOne(iWAIT_SLICE);
+                bWorkComplete = (m_DeviceUpdateComplete.WaitOne(iWAIT_SLICE) && m_FileLoadComplete.WaitOne(0));
                 iWaited += iWAIT_SLICE;
+            }
+        }
+
+        /// <summary>
+        /// Records that a file load has started so the form is not disposed while it is running
+        /// </summary>
+        private void BeginFileLoad()
+        {
+            int iActiveLoads = Interlocked.Increment(ref m_iActiveFileLoads);
+            if (1 == iActiveLoads)
+            {
+                m_FileLoadComplete.Reset();
+            }
+        }
+
+        /// <summary>
+        /// Records that a file load has finished
+        /// </summary>
+        private void EndFileLoad()
+        {
+            int iActiveLoads = Interlocked.Decrement(ref m_iActiveFileLoads);
+            if (0 >= iActiveLoads)
+            {
+                m_FileLoadComplete.Set();
+            }
+        }
+
+        /// <summary>
+        /// Reports the result of a file load on the GUI thread, unless the form is being closed
+        /// </summary>
+        /// <param name="loadCompleted">IN - The action that reports the result of the load</param>
+        private void ReportFileLoadCompleted(Action loadCompleted)
+        {
+            // Nothing is reported once the form is closing, as the controls are about to be disposed
+            if (RngGuiStates.Terminating == m_State)
+            {
+                return;
+            }
+
+            // Update the UI on the main thread
+            if (InvokeRequired)
+            {
+                Invoke(loadCompleted);
+            }
+            else
+            {
+                loadCompleted();
             }
         }
 
@@ -1843,6 +1891,10 @@ namespace RandomNumberGenerator
         private int m_iSeed = 0;
         private BindingSource m_DeviceBindingSource;
         private ManualResetEvent m_DeviceUpdateComplete = new ManualResetEvent(false);
+
+        // Tracks file loads running in the background so the form is not disposed while one is using it
+        private ManualResetEvent m_FileLoadComplete = new ManualResetEvent(true);
+        private int m_iActiveFileLoads = 0;
 
         // Statistical analysis for baseline data
         private StatisticalAnalysis m_BaselineAnalysis = null;

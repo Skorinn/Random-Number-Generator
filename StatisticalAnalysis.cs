@@ -54,21 +54,19 @@ namespace RandomNumberGenerator
                 // Create the XML reader for loading the result file
                 RNGXMLReader xmlReader = new RNGXMLReader(sFilePath);
 
-                // Create a temporary session data object to hold the loaded data
-                // We need to create dummy file and timer objects since RNGSessionData requires them
-                RNGXMLWriter dummyWriter = new RNGXMLWriter();
-                RNGSessionDataFile dummyDataFile = new RNGSessionDataFile(dummyWriter, xmlReader);
-                RNGSessionTimer dummyTimer = new RNGSessionTimer();
-                RNGSessionData tempSessionData = new RNGSessionData(dummyDataFile, dummyTimer);
+                // Collect the data points directly rather than loading them into a session. A session holds
+                // a fixed size window of the most recent data, so analysing a file through one would report
+                // on the end of a long session rather than on all of it.
+                DataPointCollector collector = new DataPointCollector();
 
-                // Load the file data into the temporary session data object
+                // Load the file data into the collector
                 const uint iBATCH_SIZE = 10000; // Use large batch size for efficient loading
-                bool bLoadSuccess = xmlReader.LoadFile(tempSessionData, iBATCH_SIZE);
+                bool bLoadSuccess = xmlReader.LoadFile(collector, iBATCH_SIZE);
 
                 if (bLoadSuccess)
                 {
-                    // Extract the data points and convert to List<double>
-                    resultData = tempSessionData.DataPoints.ToList();
+                    // Take the data points that were collected
+                    resultData = collector.CollectedPoints;
 
                     // Create statistical analysis for the loaded data and store it
                     if (resultData.Count > 0)
@@ -247,6 +245,116 @@ namespace RandomNumberGenerator
 
         // Raw data points from loaded file
         private List<double> m_LoadedFileData;
+
+        #endregion
+        #region Helper Types
+
+        /// <summary>
+        /// Collects every data point read from a file for analysis.
+        /// NOTE: This stands in for a session when loading a file to analyse it. A session keeps a fixed
+        /// size window of the most recent data and recalculates its statistics for every point added, so
+        /// loading through one would both discard the earlier part of a long file and take a length of time
+        /// that grows with the square of the number of points.
+        /// </summary>
+        private class DataPointCollector : IRNGSessionData
+        {
+            #region Methods
+
+            /// <summary>
+            /// Collects a batch of data points read from the file
+            /// </summary>
+            /// <param name="dataPoints">IN - The data points to collect</param>
+            /// <param name="uMaxCount">IN - Maximum number to take from the batch (0 = no limit)</param>
+            /// <returns>true if successful; otherwise, false</returns>
+            public bool LoadDataPointsBatch(System.Collections.Generic.IEnumerable<double> dataPoints, uint uMaxCount = 0)
+            {
+                if (null == dataPoints)
+                {
+                    return false;
+                }
+
+                uint uCollected = 0;
+                foreach (double fDataPoint in dataPoints)
+                {
+                    if ((0 < uMaxCount) && (uCollected >= uMaxCount))
+                    {
+                        break;
+                    }
+
+                    m_CollectedPoints.Add(fDataPoint);
+                    ++uCollected;
+                }
+
+                return true;
+            }
+
+            /// <summary>
+            /// Discards anything collected so far, ready for a new file
+            /// </summary>
+            public void Reset()
+            {
+                m_CollectedPoints.Clear();
+            }
+
+            // The rest of the session behaviour is not used when collecting data points from a file
+            public bool AddDataPoint(double fDataPoint) { _ = fDataPoint; return false; }
+            public void EndSession() { }
+            public bool LoadSession(string sFilePath) { _ = sFilePath; return false; }
+            public void PauseSession() { }
+            public void ResumeSession() { }
+            public bool StartSession() { return false; }
+            public bool WritePendingData(bool bFlush = false) { _ = bFlush; return true; }
+
+            #endregion
+            #region Properties
+
+            /// <summary>
+            /// Every data point collected from the file, in the order they were recorded (read-only)
+            /// </summary>
+            public List<double> CollectedPoints { get => m_CollectedPoints; }
+
+            /// <summary>
+            /// Number of data points collected so far (read-only)
+            /// </summary>
+            public int NumDataPoints { get => m_CollectedPoints.Count; }
+
+            /// <summary>
+            /// Whether the data in the file was simulated
+            /// </summary>
+            public bool Simulated { get; set; }
+
+            /// <summary>
+            /// Target value recorded in the file
+            /// </summary>
+            public int TargetValue { get; set; }
+
+            /// <summary>
+            /// Path of the file the data was collected from
+            /// </summary>
+            public string FilePath { get; set; } = string.Empty;
+
+            // The remaining session properties are not used when collecting data points from a file
+            public double CurrentAverage { get => 0.0; }
+            public double MeanDeviation { get => 0.0; }
+            public double StandardDeviation { get => 0.0; }
+            public System.Collections.Concurrent.ConcurrentQueue<double> DataPoints { get; set; } = new System.Collections.Concurrent.ConcurrentQueue<double>();
+            public int DataWindowSize { get; set; }
+            public string LastError { get => string.Empty; }
+            public bool InProgress { get => false; }
+            public double MaxPoint { get => double.NaN; }
+            public double MinPoint { get => double.NaN; }
+            public string SessionTime { get => string.Empty; }
+            public IRNGSessionTimer Timer { get => null; }
+            public uint WriteFileInterval { get => 0; }
+            public DataPointAddedDelegate DataPointAddedCallback { get; set; }
+
+            #endregion
+            #region Data Members
+
+            private readonly List<double> m_CollectedPoints = new List<double>();
+
+            #endregion
+        }
 
         #endregion
     }

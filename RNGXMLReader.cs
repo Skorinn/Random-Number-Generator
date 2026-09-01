@@ -383,7 +383,7 @@ namespace RandomNumberGenerator
         {
             // Read the inner text of the Data element
             string sDataValue = string.Empty;
-            
+
             // If we're positioned on a Data element, read its content
             if (m_Reader.NodeType == XmlNodeType.Element && m_Reader.Name == XMLConstants.DATA_ELEMENT)
             {
@@ -391,7 +391,18 @@ namespace RandomNumberGenerator
                 bool bReadSuccess = m_Reader.Read();
                 if (bReadSuccess && m_Reader.NodeType == XmlNodeType.Text)
                 {
-                    sDataValue = m_Reader.Value;
+                    string sElementText = m_Reader.Value;
+
+                    // The value is only taken once the element that holds it has been closed. A file that
+                    // the application was stopped part way through writing can end inside a Data element,
+                    // and the digits written so far are not the value that was being recorded.
+                    bool bEndReadSuccess = m_Reader.Read();
+                    bool bElementClosed = (bEndReadSuccess && (XmlNodeType.EndElement == m_Reader.NodeType) &&
+                                           (XMLConstants.DATA_ELEMENT == m_Reader.Name));
+                    if (bElementClosed)
+                    {
+                        sDataValue = sElementText;
+                    }
                 }
             }
 

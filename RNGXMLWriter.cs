@@ -454,8 +454,27 @@ namespace RandomNumberGenerator
                         return true;
                     }
 
-                    // Case 3: the session was never closed, so the file is already open for the data to be
-                    // appended to it and nothing has to be changed
+                    // Case 3: the session was never closed, so the file is already open for data to be added
+                    // to it. Anything after the last complete data point is discarded first, as a file that
+                    // the application was stopped part way through writing can end inside a data element,
+                    // and appending after that fragment would leave the file malformed.
+                    byte[] closingDataTag = System.Text.Encoding.UTF8.GetBytes($"</{XMLConstants.DATA_ELEMENT}>");
+                    int iClosingDataIndex = FindLastPattern(endBlock, closingDataTag);
+                    if (0 <= iClosingDataIndex)
+                    {
+                        // Keep everything up to and including the last complete data point
+                        fileStream.SetLength(lEndBlockStart + iClosingDataIndex + closingDataTag.Length);
+                    }
+                    else
+                    {
+                        // No complete data point was written, so keep only the session tag itself
+                        int iSessionTagEnd = FindByte(startBlock, m_byTAG_END, iSessionIndex);
+                        if (0 <= iSessionTagEnd)
+                        {
+                            fileStream.SetLength(iSessionTagEnd + 1);
+                        }
+                    }
+
                     return true;
                 }
             }
@@ -505,6 +524,26 @@ namespace RandomNumberGenerator
             }
 
             return block;
+        }
+
+        /// <summary>
+        /// Finds the first occurrence of a byte in a block, starting from the specified index
+        /// </summary>
+        /// <param name="block">IN - The block to search</param>
+        /// <param name="value">IN - The byte to search for</param>
+        /// <param name="iStartIndex">IN - Index in the block to start searching from</param>
+        /// <returns>Index of the first occurrence at or after the start; -1 if the byte is not present</returns>
+        private static int FindByte(byte[] block, byte value, int iStartIndex)
+        {
+            for (int iIndex = Math.Max(0, iStartIndex); iIndex < block.Length; iIndex++)
+            {
+                if (value == block[iIndex])
+                {
+                    return iIndex;
+                }
+            }
+
+            return -1;
         }
 
         /// <summary>
@@ -756,6 +795,9 @@ namespace RandomNumberGenerator
 
         // Size of the blocks read from the ends of the file when preparing it for appending
         private const int m_iSEARCH_BLOCK_SIZE = 8192;
+
+        // Byte that ends an XML tag
+        private const byte m_byTAG_END = 0x3E; // >
 
         // Limit on searching a whole file, which is only reached by a file not written by the application
         private const int m_iMAX_SEARCH_SIZE = 64 * 1024 * 1024;
