@@ -80,7 +80,7 @@ namespace RandomNumberGenerator
 
         /// <summary>
         /// Initializing constructor
-        /// <\summary>
+        /// </summary>
         /// <param name="dataFile">IN - File to which to write the data (cannot be null)</param>
         /// <param name="timer">IN - Timer for the session (cannot be null)</param>
         public RNGSessionData(IRNGSessionDataFile dataFile, IRNGSessionTimer timer)

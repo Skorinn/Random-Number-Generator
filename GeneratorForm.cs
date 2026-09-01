@@ -31,7 +31,7 @@ namespace RandomNumberGenerator
 {
     /// <summary>
     /// Interface for the Random Number Generator form
-    /// <\summary>
+    /// </summary>
     public interface IGeneratorForm : ISynchronizeInvoke
     {
         BindingList<IRNGDevice> DeviceList { set; }
@@ -622,7 +622,7 @@ namespace RandomNumberGenerator
 
         /// <summary>
         /// Implementation of Invoke as needed by the ISynchronizeInvoke interface
-        /// <\summary>
+        /// </summary>
         public object Invoke(Action method)
         {
             return base.Invoke(method);

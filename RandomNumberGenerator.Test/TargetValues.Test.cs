@@ -120,7 +120,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests the ToString method with an invalid value
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void ToString_Invalid_Null()
@@ -150,7 +150,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests the ToInt method with a valid string
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void ToInt_Valid_Success()
@@ -200,7 +200,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests the ToInt method with an invalid string
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void ToInt_Invalid_NoValue()
@@ -230,7 +230,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests the GetStringAt method with a valid index
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void GetStringAt_Valid_Success()
@@ -280,7 +280,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests the GetStringAt method with an invalid index
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void GetStringAt_Invalid_Null()
@@ -310,7 +310,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests the GetValueAt method with a valid index
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void GetValueAt_Valid_Success()
@@ -360,7 +360,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests the GetValueAt method with an invalid index
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void GetValueAt_Invalid_NoValue()

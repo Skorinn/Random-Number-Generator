@@ -138,7 +138,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests the properties are set correctly using the initializing constructor
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void Constructor_Initializing_Properties()
@@ -169,7 +169,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests WriteDataPoint with a valid writer
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void WriteDataPoint_ValidWriter_Success()
@@ -214,7 +214,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests WriteDataPoint with a null writer
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void WriteDataPoint_NullWriter_Failure()
@@ -281,7 +281,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests the SessionTime property
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void SessionTime_SetProperty_PropertiesCorrect()
@@ -313,7 +313,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests the DataPoint property
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void DataPoint_SetProperty_PropertiesCorrect()

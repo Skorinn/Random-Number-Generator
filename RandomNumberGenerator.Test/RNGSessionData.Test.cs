@@ -289,7 +289,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests resetting the session
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void Reset_SessionDataReset()
@@ -338,7 +338,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests setting the DataPoints property
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void DataPoints_SetProperty_PropertiesCorrect()
@@ -388,7 +388,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests setting the DataWindowSize property
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void DataWindowSize_SetProperty_PropertiesCorrect()
@@ -426,7 +426,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests setting the TargetValue property
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void TargetValue_SetProperty_PropertiesCorrect()
@@ -464,7 +464,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests setting the Simulated property true
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void Simulated_SetProperty_True()
@@ -502,7 +502,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests setting the Simulated property false
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void Simulated_SetProperty_False()
@@ -600,7 +600,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests that end session ends the file session but writes no data if none is pending
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void EndSession_NoData_FileSessionEnded()
@@ -795,7 +795,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests WritePendingData does not write if no pending data and false is specified
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void WritePendingData_False_NoDataWritten()

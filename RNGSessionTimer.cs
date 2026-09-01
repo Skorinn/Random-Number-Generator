@@ -1,13 +1,14 @@
 ﻿//*********************************************************************************************************************
-// File Name:      DeviceUpdateThread.cs
-// Description:    Thread for asynchronously updating the device list
+// File Name:      RNGSessionTimer.cs
+// Description:    Timer for tracking the elapsed time of a Random Number Generator session
 //
 // Copyright (C) 2024 Mike Pullen. All Rights Reserved.
 // Confidential and Proprietary
 //
-// Revision History: 
+// Revision History:
 //====================================================================================================================
 // 2024/02/03 - Mike Pullen - Original implementation.
+// 2026/09/01 - Mike Pullen - Corrected the file header and rolled the session time over at 60 rather than 61
 //*********************************************************************************************************************
 using System;
 using System.Windows.Forms;
@@ -152,13 +153,13 @@ namespace RandomNumberGenerator
                     m_iSessionMilliseconds -= 1000;
                 }
 
-                if (m_iSessionSeconds > 60)
+                if (m_iSessionSeconds >= 60)
                 {
                     ++m_iSessionMinutes;
                     m_iSessionSeconds -= 60;
                 }
 
-                if (m_iSessionMinutes > 60)
+                if (m_iSessionMinutes >= 60)
                 {
                     ++m_iSessionHours;
                     m_iSessionMinutes -= 60;

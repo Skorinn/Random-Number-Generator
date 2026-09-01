@@ -161,7 +161,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests the constructor generates an exception if the device timer is null
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         [ExpectedException(typeof(System.ArgumentNullException))]
@@ -190,7 +190,7 @@ namespace RandomNumberGenerator.Test
 
         // <summary>
         // Test for get and set for the FileBrowseActive property using true
-        // <\summary>
+        // </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void FileBrowseActive_SetProperty_True()
@@ -228,7 +228,7 @@ namespace RandomNumberGenerator.Test
 
         // <summary>
         // Test for get and set for the FileBrowseActive property using false
-        // <\summary>
+        // </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void FileBrowseActive_SetProperty_False()
@@ -266,7 +266,7 @@ namespace RandomNumberGenerator.Test
 
         // <summary>
         // Test for get and set for the StatusBoxText property
-        // <\summary>
+        // </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void StatusBoxText_SetProperty_PropertiesCorrect()
@@ -307,7 +307,7 @@ namespace RandomNumberGenerator.Test
 
         // <summary>
         // Test for get and set for the StatusBoxTextColor property
-        // <\summary>
+        // </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void StatusBoxTextColor_SetProperty_PropertiesCorrect()
@@ -348,7 +348,7 @@ namespace RandomNumberGenerator.Test
 
         // <summary>
         // Test for get and set for the StatusBoxBackColor property
-        // <\summary>
+        // </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void StatusBoxBackColor_SetProperty_PropertiesCorrect()

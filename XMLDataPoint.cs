@@ -65,9 +65,12 @@ namespace RandomNumberGenerator
             try
             {
                 // <Data Time="01:30:45">0.123456789</Data>
+                // NOTE: The value is written with the invariant culture so the file holds the same text
+                // wherever it is written, rather than picking up a decimal separator that a machine in
+                // another region would read back as a different number.
                 writer.WriteStartElement(XMLConstants.DATA_ELEMENT);
                 writer.WriteAttributeString(XMLConstants.TIME_ATTRIBUTE, m_sSessionTime);
-                writer.WriteValue(m_fDataPoint.ToString());
+                writer.WriteValue(m_fDataPoint.ToString(System.Globalization.CultureInfo.InvariantCulture));
                 writer.WriteEndElement();
                 writer.Flush();
             }

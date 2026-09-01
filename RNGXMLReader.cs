@@ -395,7 +395,11 @@ namespace RandomNumberGenerator
                 }
             }
 
-            bool bDataPointParsed = double.TryParse(sDataValue, out double fDataPoint);
+            // The value is parsed with the invariant culture to match how it is written, so a file written
+            // in one region is read back as the same number in another
+            double fDataPoint;
+            bool bDataPointParsed = double.TryParse(sDataValue, System.Globalization.NumberStyles.Float,
+                                                    System.Globalization.CultureInfo.InvariantCulture, out fDataPoint);
             if (bDataPointParsed)
             {
                 dataBatch.Add(fDataPoint);

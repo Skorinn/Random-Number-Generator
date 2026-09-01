@@ -46,7 +46,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Simulates the timer ticks for the specified interval and number of ticks
-        /// <\summary>
+        /// </summary>
         /// <param name="sessionTimer">INOUT - The session timer to simulate ticks</param>
         /// <param name="iInterval">IN - The interval for each tick</param>
         /// <param name="iNumTicks">IN - The number of ticks to simulate</param>
@@ -95,7 +95,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests the Start method sets the Enabled and InProgress properties to true
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void Start_EnabledandInProgressPropertiesAreTrue()
@@ -127,7 +127,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests the Stop method sets the Enabled and InProgress properties to false
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void Stop_RunningPropertyIsFalse()
@@ -157,7 +157,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests the Tick method updates the session timer using the default interval
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void Tick_DefaultInterval_SessionTimeUpdated()
@@ -193,7 +193,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests the Tick method updates the session timer using a non-default interval
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void Tick_NonDefaultInterval_SessionTimeUpdated()
@@ -322,7 +322,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Verify the Interval property cna be set and read back
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void Interval_PropertyIsSet()
@@ -350,7 +350,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Test setting the TimerTextBox property
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void TimerTextBox_PropertyIsSet()

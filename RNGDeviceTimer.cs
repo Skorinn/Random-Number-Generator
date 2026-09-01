@@ -116,7 +116,7 @@ namespace RandomNumberGenerator
 
         /// <summary>
         /// Starts the timer
-        /// <\summary>
+        /// </summary>
         public void Start()
         {
             m_Timer.Start();

@@ -137,9 +137,10 @@ namespace RandomNumberGenerator
                 bool bValid = IsValid();
                 if (bValid)
                 {
-                    // Write the session start
-                    m_bSessionInProgress = true;
+                    // Write the session start, recording the session as in progress only once it is, so a
+                    // write that reports failure does not leave the file looking like it holds a session
                     bStatus = m_Writer.WriteSessionStart(sessionData.Simulated, sessionData.TargetValue);
+                    m_bSessionInProgress = bStatus;
                 }
                 else
                 {
@@ -259,6 +260,12 @@ namespace RandomNumberGenerator
                     // Re-throw InvalidDataException (from XML reader errors) to be handled by calling code
                     throw;
                 }
+                catch (InvalidOperationException)
+                {
+                    // Re-throw InvalidOperationException, which already describes the problem for the user,
+                    // rather than wrapping it in a general message
+                    throw;
+                }
                 catch (Exception generalException)
                 {
                     // Wrap other exceptions with file context
@@ -280,15 +287,25 @@ namespace RandomNumberGenerator
         /// <param name="sFilePath">IN - Path to the file to prepare for appending</param>
         private void PrepareWriterForAppend(string sFilePath)
         {
-            // Set the session as in progress since we loaded an existing session
-            // The file is already open and contains a session start tag
-            m_bSessionInProgress = true;
-            
             // Configure the writer for append mode with the specific file path
+            bool bPrepared = false;
             if (null != m_Writer)
             {
-                m_Writer.PrepareForAppend(sFilePath);
+                bPrepared = m_Writer.PrepareForAppend(sFilePath);
             }
+
+            // Preparing the file has to succeed before the session can be recorded as in progress. Reporting
+            // the session as in progress when it is not would leave data being written through a writer that
+            // was never set up, and reporting it as not in progress would let the next session start
+            // overwrite the file that has just been loaded.
+            if (false == bPrepared)
+            {
+                throw new InvalidOperationException($" Unable to prepare '{Path.GetFileName(sFilePath)}' for" +
+                                                    $" appending, so the session cannot be continued.");
+            }
+
+            // The file is already open and contains a session start tag
+            m_bSessionInProgress = true;
         }
 
         /// <summary>

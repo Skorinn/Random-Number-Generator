@@ -11,6 +11,7 @@
 //*********************************************************************************************************************
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
+using System;
 using System.IO;
 
 namespace RandomNumberGenerator.Test
@@ -161,7 +162,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests StartSession() method works correctly when the writer is valid
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void StartSession_ValidWriter_Success()
@@ -276,7 +277,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests WriteDataPoint() method generates an error when the writer is valid but no session was started
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void WriteDataPoint_ValidWriterNoSession_Failure()
@@ -316,7 +317,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests WriteDataPoint() method works correctly when the writer is valid and a session is in progress
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void WriteDataPoint_ValidWriterSession_Success()
@@ -328,6 +329,7 @@ namespace RandomNumberGenerator.Test
             // Mock the IRNGSessionFileWriter interface
             var xmlWriterMock = new Mock<IRNGSessionFileWriter>();
             xmlWriterMock.Setup(mock => mock.FilePath).Returns(m_sTEST_FILE_PATH);
+            xmlWriterMock.Setup(mock => mock.WriteSessionStart(It.IsAny<bool>(), It.IsAny<int>())).Returns(true);
             xmlWriterMock.Setup(mock => mock.WriteDataPoint(It.IsAny<IXMLDataPoint>())).Returns(true).Verifiable(); ;
 
             // Mock the data point interface
@@ -392,7 +394,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests EndSession() method works correctly when the writer is valid
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void EndSession_ValidWriter_Success()
@@ -427,7 +429,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests EndSession() method returns false when the writer is invalid
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void EndSession_InvalidWriter_Failure()
@@ -465,7 +467,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests the FileProperty property works correctly
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void FileProperty_SetProperty_PropertiesCorrect()
@@ -501,7 +503,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests the valid property when the file path is valid
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void Valid_ValidFilePath_True()
@@ -534,7 +536,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests the valid property when the file path is not valid
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void Valid_InvalidFilePath_False()
@@ -566,6 +568,76 @@ namespace RandomNumberGenerator.Test
 
             // Verify the the property was set correctly
             Assert.IsFalse(sessionDataFile.IsValid());
+        }
+
+        /// <summary>
+        /// Tests a session start that reports failure does not leave a session recorded as in progress
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void StartSession_WriteSessionStartFails_SessionNotInProgress()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Mock a writer that reports the session start failed without throwing
+            var xmlWriterMock = new Mock<IRNGSessionFileWriter>();
+            xmlWriterMock.Setup(mock => mock.FilePath).Returns(m_sTEST_FILE_PATH);
+            xmlWriterMock.Setup(mock => mock.WriteSessionStart(It.IsAny<bool>(), It.IsAny<int>())).Returns(false);
+
+            // Create the object under test
+            RNGSessionDataFile sessionDataFile = new RNGSessionDataFile(xmlWriterMock.Object);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            bool bStatus = sessionDataFile.StartSession(new Mock<IRNGSessionData>().Object);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the failure is reported and no session is left recorded against the file
+            Assert.IsFalse(bStatus);
+            Assert.IsFalse(sessionDataFile.SessionInProgress);
+        }
+
+        /// <summary>
+        /// Tests a file that cannot be prepared for appending is reported rather than being treated as loaded
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void LoadSession_PrepareForAppendFails_ThrowsAndNoSessionInProgress()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Mock a writer that reports it cannot prepare the file for appending
+            var xmlWriterMock = new Mock<IRNGSessionFileWriter>();
+            xmlWriterMock.SetupProperty(mock => mock.FilePath, m_sTEST_FILE_PATH);
+            xmlWriterMock.Setup(mock => mock.PrepareForAppend(It.IsAny<string>())).Returns(false);
+
+            // Mock a reader that loads the file successfully
+            var xmlReaderMock = new Mock<IRNGSessionFileReader>();
+            xmlReaderMock.SetupProperty(mock => mock.FilePath);
+            xmlReaderMock.Setup(mock => mock.LoadFile(It.IsAny<IRNGSessionData>(), It.IsAny<uint>())).Returns(true);
+
+            // Create the object under test
+            RNGSessionDataFile sessionDataFile = new RNGSessionDataFile(xmlWriterMock.Object, xmlReaderMock.Object);
+
+            //**************************************************************//
+            // Act & Assert
+            //**************************************************************//
+
+            // Verify the failure to prepare the file is reported rather than passing silently
+            Assert.ThrowsException<InvalidOperationException>(() =>
+                sessionDataFile.LoadSession(new Mock<IRNGSessionData>().Object, m_sTEST_FILE_PATH));
+
+            // Verify no session is left recorded against a file that was not prepared
+            Assert.IsFalse(sessionDataFile.SessionInProgress);
         }
 
         #endregion

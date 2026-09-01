@@ -19,7 +19,7 @@ namespace RandomNumberGenerator.Test
 {
     /// <summary
     /// Mock implementation of the IXMLDataPoint interface
-    /// <\summary>
+    /// </summary>
     public class MockXMLDataPoint : IXMLDataPoint
     {
         /// <summary>
@@ -168,7 +168,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests WriteSessionStart() method works correctly when the writer is valid
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void WriteSessionStart_Valid_Success()
@@ -216,7 +216,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests WriteSessionStart() method generates exception if the writer is not valid
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         [ExpectedException(typeof(InvalidOperationException))]
@@ -279,7 +279,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests WriteDataPoint() method returns true if the data point write is successful
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void WriteDataPoint_Success_ReturnsTrue()
@@ -316,7 +316,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests WriteDataPoint() method generates exception if the data point fails to write
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         [ExpectedException(typeof(InvalidOperationException))]
@@ -462,7 +462,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Tests WriteSessionEnd() method works correctly when no data points have been written
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void WriteSessionEnd_NoData_Success()
@@ -535,7 +535,7 @@ namespace RandomNumberGenerator.Test
 
         /// <summary>
         /// Test the FilePath property works correctly
-        /// <\summary>
+        /// </summary>
         [TestMethod]
         [TestCategory("Component")]
         public void FilePath_SetProperty_PropertiesCorrect()
