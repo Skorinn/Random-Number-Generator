@@ -10,6 +10,7 @@
 // 2023/12/03 - Mike Pullen - Original implementation.
 // 2023/12/06 - Mike Pullen - Changed from an always-running watchdog to a thread pool
 // 2026/08/31 - Mike Pullen - Only restore the info box when the reading devices message is still displayed
+// 2026/09/01 - Mike Pullen - Release the searches run for each controller when they are finished with
 //*********************************************************************************************************************
 using System;
 using System.ComponentModel;
@@ -69,41 +70,47 @@ namespace RandomNumberGenerator
                         string[] sDependentSplit = System.Text.RegularExpressions.Regex.Split(sDependent, "DeviceID=");
                         string sDeviceID = sDependentSplit[1];
 
-                        // Search all of the USB devices found with this device ID (should only be 1)
-                        ManagementObjectSearcher deviceSearcher = new ManagementObjectSearcher(@"Select * From Win32_PnPEntity Where DeviceID=" + sDeviceID);
-                        ManagementObjectCollection deviceCollection = deviceSearcher.Get();
-
-                        foreach (ManagementBaseObject device in deviceCollection)
+                        // Search all of the USB devices found with this device ID (should only be 1).
+                        // The searcher and the results it returns are released once each controller has been
+                        // looked at, as the search is run for every controller every time the devices are
+                        // updated and holding on to them would leak the resources behind them.
+                        using (ManagementObjectSearcher deviceSearcher = new ManagementObjectSearcher(@"Select * From Win32_PnPEntity Where DeviceID=" + sDeviceID))
                         {
-                            // Attempt to get the name of the device
-                            object oName = device.GetPropertyValue("Name");
-                            if (null != oName)
+                            using (ManagementObjectCollection deviceCollection = deviceSearcher.Get())
                             {
-                                // Check if this is a USB serial device
-                                string sDeviceName = (string)oName;
-                                string sSerialDeviceRegex = @".*USB.*Serial.*COM\d+.*";
-                                bool bSerialDevice = Regex.IsMatch(sDeviceName, sSerialDeviceRegex, RegexOptions.IgnoreCase);
-                                if (bSerialDevice)
+                                foreach (ManagementBaseObject device in deviceCollection)
                                 {
-                                    // Extract the port name and number
-                                    string sComPortRegex = @"COM\d+";
-                                    string sComName = Regex.Match(sDeviceName, sComPortRegex, RegexOptions.IgnoreCase).Value;
-                                    string sPortNumRegex = @"\d+";
-                                    string sPortNumString = Regex.Match(sComName, sPortNumRegex, RegexOptions.IgnoreCase).Value;
-                                    int iPortNum = Convert.ToInt32(sPortNumString);
+                                    // Attempt to get the name of the device
+                                    object oName = device.GetPropertyValue("Name");
+                                    if (null != oName)
+                                    {
+                                        // Check if this is a USB serial device
+                                        string sDeviceName = (string)oName;
+                                        string sSerialDeviceRegex = @".*USB.*Serial.*COM\d+.*";
+                                        bool bSerialDevice = Regex.IsMatch(sDeviceName, sSerialDeviceRegex, RegexOptions.IgnoreCase);
+                                        if (bSerialDevice)
+                                        {
+                                            // Extract the port name and number
+                                            string sComPortRegex = @"COM\d+";
+                                            string sComName = Regex.Match(sDeviceName, sComPortRegex, RegexOptions.IgnoreCase).Value;
+                                            string sPortNumRegex = @"\d+";
+                                            string sPortNumString = Regex.Match(sComName, sPortNumRegex, RegexOptions.IgnoreCase).Value;
+                                            int iPortNum = Convert.ToInt32(sPortNumString);
 
-                                    // Add the device to the list
-                                    RNGDevice currentDevice = new RNGDevice(sComName, iPortNum);
-                                    m_DeviceList.Add(currentDevice);
-                                } // END: if (bSerialDevice)
-                            } // END: if (null != oName)
+                                            // Add the device to the list
+                                            RNGDevice currentDevice = new RNGDevice(sComName, iPortNum);
+                                            m_DeviceList.Add(currentDevice);
+                                        } // END: if (bSerialDevice)
+                                    } // END: if (null != oName)
 
-                            // Break out of the loop if the thread was terminated early
-                            if (Terminating)
-                            {
-                                break;
-                            }
-                        } // END: foreach (ManagementBaseObject device in deviceCollection)
+                                    // Break out of the loop if the thread was terminated early
+                                    if (Terminating)
+                                    {
+                                        break;
+                                    }
+                                } // END: foreach (ManagementBaseObject device in deviceCollection)
+                            } // END: using (ManagementObjectCollection deviceCollection = deviceSearcher.Get())
+                        } // END: using (ManagementObjectSearcher deviceSearcher = new ManagementObjectSearcher(...))
 
                         // Break out of the loop if the thread was terminated early
                         if (Terminating)
@@ -142,7 +149,7 @@ namespace RandomNumberGenerator
         /// </summary>
         private static void BackupInfoBox()
         {
-            // Make sure the parent is valid and not terminaating early
+            // Make sure the parent is valid and not terminating early
             if ((null != m_Parent) && (false == Terminating))
             {
                 // Get the current status box state through the parent's interface
@@ -158,7 +165,7 @@ namespace RandomNumberGenerator
         /// <param name="backColor">IN - Background color to set for the info box</param>
         private static void UpdateInfoBox(string sText, Color textColor, Color backColor)
         {
-            // Make sure the parent is valid and not terminaating early
+            // Make sure the parent is valid and not terminating early
             if ((null != m_Parent) && (false == Terminating))
             {
                 // Use parent's method which already handles invoke requirements

@@ -621,7 +621,7 @@ namespace RandomNumberGenerator
         private double[] DataPointSnapshot { get => (null == m_DataPoints) ? new double[0] : m_DataPoints.ToArray(); }
 
         /// <summary>
-        /// Formated session time string (read-only)
+        /// Formatted session time string (read-only)
         /// </summary>
         public string SessionTime { get => (null == m_Timer) ? "" : m_Timer.SessionTime; }
 

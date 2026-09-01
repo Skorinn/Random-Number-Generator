@@ -29,7 +29,7 @@ namespace RandomNumberGenerator
         /// Loads a result file using RNGXMLReader and creates statistical analysis from the data
         /// </summary>
         /// <param name="sFilePath">IN - Path to the XML result file to load</param>
-        /// <returns>List of double values from the loaded file, or null if loading fails</returns>
+        /// <returns>List of the data points loaded from the file</returns>
         /// <exception cref="ArgumentException">Thrown when sFilePath is null or empty</exception>
         /// <exception cref="System.IO.FileNotFoundException">Thrown when the specified file does not exist</exception>
         /// <exception cref="System.IO.IOException">Thrown when file I/O operations fail</exception>

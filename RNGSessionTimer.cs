@@ -230,7 +230,7 @@ namespace RandomNumberGenerator
         }
 
         /// <summary>
-        /// Formated session time string (read-only)
+        /// Formatted session time string (read-only)
         /// </summary>
         public string SessionTime
         {
