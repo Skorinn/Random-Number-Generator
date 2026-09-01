@@ -88,10 +88,22 @@ namespace RandomNumberGenerator
             bool bExtremeDropped = false;
             if (DataPoints.Count >= MaxDataSize)
             {
-                // Record whether the point rolling off the chart is one of the tracked extremes, as the
-                // extremes have to be recalculated when the point they were taken from is removed
+                // Count the point rolling off the chart out of the extremes. The same value is often
+                // displayed many times over, so the extremes are only out of date once the last point
+                // holding one has gone, rather than every time one of them is dropped.
                 double fDroppedPoint = DataPoints[0].YValues[0];
-                bExtremeDropped = ((fDroppedPoint >= m_fMaxPoint) || (fDroppedPoint <= m_fMinPoint));
+                if (fDroppedPoint >= m_fMaxPoint)
+                {
+                    --m_iMaxPointCount;
+                    bExtremeDropped = (0 >= m_iMaxPointCount);
+                }
+
+                if (fDroppedPoint <= m_fMinPoint)
+                {
+                    --m_iMinPointCount;
+                    bExtremeDropped = (bExtremeDropped || (0 >= m_iMinPointCount));
+                }
+
                 DataPoints.RemoveAt(0);
             }
             DataPoints.AddY(fDataPoint);
@@ -113,14 +125,26 @@ namespace RandomNumberGenerator
             }
             else
             {
+                // A new extreme replaces the old one and its count starts again, while a point equal to the
+                // one already held adds to how many points are keeping that extreme in place
                 if (fDataPoint > m_fMaxPoint)
                 {
                     m_fMaxPoint = fDataPoint;
+                    m_iMaxPointCount = 1;
+                }
+                else if (fDataPoint == m_fMaxPoint)
+                {
+                    ++m_iMaxPointCount;
                 }
 
                 if (fDataPoint < m_fMinPoint)
                 {
                     m_fMinPoint = fDataPoint;
+                    m_iMinPointCount = 1;
+                }
+                else if (fDataPoint == m_fMinPoint)
+                {
+                    ++m_iMinPointCount;
                 }
             }
 
@@ -140,9 +164,11 @@ namespace RandomNumberGenerator
             Series AverageSeries = Series[(int)SeriesIndex.AverageSeries];
             AverageSeries.Points.Clear();
 
-            // Reset the tracked extremes to the center of the chart
+            // Reset the tracked extremes to the center of the chart, held by the single point just added
             m_fMaxPoint = m_fCENTER;
             m_fMinPoint = m_fCENTER;
+            m_iMaxPointCount = 1;
+            m_iMinPointCount = 1;
 
             // Reset the Y-Axis
             Axis AverageChartYAxis = ChartAreas[0].AxisY;
@@ -159,8 +185,10 @@ namespace RandomNumberGenerator
             // Start from the center so an empty series leaves the limits at their defaults
             double fMax = m_fCENTER;
             double fMin = m_fCENTER;
+            int iMaxCount = 0;
+            int iMinCount = 0;
 
-            // Walk the displayed points for the extremes
+            // Walk the displayed points for the extremes, counting how many points hold each of them
             foreach (DataPoint currentPoint in dataPoints)
             {
                 double fCurrentValue = currentPoint.YValues[0];
@@ -168,16 +196,28 @@ namespace RandomNumberGenerator
                 if (fCurrentValue > fMax)
                 {
                     fMax = fCurrentValue;
+                    iMaxCount = 1;
+                }
+                else if (fCurrentValue == fMax)
+                {
+                    ++iMaxCount;
                 }
 
                 if (fCurrentValue < fMin)
                 {
                     fMin = fCurrentValue;
+                    iMinCount = 1;
+                }
+                else if (fCurrentValue == fMin)
+                {
+                    ++iMinCount;
                 }
             }
 
             m_fMaxPoint = fMax;
             m_fMinPoint = fMin;
+            m_iMaxPointCount = iMaxCount;
+            m_iMinPointCount = iMinCount;
         }
 
         /// <summary>
@@ -233,6 +273,11 @@ namespace RandomNumberGenerator
         // Extremes of the data currently displayed on the chart
         private double m_fMaxPoint = m_fCENTER;
         private double m_fMinPoint = m_fCENTER;
+
+        // How many of the displayed points hold each extreme, so a rescan is only needed once the last of
+        // them has rolled off the chart
+        private int m_iMaxPointCount = 1;
+        private int m_iMinPointCount = 1;
 
         #endregion
     }

@@ -227,6 +227,22 @@ namespace RandomNumberGenerator
         /// <param name="fDataPoint">IN - The new data point to record</param>
         private void RecordDataPoint(double fDataPoint)
         {
+            // Add the point to the data set
+            AddPointToDataSet(fDataPoint);
+
+            // Update the statistics for the data set the point was added to
+            UpdateStatistics();
+
+            // Invoke the callback if it's set with the data point and the current running average
+            DataPointAddedCallback?.Invoke(fDataPoint, m_fCurrentAverage);
+        }
+
+        /// <summary>
+        /// Adds a data point to the data set, making room for it if the set is full
+        /// </summary>
+        /// <param name="fDataPoint">IN - The new data point to add</param>
+        private void AddPointToDataSet(double fDataPoint)
+        {
             // Since we have to walk the data to calculate standard devication a lock is
             // required, even though ConcurrentQueue is used, to ensure elements are not added
             // or removed while we are evaluating the data
@@ -242,22 +258,6 @@ namespace RandomNumberGenerator
                 // Add the point to the data set
                 m_DataPoints.Enqueue(fDataPoint);
             }
-
-            // Update the current fAverage and count
-            Interlocked.Exchange(ref m_fCurrentAverage, m_DataPoints.Average());
-            Interlocked.Exchange(ref m_iNumDataPoints, m_DataPoints.Count);
-
-            // Calculate the mean deviation
-            double fMeanDev = 0.5 - m_fCurrentAverage;
-            fMeanDev = Math.Abs(fMeanDev);
-            Interlocked.Exchange(ref m_fMeanDeviation, fMeanDev);
-
-            // Calculate the standard deviation
-            double fStandardDev = CalculateStandardDeviation();
-            Interlocked.Exchange(ref m_fStandardDeviation, fStandardDev);
-
-            // Invoke the callback if it's set with the data point and the current running average
-            DataPointAddedCallback?.Invoke(fDataPoint, m_fCurrentAverage);
         }
 
         /// <summary>
@@ -490,9 +490,18 @@ namespace RandomNumberGenerator
                         break;
                     }
 
-                    // Record the data point (this will trigger the callback and update the chart in real-time)
-                    RecordDataPoint(fDataPoint);
+                    // Record the data point and report it so the chart fills in as the file is read
+                    AddPointToDataSet(fDataPoint);
+                    DataPointAddedCallback?.Invoke(fDataPoint, m_fCurrentAverage);
                 }
+
+                // Update the statistics once for the whole batch rather than for every point in it. Working
+                // them out costs a walk of the data set, which holds up to a million points, so doing that
+                // per point makes loading a large file take a length of time that grows with the square of
+                // the number of points in it. The average reported to the chart while a batch is being read
+                // is the one from the batch before it, so the average line steps rather than curves during a
+                // load, and it is correct again as soon as the batch is finished.
+                UpdateStatistics();
             }
             catch (System.OutOfMemoryException)
             {
@@ -509,21 +518,45 @@ namespace RandomNumberGenerator
         }
 
         /// <summary>
-        /// Calculates the standard deviation of a set of data points
+        /// Updates the statistics to describe the data currently held.
+        /// NOTE: The average is worked out once and handed to the standard deviation rather than being
+        /// worked out again there, as walking the data is the expensive part of this and the data set can
+        /// hold over a million points.
         /// </summary>
-        /// <returns>The standard deviation</returns>
-        private double CalculateStandardDeviation()
+        private void UpdateStatistics()
         {
-            // Since we have to walk the data to calculate standard devication a lock is
-            // required, even though ConcurrentQueue is used, to ensure elements are not added
-            // or removed while we are evaluating the data
+            // Since we have to walk the data to calculate the statistics a lock is required, even though
+            // ConcurrentQueue is used, to ensure elements are not added or removed while we are evaluating
+            double fAverage;
+            double fStandardDeviation;
             lock (m_DataLock)
             {
-                double fAverage = m_DataPoints.Average();
-                double fSumOfSquaresOfDifferences = m_DataPoints.Select(val => (val - fAverage) * (val - fAverage)).Sum();
-                double fStandardDeviation = Math.Sqrt(fSumOfSquaresOfDifferences / m_DataPoints.Count);
-                return fStandardDeviation;
+                fAverage = m_DataPoints.Average();
+                fStandardDeviation = CalculateStandardDeviation(fAverage);
             }
+
+            // Record the average and the count
+            Interlocked.Exchange(ref m_fCurrentAverage, fAverage);
+            Interlocked.Exchange(ref m_iNumDataPoints, m_DataPoints.Count);
+
+            // Record the deviation from the statistical mean
+            double fMeanDev = Math.Abs(m_fSTATISTICAL_MEAN - fAverage);
+            Interlocked.Exchange(ref m_fMeanDeviation, fMeanDev);
+
+            // Record the standard deviation
+            Interlocked.Exchange(ref m_fStandardDeviation, fStandardDeviation);
+        }
+
+        /// <summary>
+        /// Calculates the standard deviation of the data points currently held
+        /// </summary>
+        /// <param name="fAverage">IN - The average of the data points currently held</param>
+        /// <returns>The standard deviation</returns>
+        private double CalculateStandardDeviation(double fAverage)
+        {
+            double fSumOfSquaresOfDifferences = m_DataPoints.Select(val => (val - fAverage) * (val - fAverage)).Sum();
+            double fStandardDeviation = Math.Sqrt(fSumOfSquaresOfDifferences / m_DataPoints.Count);
+            return fStandardDeviation;
         }
 
         #endregion
@@ -693,6 +726,11 @@ namespace RandomNumberGenerator
         /// the application terminates unexpectedly.
         /// </summary>
         private const uint WRITE_FILE_INTERVAL = 1;
+
+        /// <summary>
+        /// The statistical mean the data is expected to sit around
+        /// </summary>
+        private const double m_fSTATISTICAL_MEAN = 0.5;
 
         #endregion
         #region Data Members

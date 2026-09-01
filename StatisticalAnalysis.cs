@@ -50,6 +50,9 @@ namespace RandomNumberGenerator
 
             List<double> resultData = null;
 
+            // Clear anything reported about the file loaded before this one
+            m_sLoadWarning = string.Empty;
+
             try
             {
                 // Create the XML reader for loading the result file. It is disposed however this block is
@@ -69,6 +72,11 @@ namespace RandomNumberGenerator
                     {
                         // Take the data points that were collected
                         resultData = collector.CollectedPoints;
+
+                        // A file can load successfully and still have something worth reporting, such as
+                        // having been recovered after the application was stopped while recording. The
+                        // reader is the only thing holding that, so it is kept before the reader is closed.
+                        m_sLoadWarning = xmlReader.LastError;
 
                         // Create statistical analysis for the loaded data and store it
                         if (resultData.Count > 0)
@@ -218,6 +226,13 @@ namespace RandomNumberGenerator
         public string LoadedFileName { get => m_sLoadedFileName; }
 
         /// <summary>
+        /// Description of anything that needs raising about the last file loaded, such as it having been
+        /// recovered after the application was stopped while recording. Empty when there is nothing to
+        /// report (read-only).
+        /// </summary>
+        public string LoadWarning { get => m_sLoadWarning; }
+
+        /// <summary>
         /// Gets the statistical analysis for data set A from the last comparison (read-only)
         /// </summary>
         public DescriptiveStatistics StatsA { get => m_StatsA; }
@@ -245,6 +260,9 @@ namespace RandomNumberGenerator
 
         // Raw data points from loaded file
         private List<double> m_LoadedFileData;
+
+        // Anything that needs raising about the last file loaded, such as it having been recovered
+        private string m_sLoadWarning = string.Empty;
 
         #endregion
         #region Helper Types

@@ -38,14 +38,27 @@ namespace RandomNumberGenerator
                 BackupInfoBox();
                 UpdateInfoBox(m_sREADING_DEVICES_MESSAGE, m_READING_DEVICES_TEXTCOLOR, m_READING_DEVICES_BACKCOLOR);
 
-                // Update the device list
-                GetDevicePorts();
+                try
+                {
+                    // Update the device list
+                    GetDevicePorts();
 
-                // Update the device list in the parent form
-                UpdateDeviceList();
-
-                // Restore the previous info box message
-                RestoreInfoBox();
+                    // Update the device list in the parent form
+                    UpdateDeviceList();
+                }
+                catch (Exception deviceException)
+                {
+                    // Searching for devices can fail for reasons outside of this application, and this runs
+                    // on a pool thread where an escaping exception would bring the process down. The failure
+                    // is reported and the port list is left as it was.
+                    ReportDeviceUpdateFailure(deviceException);
+                    return;
+                }
+                finally
+                {
+                    // Restore the previous info box message, whether or not the search succeeded
+                    RestoreInfoBox();
+                }
             }
         }
 
@@ -204,6 +217,20 @@ namespace RandomNumberGenerator
         }
 
         /// <summary>
+        /// Reports that the search for devices failed
+        /// </summary>
+        /// <param name="deviceException">IN - The failure that stopped the search</param>
+        private static void ReportDeviceUpdateFailure(Exception deviceException)
+        {
+            // Make sure the parent is valid and not terminating early
+            if ((null != m_Parent) && (false == Terminating))
+            {
+                string sMessage = $"{m_sREADING_DEVICES_ERROR} {deviceException.Message}";
+                m_Parent.SetStatusBoxState(sMessage, m_DEVICE_ERROR_TEXTCOLOR, m_DEVICE_ERROR_BACKCOLOR);
+            }
+        }
+
+        /// <summary>
         /// The binding list of devices
         /// </summary>
         public static BindingList<IRNGDevice> DeviceList { get => m_DeviceList; }
@@ -232,6 +259,9 @@ namespace RandomNumberGenerator
 
         // Message to display in the info box when reading devices
         private static readonly string m_sREADING_DEVICES_MESSAGE = " Checking attached devices and updating port list...";
+        private static readonly string m_sREADING_DEVICES_ERROR = " Unable to check the attached devices. The port list has been left as it was.";
+        private static readonly Color m_DEVICE_ERROR_TEXTCOLOR = System.Drawing.Color.Black;
+        private static readonly Color m_DEVICE_ERROR_BACKCOLOR = System.Drawing.Color.Red;
         private static readonly Color m_READING_DEVICES_TEXTCOLOR = System.Drawing.Color.White;
         private static readonly Color m_READING_DEVICES_BACKCOLOR = System.Drawing.SystemColors.Highlight;
     }

@@ -113,8 +113,16 @@ namespace RandomNumberGenerator
             ThreadPool.QueueUserWorkItem(state =>
             {
                 m_DeviceUpdateComplete.Reset(); // Clear the device update complete flag
-                DeviceUpdateThread.ThreadProc(state);
-                m_DeviceUpdateComplete.Set(); // Signal that the device update has finished
+                try
+                {
+                    DeviceUpdateThread.ThreadProc(state);
+                }
+                finally
+                {
+                    // Signal that the device update has finished however it ended, so a failure does not
+                    // leave the close waiting for an update that will never report itself complete
+                    m_DeviceUpdateComplete.Set();
+                }
             });
 
             // Create the source from the list of device ports
@@ -164,8 +172,16 @@ namespace RandomNumberGenerator
                         ThreadPool.QueueUserWorkItem(state =>
                         {
                             m_DeviceUpdateComplete.Reset(); // Clear the device update complete flag
-                            DeviceUpdateThread.ThreadProc(state);
-                            m_DeviceUpdateComplete.Set(); // Signal that the device update has finished
+                            try
+                            {
+                                DeviceUpdateThread.ThreadProc(state);
+                            }
+                            finally
+                            {
+                                // Signal completion however the update ended, so a failure does not leave
+                                // the close waiting for an update that will never report itself complete
+                                m_DeviceUpdateComplete.Set();
+                            }
                         });
                         break;
 
@@ -649,6 +665,27 @@ namespace RandomNumberGenerator
                 Application.DoEvents();
                 bWorkComplete = (m_DeviceUpdateComplete.WaitOne(iWAIT_SLICE) && m_FileLoadComplete.WaitOne(0));
                 iWaited += iWAIT_SLICE;
+            }
+        }
+
+        /// <summary>
+        /// Reports a file that has been loaded for analysis, raising anything that needs saying about it
+        /// rather than reporting a plain success
+        /// </summary>
+        /// <param name="analysis">IN - The analysis the file was loaded into</param>
+        /// <param name="sSuccessMessage">IN - The message to display when there is nothing to raise</param>
+        private void ReportAnalysisLoaded(StatisticalAnalysis analysis, string sSuccessMessage)
+        {
+            // A file can load and still need something raising about it, such as having been recovered
+            string sLoadWarning = (null == analysis) ? string.Empty : analysis.LoadWarning;
+            bool bWarningReported = (false == string.IsNullOrEmpty(sLoadWarning));
+            if (bWarningReported)
+            {
+                SetStatusBoxState(sLoadWarning, System.Drawing.Color.Black, System.Drawing.Color.Khaki);
+            }
+            else
+            {
+                SetStatusBoxState(sSuccessMessage, System.Drawing.Color.Black, System.Drawing.Color.LightGreen);
             }
         }
 
@@ -1498,9 +1535,9 @@ namespace RandomNumberGenerator
                 // Update comparison statistics if both files are loaded
                 UpdateComparisonStatistics();
 
-                // Show success status
-                SetStatusBoxState($" Baseline file loaded: {Path.GetFileName(sFilePath)}. Ready for analysis.", 
-                                System.Drawing.Color.Black, System.Drawing.Color.LightGreen);
+                // Show the success status, or anything that needs raising about the file that was loaded
+                ReportAnalysisLoaded(m_BaselineAnalysis,
+                                     $" Baseline file loaded: {Path.GetFileName(sFilePath)}. Ready for analysis.");
             }
             else
             {
@@ -1539,9 +1576,9 @@ namespace RandomNumberGenerator
                 // Update comparison statistics if both files are loaded
                 UpdateComparisonStatistics();
 
-                // Show success status
-                SetStatusBoxState($" Result file loaded: {Path.GetFileName(sFilePath)}. Ready for analysis.", 
-                                System.Drawing.Color.Black, System.Drawing.Color.LightGreen);
+                // Show the success status, or anything that needs raising about the file that was loaded
+                ReportAnalysisLoaded(m_ResultAnalysis,
+                                     $" Result file loaded: {Path.GetFileName(sFilePath)}. Ready for analysis.");
             }
             else
             {

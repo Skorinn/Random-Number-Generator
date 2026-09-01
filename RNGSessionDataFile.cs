@@ -331,9 +331,11 @@ namespace RandomNumberGenerator
             bool bValid = IsValid();
             if (bValid)
             {
-                // Write the session end
+                // Write the session end. The session is only recorded as closed once the writer confirms it,
+                // so a failure leaves it open to be closed again rather than leaving the file unterminated
+                // with nothing left that will try to finish it.
                 bStatus = m_Writer.WriteSessionEnd();
-                m_bSessionInProgress = false;
+                m_bSessionInProgress = (false == bStatus);
             }
 
             return bStatus;
