@@ -2,7 +2,7 @@
 // File Name:      RNGDevice.cs
 // Description:    Implementation of the RNG device class
 //
-// Copyright (C) 2023 Mike Pullen. All Rights Reserved.
+// Copyright (C) 2023-2024 Mike Pullen. All Rights Reserved.
 // Confidential and Proprietary
 //
 // Revision History: 
@@ -13,9 +13,18 @@
 namespace RandomNumberGenerator
 {
     /// <summary>
+    /// Interface for an RNG device
+    /// </summary>
+    public interface IRNGDevice
+    {
+        string Description { get; set; }
+        int Port { get; set; }
+    }
+
+    /// <summary>
     /// Representation of an RNG device
     /// </summary>
-    class RNGDevice
+    public class RNGDevice : IRNGDevice
     {
         /// <summary>
         /// Default constructor
@@ -46,12 +55,12 @@ namespace RandomNumberGenerator
         /// <summary>
         /// The member used for display in combo box list
         /// </summary>
-        public static string DisplayMember { get => "Description"; }
+        internal static string DisplayMember { get => "Description"; }
 
         /// <summary>
         /// The value used in combo box list
         /// </summary>
-        public static string ValueMember { get => "Port"; }
+        internal static string ValueMember { get => "Port"; }
 
         private string m_sDescription = "";
         private int m_iPort = -1;

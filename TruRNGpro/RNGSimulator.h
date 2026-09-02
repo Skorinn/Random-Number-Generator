@@ -7,8 +7,8 @@
 //*
 //* Revision History: 
 //=====================================================================================================================
-//* 09/10/2022 - Mike Pullen - Original implementation.
-//* 10/30/2022 - Mike Pullen - Recreated under VS2022 and added ARM64 support.
+//* 2022/09/10 - Mike Pullen - Original implementation.
+//* 2022/10/30 - Mike Pullen - Recreated under VS2022 and added ARM64 support.
 //*********************************************************************************************************************
 #pragma once
 #include "RNGInterface.h"
@@ -78,8 +78,9 @@ namespace RNGInterfaces
         // Default the return value
         bool bStatus = true;
 
-        // The number of samples to average
-        constexpr size_t iNUM_SAMPLES = 4094;
+        // Increase samples to compensate for reduced timer rate (10x decimation)
+        // This happens only once per timer tick (now every 100ms instead of 10ms)
+        constexpr size_t iNUM_SAMPLES = 16384; // Increased from 4094 to 16384 (4x increase)
 
         // Get the samples
         rfResult = 0;

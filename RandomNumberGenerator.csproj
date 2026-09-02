@@ -47,6 +47,7 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup>
     <StartupObject>RandomNumberGenerator.Program</StartupObject>
@@ -55,6 +56,12 @@
     <Reference Include="CommonControls, Version=1.0.1.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>Externals\CommonControls.dll</HintPath>
+    </Reference>
+    <Reference Include="DeviceInterfaces">
+      <HintPath>Externals\DeviceInterfaces.dll</HintPath>
+    </Reference>
+    <Reference Include="MathNet.Numerics, Version=5.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>packages\MathNet.Numerics.5.0.0\lib\net48\MathNet.Numerics.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -71,20 +78,32 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="DeviceWatchDog.cs" />
+    <Compile Include="DeviceUpdateThread.cs" />
     <Compile Include="GeneratorForm.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="GeneratorForm.Designer.cs">
       <DependentUpon>GeneratorForm.cs</DependentUpon>
     </Compile>
+    <Compile Include="HistogramChart.cs">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="RNGChart.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="RNGDeviceTimer.cs" />
     <Compile Include="RNGSessionDataFile.cs" />
     <Compile Include="RNGSessionData.cs" />
+    <Compile Include="RNGSessionTimer.cs" />
+    <Compile Include="RNGXMLReader.cs" />
+    <Compile Include="StatisticalAnalysis.cs" />
+    <Compile Include="XMLConstants.cs" />
+    <Compile Include="XMLDataPoint.cs" />
+    <Compile Include="RNGXMLWriter.cs" />
     <Compile Include="TargetValues.cs" />
     <Compile Include="RNGDevice.cs" />
-    <Compile Include="USBDeviceNotification.cs" />
     <EmbeddedResource Include="GeneratorForm.resx">
       <DependentUpon>GeneratorForm.cs</DependentUpon>
     </EmbeddedResource>
@@ -98,6 +117,8 @@
       <DependentUpon>Resources.resx</DependentUpon>
       <DesignTime>True</DesignTime>
     </Compile>
+    <None Include="CODING_GUIDELINES.md" />
+    <None Include="packages.config" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
@@ -125,13 +146,13 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Externals\CommonControls.dll" />
-    <Content Include="Notes.txt" />
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>xcopy /y "$(TargetPath)" "$(SolutionDir)bin\"
 if errorlevel  1 goto end
+echo Copied to "$(SolutionDir)bin\"
 
 :end</PostBuildEvent>
   </PropertyGroup>

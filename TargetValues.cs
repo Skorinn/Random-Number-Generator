@@ -16,7 +16,7 @@ namespace RandomNumberGenerator
     /// <summary>
     /// Representation of the target value options
     /// </summary>
-    internal static class TargetValues
+    public static class TargetValues
     {
         /// <summary>
         /// Gets the string for the specified value
@@ -43,11 +43,10 @@ namespace RandomNumberGenerator
         /// Gets the value for the specified string
         /// </summary>
         /// <param name="sTargetValue">IN - The string for which to get the value</param>
-        /// <returns>Value for string if found; otherwise, null</returns>
-        public static int? ToInt(string sTargetValue)
+        /// <returns>Value for string if found; otherwise, NO_VALUE_SET</returns>
+        public static int ToInt(string sTargetValue)
         {
-            // Default the return to null object
-            int? iResult = null;
+            int iResult = NO_VALUE_SET;
 
             // Attempt to find the specified string
             int iIndex = Array.FindIndex(TargetStrings, sCurrentValue => (sCurrentValue == sTargetValue));
@@ -81,10 +80,10 @@ namespace RandomNumberGenerator
         /// Gets the value at the specified index
         /// </summary>
         /// <param name="iIndex">IN - Index for the value to get</param>
-        /// <returns>Value if index is valid; otherwise, null</returns>
-        public static int? GetValueAt(uint iIndex)
+        /// <returns>Value if index is valid; otherwise, NO_VALUE_SET</returns>
+        public static int GetValueAt(uint iIndex)
         {
-            int? iResult = null;
+            int iResult = NO_VALUE_SET;
 
             if (m_sTargetValues.Length > iIndex)
             {
@@ -94,7 +93,16 @@ namespace RandomNumberGenerator
             return iResult;
         }
 
-        public static string[] TargetStrings { get; } = { "None", "0", "1" }; // string respresentation of possible targets
+        /// <summary>
+        /// The list of string representations of the possible values set
+        /// </summary>
+        public static string[] TargetStrings { get; } = { "None", "0", "1" }; // string representation of possible targets
+
+        /// <summary>
+        /// Constant used when no value has been set
+        /// </summary>
+        public const int NO_VALUE_SET = -2;
+
         private static readonly int[] m_sTargetValues = { -1, 0, 1 }; // Possible target values
     }
 }
