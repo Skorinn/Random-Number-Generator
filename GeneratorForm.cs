@@ -204,9 +204,10 @@ namespace RandomNumberGenerator
             _ = sender;
             _ = e;
 
-            // Update the simulation status and button
-            m_Data.Simulated = !(m_Data.Simulated);
-            m_SimulateToggle.Checked = m_Data.Simulated;
+            // Take the simulation status from the toggle rather than by inverting what is recorded. The
+            // toggle is also set from code, such as when a session is loaded, and inverting the recorded
+            // value there disagrees with the control and sets the two of them toggling each other.
+            m_Data.Simulated = m_SimulateToggle.Checked;
 
             // Record the device interface requires initialization
             m_Timer.Initialized = false;

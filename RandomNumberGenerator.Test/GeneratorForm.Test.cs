@@ -1667,6 +1667,61 @@ namespace RandomNumberGenerator.Test
             StringAssert.Contains(generatorForm.StatusBoxText, "Result file not found", "Should show result file not found error");
         }
 
+        /// <summary>
+        /// Tests setting the simulate toggle from code settles rather than toggling back and forth.
+        /// NOTE: Loading a session sets this toggle to match the file. Taking the new state by inverting
+        /// what is recorded rather than by reading the toggle left the two of them setting each other
+        /// without end, which overflowed the stack and took the application down as a file was opened.
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        [Timeout(15000)]
+        public void SimulateToggle_SetFromCode_MatchesTheToggle()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Mock the session timer and setup the properties
+            Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
+            mockSessionTimer.SetupAllProperties();
+
+            // Mock the session data, recording it as simulated as a loaded session would
+            Mock<IRNGSessionData> mockSessionData = new Mock<IRNGSessionData>();
+            mockSessionData.Setup(mock => mock.Timer).Returns(mockSessionTimer.Object);
+            mockSessionData.SetupProperty(mock => mock.Simulated, true);
+            Mock<IRNGDeviceTimer> mockDeviceTimer = new Mock<IRNGDeviceTimer>();
+
+            // Create the object under test
+            GeneratorForm generatorForm = new GeneratorForm(mockSessionData.Object, mockDeviceTimer.Object);
+
+            // Reach the toggle, which is not exposed outside of the form
+            System.Reflection.FieldInfo toggleField = typeof(GeneratorForm).GetField("m_SimulateToggle",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            Assert.IsNotNull(toggleField, "The simulate toggle should be present on the form");
+            System.Windows.Forms.CheckBox simulateToggle = (System.Windows.Forms.CheckBox)toggleField.GetValue(generatorForm);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Set the toggle the way loading a simulated session does, which disagrees with the toggle
+            simulateToggle.Checked = true;
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the toggle and what is recorded agree, rather than having driven each other
+            Assert.IsTrue(simulateToggle.Checked, "The toggle should stay set");
+            Assert.IsTrue(mockSessionData.Object.Simulated, "The recorded state should match the toggle");
+
+            // And that setting it back settles the same way
+            simulateToggle.Checked = false;
+            Assert.IsFalse(simulateToggle.Checked, "The toggle should stay clear");
+            Assert.IsFalse(mockSessionData.Object.Simulated, "The recorded state should match the toggle");
+        }
+
         #endregion
     }
 }
