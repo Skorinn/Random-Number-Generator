@@ -548,13 +548,20 @@ namespace RandomNumberGenerator
         /// <param name="disposing">true if called from Dispose method; false if called from finalizer</param>
         protected virtual void Dispose(bool disposing)
         {
-            if (disposing)
+            // Discard unused parameters. The reader and the file it holds open are closed whether this is a
+            // disposal or a finalization, as closing only on disposal would leave the file held by anything
+            // that was not disposed, which is what the destructor is here to prevent.
+            _ = disposing;
+
+            try
             {
-                // Free managed resources
                 Close();
             }
-
-            // Free unmanaged resources if any
+            catch (Exception)
+            {
+                // Closing can fail while finalizing, where there is nothing left to report it to and an
+                // escaping exception would bring the process down, so it is given up on instead
+            }
         }
 
         #endregion

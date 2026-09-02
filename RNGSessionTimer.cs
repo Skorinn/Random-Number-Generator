@@ -215,14 +215,15 @@ namespace RandomNumberGenerator
             get => (int)m_Timer.Interval;
             set
             {
-                // Validate the interval
+                // Validate the interval. The parameter is named as well as described, as the constructor
+                // taking a single string records it as the name of the parameter rather than as a message.
                 if (0 >= value)
                 {
-                    throw new ArgumentOutOfRangeException("Interval must be greater than 0");
+                    throw new ArgumentOutOfRangeException(nameof(value), " Interval must be greater than 0.");
                 }
                 else if (1000 < value)
                 {
-                    throw new ArgumentOutOfRangeException("Interval cannot be greater than 1000");
+                    throw new ArgumentOutOfRangeException(nameof(value), " Interval cannot be greater than 1000.");
                 }
 
                 m_Timer.Interval = value;

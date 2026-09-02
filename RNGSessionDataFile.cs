@@ -361,7 +361,9 @@ namespace RandomNumberGenerator
                         // Check if a file info object can be created from the writer's file property
                         try
                         {
-                            FileInfo file = new FileInfo(m_Writer.FilePath);
+                            // Creating the file info is what validates the path; the object itself is not
+                            // needed, so it is discarded rather than left looking like it goes unused
+                            _ = new FileInfo(m_Writer.FilePath);
                             bValid = true;
                             m_bFileValidated = true;
                         }
