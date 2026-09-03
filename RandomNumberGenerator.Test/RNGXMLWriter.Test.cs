@@ -1,5 +1,5 @@
 ﻿//*********************************************************************************************************************
-// File Name:      RNGSessionDataFile.Test.cs
+// File Name:      RNGXMLWriter.Test.cs
 // Description:    Unit tests for the RNGXMLWriter class
 //
 // Copyright (c) 2024 Mike Pullen

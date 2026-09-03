@@ -1,5 +1,5 @@
 //*********************************************************************************************************************
-// File Name:      dllmain.cpp
+// File Name:      TruRNGproMain.cpp
 // Description:    Entry point and exported functions
 //
 // Copyright (c) 2022-2023 Mike Pullen
