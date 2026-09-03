@@ -145,8 +145,13 @@ The coding standards are written down and are followed throughout:
 - `Externals/CommonControls.dll` and `Externals/DeviceInterfaces.dll`, committed binaries with no source
   in this repository
 - `TruRNGpro/rng.h`, a third-party header that wraps the serial port setup and reads for the device. Its
-  licensing has not been established, which is worth settling before the code is distributed.
+  author states in the file that it carries no copyright and no warranty, so it is treated as being in the
+  public domain rather than under this project's licence. It is not a formal dedication such as CC0, which
+  is worth bearing in mind if the licensing of the whole ever has to be stated precisely.
 
-## Copyright
+## Licence
 
-Copyright (C) Mike Pullen. All rights reserved. The source files are marked confidential and proprietary.
+[MIT](LICENSE). Copyright (c) 2022-2026 Mike Pullen.
+
+You may use, modify and redistribute this, including commercially, provided the copyright notice and the
+permission notice are kept. It comes with no warranty.

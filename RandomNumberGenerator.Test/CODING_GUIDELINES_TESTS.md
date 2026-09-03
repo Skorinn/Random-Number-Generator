@@ -29,8 +29,8 @@ All test files must include the standardized header:
 // File Name:      [ClassName].Test.cs
 // Description:    Unit tests for the [ClassName] class
 //
-// Copyright (C) 2025 Mike Pullen. All Rights Reserved.
-// Confidential and Proprietary
+// Copyright (c) 2025 Mike Pullen
+// Licensed under the MIT License. See LICENSE in the repository root.
 //
 // Revision History: 
 //====================================================================================================================

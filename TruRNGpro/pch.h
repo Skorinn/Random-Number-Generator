@@ -6,8 +6,8 @@
 //*                 However, files listed here are ALL re-compiled if any one of them is updated between builds.
 //*                 Do not add files here that you will be updating frequently as this negates the performance advantage.
 //*
-//* Copyright (C) 2022 Mike Pullen. All Rights Reserved.
-//* Confidential and Proprietary
+//* Copyright (c) 2022 Mike Pullen
+//* Licensed under the MIT License. See LICENSE in the repository root.
 //*
 //* Revision History: 
 //=====================================================================================================================

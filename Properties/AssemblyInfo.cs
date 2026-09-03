@@ -9,7 +9,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("Random Number Generator")]
-[assembly: AssemblyCopyright("Copyright ©  2022")]
+[assembly: AssemblyCopyright("Copyright (c) 2022-2026 Mike Pullen. MIT License.")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
