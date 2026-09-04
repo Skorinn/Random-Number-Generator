@@ -144,10 +144,11 @@ The coding standards are written down and are followed throughout:
 - [Moq](https://github.com/devlooped/moq) and MSTest, for the tests
 - `Externals/CommonControls.dll` and `Externals/DeviceInterfaces.dll`, committed binaries with no source
   in this repository
-- `TruRNGpro/rng.h`, a third-party header that wraps the serial port setup and reads for the device. Its
-  author states in the file that it carries no copyright and no warranty, so it is treated as being in the
-  public domain rather than under this project's licence. It is not a formal dedication such as CC0, which
-  is worth bearing in mind if the licensing of the whole ever has to be stated precisely.
+- `TruRNGpro/rng.h`, a third-party header that wraps the serial port setup and reads for the device. It is
+  not covered by this project's licence. Its author states in the file that it carries "No copyright, no
+  warranties", which is a disclaimer rather than a formal grant such as CC0, so no particular legal status
+  is claimed for it here. That is worth settling with the author if the licensing of the whole ever has to
+  be stated precisely.
 
 ## Licence
 
