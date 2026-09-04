@@ -1,0 +1,239 @@
+name: Release
+
+run-name: Release ${{ inputs.version }} requested by @${{ github.actor }}
+
+# Releases are never automatic. Someone with write access has to start this from the Actions tab,
+# and the release it produces is left as a draft for that person to read over and publish.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, such as 1.1.0"
+        required: true
+        type: string
+      confirm:
+        description: "Type RELEASE to confirm"
+        required: true
+        type: string
+      prerelease:
+        description: "Mark this as a pre-release"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+# NOTE: Every step below sets $ErrorActionPreference and checks the exit code of anything it runs,
+# rather than relying on the shell to stop of its own accord. A release that carried on past a failed
+# restore or a failed copy could put out a package with something missing from it.
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Only release from master
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ('${{ github.ref }}' -ne 'refs/heads/master')
+          {
+              Write-Host "::error::Releases are made from master only. This run was started from '${{ github.ref }}'."
+              exit 1
+          }
+          Write-Host "Releasing from master."
+
+      - name: Check the confirmation
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ('${{ inputs.confirm }}' -cne 'RELEASE')
+          {
+              Write-Host "::error::Type RELEASE in the confirmation box to start a release."
+              exit 1
+          }
+
+      - name: Check the version
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ('${{ inputs.version }}' -notmatch '^\d+\.\d+\.\d+$')
+          {
+              Write-Host "::error::The version should read like 1.2.3, not '${{ inputs.version }}'."
+              exit 1
+          }
+
+      - name: Check out master
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check the version has not been released already
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = "v${{ inputs.version }}"
+          $existing = git tag --list $tag
+          if ($LASTEXITCODE -ne 0)
+          {
+              Write-Host "::error::Could not read the existing tags."
+              exit 1
+          }
+          if ($existing)
+          {
+              Write-Host "::error::$tag has been released already."
+              exit 1
+          }
+
+      - name: Set up MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Set up NuGet
+        uses: NuGet/setup-nuget@v2
+
+      - name: Restore packages
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # The projects use packages.config, which dotnet restore does not handle
+          nuget restore RandomNumberGenerator.sln
+          if ($LASTEXITCODE -ne 0)
+          {
+              Write-Host "::error::Restoring the packages failed."
+              exit 1
+          }
+
+      - name: Record the version in the assembly
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = "${{ inputs.version }}.0"
+          $info = "Properties/AssemblyInfo.cs"
+
+          # Anchored to the start of the line so the commented out example above them is left alone
+          $updated = (Get-Content $info) `
+              -replace '^\[assembly: AssemblyVersion\("[0-9\.\*]*"\)\]', "[assembly: AssemblyVersion(""$version"")]" `
+              -replace '^\[assembly: AssemblyFileVersion\("[0-9\.\*]*"\)\]', "[assembly: AssemblyFileVersion(""$version"")]"
+          Set-Content -Path $info -Value $updated
+
+          $recorded = @(Select-String -Path $info -Pattern '^\[assembly: Assembly(File)?Version\("' -AllMatches)
+          if ($recorded.Count -ne 2)
+          {
+              Write-Host "::error::The version could not be recorded in $info."
+              exit 1
+          }
+          $recorded | ForEach-Object { Write-Host ("  " + $_.Line.Trim()) }
+
+      - name: Build
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          msbuild RandomNumberGenerator.sln /t:Rebuild /p:Configuration=Release /p:Platform="Any CPU" /v:minimal /nologo
+          if ($LASTEXITCODE -ne 0)
+          {
+              Write-Host "::error::The build failed."
+              exit 1
+          }
+
+      - name: Test
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          $vstest = & $vswhere -latest -products * -find '**\vstest.console.exe' | Select-Object -First 1
+          if (-not $vstest)
+          {
+              Write-Host "::error::vstest.console.exe was not found on the runner."
+              exit 1
+          }
+
+          & $vstest "RandomNumberGenerator.Test\bin\Release\Random Number Generator.Test.dll" /Logger:"console;verbosity=minimal"
+          if ($LASTEXITCODE -ne 0)
+          {
+              Write-Host "::error::The tests did not pass, so nothing is released."
+              exit 1
+          }
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $stage = 'package'
+          New-Item -ItemType Directory -Force $stage | Out-Null
+
+          # What the application needs to run, which the post build steps have gathered here
+          Copy-Item 'bin\Release\*' $stage -Recurse -Force
+          Copy-Item 'LICENSE', 'README.md' $stage
+
+          # Debug symbols and the API documentation that ships with the packages are not part of a
+          # release. The documentation alone is several times the size of everything else.
+          Get-ChildItem $stage -Recurse -Include *.pdb, *.xml | Remove-Item -Force
+
+          # The application cannot run without these, so the package is checked rather than assumed
+          foreach ($required in @('Random Number Generator.exe', 'TruRNGpro.dll', 'LICENSE', 'README.md'))
+          {
+              if (-not (Test-Path (Join-Path $stage $required)))
+              {
+                  Write-Host "::error::$required is missing from the package."
+                  exit 1
+              }
+          }
+
+          Write-Host "Packaging:"
+          Get-ChildItem $stage | ForEach-Object { Write-Host ("  {0,-40} {1,10:N0} bytes" -f $_.Name, $_.Length) }
+
+          $zip = "RandomNumberGenerator-${{ inputs.version }}.zip"
+          Compress-Archive -Path "$stage\*" -DestinationPath $zip -Force
+          if (-not (Test-Path $zip))
+          {
+              Write-Host "::error::The package was not produced."
+              exit 1
+          }
+
+      - name: Keep the package with the run
+        uses: actions/upload-artifact@v4
+        with:
+          name: RandomNumberGenerator-${{ inputs.version }}
+          path: RandomNumberGenerator-${{ inputs.version }}.zip
+          retention-days: 30
+
+      - name: Draft the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = "v${{ inputs.version }}"
+          $notes = @"
+          Built from master at ``${{ github.sha }}`` and started by @${{ github.actor }}.
+
+          ``RandomNumberGenerator-${{ inputs.version }}.zip`` holds the application, the native device
+          library, the licence and the README. Unpack it anywhere and run
+          ``Random Number Generator.exe``.
+
+          This release is a draft until someone reads it over and publishes it.
+          "@
+
+          $arguments = @(
+              'release', 'create', $tag,
+              "RandomNumberGenerator-${{ inputs.version }}.zip",
+              '--draft',
+              '--target', 'master',
+              '--title', $tag,
+              '--notes', $notes
+          )
+          if ('${{ inputs.prerelease }}' -eq 'true') { $arguments += '--prerelease' }
+
+          gh @arguments
+          if ($LASTEXITCODE -ne 0)
+          {
+              Write-Host "::error::The draft release could not be created."
+              exit 1
+          }
+
+      - name: Where to find it
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Write-Host "The draft release is at https://github.com/${{ github.repository }}/releases"
+          Write-Host "Nothing is published, and no tag exists, until the draft is published."
