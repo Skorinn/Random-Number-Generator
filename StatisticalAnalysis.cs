@@ -2,8 +2,8 @@
 // File Name:      StatisticalAnalysis.cs
 // Description:    Provides the statistical analysis for the results
 //
-// Copyright (C) 2025 Mike Pullen. All Rights Reserved.
-// Confidential and Proprietary
+// Copyright (c) 2025 Mike Pullen
+// Licensed under the MIT License. See LICENSE in the repository root.
 //
 // Revision History: 
 //====================================================================================================================

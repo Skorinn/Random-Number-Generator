@@ -2,8 +2,8 @@
 // File Name:      Program.cs
 // Description:    Primary class for the Random Number Generator program
 //
-// Copyright (C) 2022 Mike Pullen. All Rights Reserved.
-// Confidential and Proprietary
+// Copyright (c) 2022 Mike Pullen
+// Licensed under the MIT License. See LICENSE in the repository root.
 //
 // Revision History: 
 //====================================================================================================================

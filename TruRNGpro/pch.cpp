@@ -2,8 +2,8 @@
 //* File Name:      pch.cpp
 //* Description:    Source for building the precompiled header file
 //*
-//* Copyright (C) 2022 Mike Pullen. All Rights Reserved.
-//* Confidential and Proprietary
+//* Copyright (c) 2022 Mike Pullen
+//* Licensed under the MIT License. See LICENSE in the repository root.
 //*
 //* Revision History: 
 //=====================================================================================================================

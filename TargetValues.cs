@@ -2,8 +2,8 @@
 // File Name:      TargetValues.cs
 // Description:    Implementation of the target value options
 //
-// Copyright (C) 2023 Mike Pullen. All Rights Reserved.
-// Confidential and Proprietary
+// Copyright (c) 2023 Mike Pullen
+// Licensed under the MIT License. See LICENSE in the repository root.
 //
 // Revision History: 
 //====================================================================================================================

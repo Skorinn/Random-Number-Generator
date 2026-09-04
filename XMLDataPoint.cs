@@ -2,8 +2,8 @@
 // File Name:      XMLDataPoint.cs
 // Description:    Represents a data point in the XML file structure
 //
-// Copyright (C) 2023-2024 Mike Pullen. All Rights Reserved.
-// Confidential and Proprietary
+// Copyright (c) 2023-2024 Mike Pullen
+// Licensed under the MIT License. See LICENSE in the repository root.
 //
 // Revision History: 
 //====================================================================================================================
