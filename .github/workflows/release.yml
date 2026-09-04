@@ -24,6 +24,9 @@ on:
 permissions:
   contents: write
 
+# NOTE: Every step below sets $ErrorActionPreference and checks the exit code of anything it runs,
+# rather than relying on the shell to stop of its own accord. A release that carried on past a failed
+# restore or a failed copy could put out a package with something missing from it.
 jobs:
   release:
     runs-on: windows-latest
@@ -32,6 +35,7 @@ jobs:
       - name: Only release from master
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           if ('${{ github.ref }}' -ne 'refs/heads/master')
           {
               Write-Host "::error::Releases are made from master only. This run was started from '${{ github.ref }}'."
@@ -42,6 +46,7 @@ jobs:
       - name: Check the confirmation
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           if ('${{ inputs.confirm }}' -cne 'RELEASE')
           {
               Write-Host "::error::Type RELEASE in the confirmation box to start a release."
@@ -51,6 +56,7 @@ jobs:
       - name: Check the version
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           if ('${{ inputs.version }}' -notmatch '^\d+\.\d+\.\d+$')
           {
               Write-Host "::error::The version should read like 1.2.3, not '${{ inputs.version }}'."
@@ -65,8 +71,14 @@ jobs:
       - name: Check the version has not been released already
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           $tag = "v${{ inputs.version }}"
           $existing = git tag --list $tag
+          if ($LASTEXITCODE -ne 0)
+          {
+              Write-Host "::error::Could not read the existing tags."
+              exit 1
+          }
           if ($existing)
           {
               Write-Host "::error::$tag has been released already."
@@ -82,40 +94,70 @@ jobs:
       - name: Restore packages
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           # The projects use packages.config, which dotnet restore does not handle
           nuget restore RandomNumberGenerator.sln
+          if ($LASTEXITCODE -ne 0)
+          {
+              Write-Host "::error::Restoring the packages failed."
+              exit 1
+          }
 
       - name: Record the version in the assembly
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           $version = "${{ inputs.version }}.0"
           $info = "Properties/AssemblyInfo.cs"
+
           # Anchored to the start of the line so the commented out example above them is left alone
-          (Get-Content $info) `
+          $updated = (Get-Content $info) `
               -replace '^\[assembly: AssemblyVersion\("[0-9\.\*]*"\)\]', "[assembly: AssemblyVersion(""$version"")]" `
-              -replace '^\[assembly: AssemblyFileVersion\("[0-9\.\*]*"\)\]', "[assembly: AssemblyFileVersion(""$version"")]" |
-              Set-Content $info
-          Select-String -Path $info -Pattern 'AssemblyVersion\(|AssemblyFileVersion\(' |
-              ForEach-Object { $_.Line.Trim() }
+              -replace '^\[assembly: AssemblyFileVersion\("[0-9\.\*]*"\)\]', "[assembly: AssemblyFileVersion(""$version"")]"
+          Set-Content -Path $info -Value $updated
+
+          $recorded = @(Select-String -Path $info -Pattern '^\[assembly: Assembly(File)?Version\("' -AllMatches)
+          if ($recorded.Count -ne 2)
+          {
+              Write-Host "::error::The version could not be recorded in $info."
+              exit 1
+          }
+          $recorded | ForEach-Object { Write-Host ("  " + $_.Line.Trim()) }
 
       - name: Build
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           msbuild RandomNumberGenerator.sln /t:Rebuild /p:Configuration=Release /p:Platform="Any CPU" /v:minimal /nologo
-          if ($LASTEXITCODE -ne 0) { exit 1 }
+          if ($LASTEXITCODE -ne 0)
+          {
+              Write-Host "::error::The build failed."
+              exit 1
+          }
 
       - name: Test
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
           $vstest = & $vswhere -latest -products * -find '**\vstest.console.exe' | Select-Object -First 1
-          if (-not $vstest) { Write-Host "::error::vstest.console.exe was not found on the runner."; exit 1 }
+          if (-not $vstest)
+          {
+              Write-Host "::error::vstest.console.exe was not found on the runner."
+              exit 1
+          }
+
           & $vstest "RandomNumberGenerator.Test\bin\Release\Random Number Generator.Test.dll" /Logger:"console;verbosity=minimal"
-          if ($LASTEXITCODE -ne 0) { Write-Host "::error::The tests did not pass, so nothing is released."; exit 1 }
+          if ($LASTEXITCODE -ne 0)
+          {
+              Write-Host "::error::The tests did not pass, so nothing is released."
+              exit 1
+          }
 
       - name: Package
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           $stage = 'package'
           New-Item -ItemType Directory -Force $stage | Out-Null
 
@@ -127,8 +169,8 @@ jobs:
           # release. The documentation alone is several times the size of everything else.
           Get-ChildItem $stage -Recurse -Include *.pdb, *.xml | Remove-Item -Force
 
-          # The application cannot run without the native library, so make sure it is there
-          foreach ($required in @('Random Number Generator.exe', 'TruRNGpro.dll'))
+          # The application cannot run without these, so the package is checked rather than assumed
+          foreach ($required in @('Random Number Generator.exe', 'TruRNGpro.dll', 'LICENSE', 'README.md'))
           {
               if (-not (Test-Path (Join-Path $stage $required)))
               {
@@ -138,9 +180,15 @@ jobs:
           }
 
           Write-Host "Packaging:"
-          Get-ChildItem $stage | ForEach-Object { "  {0,-40} {1,10:N0} bytes" -f $_.Name, $_.Length }
+          Get-ChildItem $stage | ForEach-Object { Write-Host ("  {0,-40} {1,10:N0} bytes" -f $_.Name, $_.Length) }
 
-          Compress-Archive -Path "$stage\*" -DestinationPath "RandomNumberGenerator-${{ inputs.version }}.zip" -Force
+          $zip = "RandomNumberGenerator-${{ inputs.version }}.zip"
+          Compress-Archive -Path "$stage\*" -DestinationPath $zip -Force
+          if (-not (Test-Path $zip))
+          {
+              Write-Host "::error::The package was not produced."
+              exit 1
+          }
 
       - name: Keep the package with the run
         uses: actions/upload-artifact@v4
@@ -154,6 +202,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          $ErrorActionPreference = 'Stop'
           $tag = "v${{ inputs.version }}"
           $notes = @"
           Built from master at ``${{ github.sha }}`` and started by @${{ github.actor }}.
@@ -176,10 +225,15 @@ jobs:
           if ('${{ inputs.prerelease }}' -eq 'true') { $arguments += '--prerelease' }
 
           gh @arguments
-          if ($LASTEXITCODE -ne 0) { exit 1 }
+          if ($LASTEXITCODE -ne 0)
+          {
+              Write-Host "::error::The draft release could not be created."
+              exit 1
+          }
 
       - name: Where to find it
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           Write-Host "The draft release is at https://github.com/${{ github.repository }}/releases"
           Write-Host "Nothing is published, and no tag exists, until the draft is published."
