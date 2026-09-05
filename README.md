@@ -142,11 +142,10 @@ The coding standards are written down and are followed throughout:
 
 - [Math.NET Numerics](https://numerics.mathdotnet.com/) (MIT), for the statistics
 - [Moq](https://github.com/devlooped/moq) and MSTest, for the tests
-- `Externals/CommonControls.dll` and `Externals/DeviceInterfaces.dll`, built from
+- `Externals/CommonControls.dll` and `Externals/DeviceInterfaces.dll` (both MIT), built from
   [CommonControls](https://github.com/Skorinn/CommonControls) and
   [DeviceInterfaces](https://github.com/Skorinn/DeviceInterfaces). They are committed here as binaries
-  rather than built alongside this solution, and the terms they are offered under are stated in their own
-  repositories.
+  rather than built alongside this solution.
 - `TruRNGpro/rng.h`, a third-party header that wraps the serial port setup and reads for the device. It is
   not covered by this project's licence. Its author states in the file that it carries "No copyright, no
   warranties", which is a disclaimer rather than a formal grant such as CC0, so no particular legal status
