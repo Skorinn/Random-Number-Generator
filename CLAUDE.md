@@ -36,9 +36,10 @@ nuget restore RandomNumberGenerator.sln
 & $vstest "RandomNumberGenerator.Test\bin\Debug\Random Number Generator.Test.dll" /TestCaseFilter:"TestCategory=Component"
 ```
 
-Build ordering matters: post-build events copy the app output to `<sln>\bin\`, and the test project copies
-`<sln>\bin\TruRNGpro.dll` into its own output. Build the whole solution (not just the test project) or any
-test that reaches the P/Invoke layer will fail to load the native DLL.
+Build ordering matters. The native project copies `TruRNGpro.dll` to `<sln>\bin\`, and both the app and the
+test project copy it from there into their own output, because a native DLL is looked for beside the
+executable that loads it. Build the whole solution — building either managed project alone leaves the DLL
+missing and anything reaching the P/Invoke layer fails with `DllNotFoundException`.
 
 App output: `bin\Debug\Random Number Generator.exe` (also copied to `<sln>\bin\`).
 
@@ -73,21 +74,44 @@ sentinel.
 
 ### Session data model
 `RNGSessionData` keeps a bounded `ConcurrentQueue<double>` (`DataWindowSize`, default 6144, overwritten from
-`RNGChart.MaxDataSize` at form construction). Stats (average, mean deviation, standard deviation) are
-recomputed on every point; the queue is walked under `m_DataLock` even though it is concurrent, and scalars
-are published with `Interlocked.Exchange`.
+`RNGChart.MaxDataSize` — 1,024,000 — at form construction). Stats (average, mean deviation, standard
+deviation) are recomputed by walking the whole window: once per point while recording, but only once per
+batch in `LoadDataPointsBatch`, which is what keeps loading a large file from taking time that grows with
+the square of its size. The queue is walked under `m_DataLock` even though it is concurrent, and scalars are
+published with `Interlocked.Exchange`.
+
+Recording therefore costs a walk of the window per reading, reaching about 10% of the 100 ms interval once
+the window is full — around 28 hours of recording. Removing that needs rolling sums, which change the
+computed values and are deliberately not done; `MaxPoint`/`MinPoint` return `double.NaN` when there is no
+data rather than throwing.
 
 ### File format and append semantics
 Session files are XML: a single `<Session Simulated="true" Target="0">` element containing
 `<Data Time="hh:mm:ss">0.123</Data>` children. Element/attribute names live in `XMLConstants` — use them
 rather than string literals.
 
+Values are written and parsed with the invariant culture, so a file written where the decimal separator is a
+comma reads back as the same numbers elsewhere. `Target="-1"` means no target; `TargetValues.NO_VALUE_SET`
+(-2) is internal and is never written to a file.
+
 Loading an existing file (`RNGSessionData.LoadSession` → `RNGSessionDataFile.LoadSession` →
 `RNGXMLReader.LoadFile`) streams data points in batches through `LoadDataPointsBatch`, which fires the same
 `DataPointAddedCallback` so the chart fills in as it loads. Afterwards `RNGXMLWriter.PrepareForAppend`
-rewrites the file **textually** — truncating at the last `</Session>`, or converting a self-closing
-`<Session … />` into an open tag — so writing can resume. Changes to the session element shape must keep
-that text surgery in sync.
+edits the file **textually** so writing can resume, handling three shapes:
+
+1. a closed session, where the closing tag and the whitespace before it are truncated away;
+2. an empty session that closed itself, where `<Session … />` is reopened;
+3. a session left unterminated by the application stopping, where anything after the last complete
+   `</Data>` is discarded so a half-written element cannot be appended to.
+
+Only the ends of the file are read rather than the whole of it, because these files grow by roughly 2MB an
+hour. Changes to the session element shape must keep that text surgery in sync.
+
+A file of the third shape is what an interrupted session leaves, and it is recovered rather than rejected:
+the reader keeps every complete data point, refuses a partially written one, and reports the recovery
+through `LastError`, which the form shows to the user. A file that closes its session and still fails to
+parse is damaged rather than unfinished and is rejected as before. The two are told apart by the shape of
+the file, not by the parse error.
 
 ### GUI
 `GeneratorForm` is a state machine over `RngGuiStates` (Idle / Running / Paused / Terminating); the
@@ -126,7 +150,10 @@ here (`DeviceInterfaces` supplies the `USBDeviceNotification` constants used in 
 `TruRNGpro/CODING_GUIDELINES_CPP.md` (native) are authoritative and are actually followed throughout. The
 non-obvious rules new code is expected to match:
 
-- Standardized file header block on every file (name, description, copyright, revision history).
+- Standardized file header block on every file: name, description, copyright, the MIT licence pointer, and
+  revision history. The templates in the three guidelines documents are the ones to copy. The name in the
+  header has to match the file it is in; two headers naming the file they were copied from have already had
+  to be corrected.
 - Modified Hungarian notation: `m_` + type char for members (`m_sFilePath`, `m_iPort`, `m_bValid`,
   `m_Timer` for objects), and `s`/`i`/`f`/`b` prefixes on locals.
 - `#region` blocks in a fixed order: Type definitions, Constructors, Event Handlers, Methods, Properties,
@@ -141,3 +168,20 @@ non-obvious rules new code is expected to match:
   swallowing and returning `false`; the form catches them and renders via `SetStatusBoxError`.
 - Tests: `[ClassName]Tests`, `[Method]_[Scenario]_[ExpectedResult]`, banner-commented Arrange/Act/Assert
   sections, Moq for collaborators, `[TestCategory("Component")]`.
+
+## Licence
+
+MIT, in `LICENSE`. Every source file carries the copyright line and a pointer to it. `TruRNGpro/rng.h` is
+third-party and is not covered by it; leave its header alone.
+
+## Releasing
+
+`.github/workflows/release.yml`, started by hand from the Actions tab and from `master` only. It refuses to
+run unless `RELEASE` is typed into the confirmation box, the version reads like `1.2.3` and has not been
+released before; it stops if the tests fail or the package is missing the application or the native
+library. What it produces is a **draft** release, so nothing is tagged or published without someone
+pressing publish.
+
+The unit tests do not build the form's event wiring, so a fault in it passes them: the crash that made
+loading a session file impossible was only found by driving the built application. Worth doing for changes
+that touch `GeneratorForm`.
