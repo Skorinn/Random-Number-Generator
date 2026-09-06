@@ -1,0 +1,91 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>CommonControls</name>
+    </assembly>
+    <members>
+        <member name="T:CommonControls.ToggleButton">
+            <summary>
+            Toggle Button control
+            </summary>
+        </member>
+        <member name="T:CommonControls.ToggleButton.DrawingStyles">
+            <summary>
+            Drawing styles for the control
+            </summary>
+        </member>
+        <member name="F:CommonControls.ToggleButton.DrawingStyles.Solid">
+            <summary>
+            The background of the control is filled
+            </summary>
+        </member>
+        <member name="F:CommonControls.ToggleButton.DrawingStyles.Hollow">
+            <summary>
+            Only the outline of the background is drawn
+            </summary>
+        </member>
+        <member name="M:CommonControls.ToggleButton.#ctor">
+            <summary>
+            Default constructor
+            </summary>
+        </member>
+        <member name="M:CommonControls.ToggleButton.OnPaint(System.Windows.Forms.PaintEventArgs)">
+            <summary>
+            Override for the paint event
+            </summary>
+            <param name="paintEvent">IN - The paint event arguments</param>
+        </member>
+        <member name="M:CommonControls.ToggleButton.GetBackgroundPath">
+            <summary>
+            Creates the path for the control
+            </summary>
+            <returns>The rounded path used to draw the background</returns>
+        </member>
+        <member name="M:CommonControls.ToggleButton.GetToggleRectangle">
+            <summary>
+            Gets the rectangle for the toggle
+            </summary>
+            <returns>The bounding rectangle of the toggle for the current state</returns>
+        </member>
+        <member name="P:CommonControls.ToggleButton.OffBackground">
+            <summary>
+            Background color when the toggle is in the OFF state
+            </summary>
+        </member>
+        <member name="P:CommonControls.ToggleButton.OffToggle">
+            <summary>
+            Toggle color when the toggle is in the OFF state
+            </summary>
+        </member>
+        <member name="P:CommonControls.ToggleButton.OnBackground">
+            <summary>
+            Background color when the toggle is in the ON state
+            </summary>
+        </member>
+        <member name="P:CommonControls.ToggleButton.OnToggle">
+            <summary>
+            Toggle color when the toggle is in the ON state
+            </summary>
+        </member>
+        <member name="P:CommonControls.ToggleButton.DisabledBackground">
+            <summary>
+            Background color when the control is disabled
+            </summary>
+        </member>
+        <member name="P:CommonControls.ToggleButton.DisabledToggle">
+            <summary>
+            Toggle color when the control is disabled
+            </summary>
+        </member>
+        <member name="P:CommonControls.ToggleButton.Style">
+            <summary>
+            Drawing style for the control
+            </summary>
+        </member>
+        <member name="P:CommonControls.ToggleButton.Text">
+            <summary>
+            Override for the Text property to remove set
+            </summary>
+        </member>
+    </members>
+</doc>
