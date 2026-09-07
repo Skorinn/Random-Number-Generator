@@ -115,8 +115,27 @@ the file, not by the parse error.
 
 ### GUI
 `GeneratorForm` is a state machine over `RngGuiStates` (Idle / Running / Paused / Terminating); the
-`Set*State()` methods own all control enable/disable and are the right place to hook new UI state.
+`Set*State()` methods own all control enable/disable, which button `SetPrimaryButton` emphasises, and the
+window title, and are the right place to hook new UI state.
 `GeneratorForm.Designer.cs` is designer-generated — prefer editing it through the VS designer.
+
+Each tab is a `TableLayoutPanel` of bands: fixed-height rows for the settings and the readouts, and a
+percent row underneath that the chart fills, so the chart takes whatever space is left and grows with the
+window. Nothing is positioned absolutely at the tab level any more, and the anchors that used to be set on
+a fixed-size dialog are gone. The window is sizable with a `MinimumSize`, and `RestoreWindowPlacement` /
+`SaveWindowPlacement` remember its geometry in `Properties.Settings` — a saved position for a screen that
+is no longer attached is ignored rather than opening the window off-screen.
+
+Status messages go to a `StatusStrip` docked to the form, not to the tab, so errors raised while analysing
+are visible on the tab that raised them. `SetStatusBoxState` takes its colours from `StatusPalette`, which
+is where the severity scheme lives for both the form and `DeviceUpdateThread`. Messages start at the first
+word: the leading space that used to pad them was for a text box with no padding of its own.
+
+Statistics are shown in borderless read-only `TextBox` readouts rather than sunken fields — read-only so
+they read as output, but still text boxes so a value can be selected and copied. A measure that nothing has
+been measured for shows `m_sNO_VALUE` rather than a zero. Number formats are named per kind:
+`m_sVALUE_FORMAT` for anything in a unit range, `m_sMOMENT_FORMAT` for the unbounded moments, and the two
+`…DIFFERENCE_FORMAT` variants, which carry an explicit sign.
 
 Device discovery is separate: `DeviceUpdateThread` (a static class queued on the thread pool) enumerates
 `Win32_USBControllerDevice`/`Win32_PnPEntity` via WMI, regex-matches `USB…Serial…COM<n>`, and pushes a
@@ -126,6 +145,17 @@ Device discovery is separate: `DeviceUpdateThread` (a static class queued on the
 The analysis UI (baseline vs. result comparison) uses `StatisticalAnalysis` (MathNet.Numerics
 `DescriptiveStatistics`) and `HistogramChart`; both charts derive from
 `System.Windows.Forms.DataVisualization.Charting.Chart`.
+
+The comparison is a single `ListView` — measure, baseline, result, difference — rather than the two
+mirrored sets of fields it used to be. `BuildComparisonTable` makes the rows once and `UpdateComparisonTable`
+rewrites their values; the row order there and the `m_iSKEWNESS_ROW` constant that tells the bounded
+measures from the unbounded ones have to be kept in step. The list does not come back through UI Automation,
+so anything driving it from outside has to read it with `LVM_GETITEMTEXT`.
+
+`HistogramChart.Plot` chooses its own bin count from the sample size unless one is passed; a fixed hundred
+bins turned a short session into a row of one-pixel spikes rather than a distribution. Axis labels are
+printed to the precision the tick interval needs, because the default prints the full double and the labels
+collide.
 
 ### Threading rules
 - `RNGDeviceTimer` uses `System.Windows.Forms.Timer` → its tick is already on the UI thread.
@@ -186,4 +216,7 @@ pressing publish.
 
 The unit tests do not build the form's event wiring, so a fault in it passes them: the crash that made
 loading a session file impossible was only found by driving the built application. Worth doing for changes
-that touch `GeneratorForm`.
+that touch `GeneratorForm`. The interface rework turned up four more the same way — start-up values still
+in a format that had been replaced, a button row clipped by a band an inch too short, comparison columns
+that did not fill their table, and a Pause button that was clickable before any session existed. All four
+passed a clean unit run.
