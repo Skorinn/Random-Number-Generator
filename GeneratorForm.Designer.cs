@@ -1,4 +1,4 @@
-//*********************************************************************************************************************
+﻿//*********************************************************************************************************************
 // File Name:      GeneratorForm.Designer.cs
 // Description:    Auto-generated code for the Random Number Generator GUI
 //
@@ -13,6 +13,7 @@
 // 2026/09/07 - Mike Pullen - Status bar, borderless statistic readouts, and an emphasised primary button
 // 2026/09/07 - Mike Pullen - Resizable window laid out in bands, so the chart takes the space that is left,
 //                            and one comparison table in place of the mirrored analysis fields
+// 2026/09/07 - Mike Pullen - Tooltips on the statistics and no-value placeholders before the first reading
 //*********************************************************************************************************************
 
 namespace RandomNumberGenerator
@@ -35,6 +36,8 @@ namespace RandomNumberGenerator
         /// </summary>
         private void InitializeComponent()
         {
+            this.components = new System.ComponentModel.Container();
+            this.m_ToolTip = new System.Windows.Forms.ToolTip(this.components);
             this.m_CurrentAverageLabel = new System.Windows.Forms.Label();
             this.m_CurrentAverageTextBox = new System.Windows.Forms.TextBox();
             this.m_SessionTimerTextBox = new System.Windows.Forms.TextBox();
@@ -354,6 +357,7 @@ namespace RandomNumberGenerator
             // m_PauseButton
             //
             this.m_PauseButton.CausesValidation = false;
+            this.m_PauseButton.Enabled = false;
             this.m_PauseButton.Location = new System.Drawing.Point(127, 6);
             this.m_PauseButton.Margin = new System.Windows.Forms.Padding(0, 0, 8, 0);
             this.m_PauseButton.Name = "m_PauseButton";
@@ -540,7 +544,7 @@ namespace RandomNumberGenerator
             this.m_CurrentAverageTextBox.Size = new System.Drawing.Size(138, 21);
             this.m_CurrentAverageTextBox.TabIndex = 0;
             this.m_CurrentAverageTextBox.TabStop = false;
-            this.m_CurrentAverageTextBox.Text = "0.000000";
+            this.m_CurrentAverageTextBox.Text = "—";
             this.m_CurrentAverageTextBox.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             this.m_CurrentAverageTextBox.WordWrap = false;
             //
@@ -556,7 +560,7 @@ namespace RandomNumberGenerator
             this.m_MeanDeviationTextBox.Size = new System.Drawing.Size(138, 21);
             this.m_MeanDeviationTextBox.TabIndex = 0;
             this.m_MeanDeviationTextBox.TabStop = false;
-            this.m_MeanDeviationTextBox.Text = "0.000000";
+            this.m_MeanDeviationTextBox.Text = "—";
             this.m_MeanDeviationTextBox.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             this.m_MeanDeviationTextBox.WordWrap = false;
             //
@@ -572,7 +576,7 @@ namespace RandomNumberGenerator
             this.m_StandardDeviationTextBox.Size = new System.Drawing.Size(141, 21);
             this.m_StandardDeviationTextBox.TabIndex = 0;
             this.m_StandardDeviationTextBox.TabStop = false;
-            this.m_StandardDeviationTextBox.Text = "0.000000";
+            this.m_StandardDeviationTextBox.Text = "—";
             this.m_StandardDeviationTextBox.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             this.m_StandardDeviationTextBox.WordWrap = false;
             //
@@ -781,6 +785,22 @@ namespace RandomNumberGenerator
             this.m_ResultHistogramChart.TabIndex = 2;
             this.m_ResultHistogramChart.TabStop = false;
             //
+            // m_ToolTip
+            //
+            this.m_ToolTip.AutoPopDelay = 12000;
+            this.m_ToolTip.InitialDelay = 500;
+            this.m_ToolTip.ReshowDelay = 100;
+            this.m_ToolTip.SetToolTip(this.m_SessionTimerLabel, "How long this session has been recording, not counting time spent paused.");
+            this.m_ToolTip.SetToolTip(this.m_SessionTimerTextBox, "How long this session has been recording, not counting time spent paused.");
+            this.m_ToolTip.SetToolTip(this.m_DataPointsLabel, "How many readings have been taken. One is taken every tenth of a second.");
+            this.m_ToolTip.SetToolTip(this.m_DataPointsTextBox, "How many readings have been taken. One is taken every tenth of a second.");
+            this.m_ToolTip.SetToolTip(this.m_CurrentAverageLabel, "The mean of every reading so far. An unbiased generator settles near 0.5.");
+            this.m_ToolTip.SetToolTip(this.m_CurrentAverageTextBox, "The mean of every reading so far. An unbiased generator settles near 0.5.");
+            this.m_ToolTip.SetToolTip(this.m_MeanDeviationLabel, "How far the mean sits from 0.5, the value an unbiased generator is expected to give.");
+            this.m_ToolTip.SetToolTip(this.m_MeanDeviationTextBox, "How far the mean sits from 0.5, the value an unbiased generator is expected to give.");
+            this.m_ToolTip.SetToolTip(this.m_StandardDeviationLabel, "How spread out the readings are around their mean. A larger figure means noisier readings.");
+            this.m_ToolTip.SetToolTip(this.m_StandardDeviationTextBox, "How spread out the readings are around their mean. A larger figure means noisier readings.");
+            //
             // GeneratorForm
             //
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
@@ -875,5 +895,6 @@ namespace RandomNumberGenerator
         private System.Windows.Forms.ColumnHeader m_ResultColumn;
         private System.Windows.Forms.ColumnHeader m_DifferenceColumn;
         private HistogramChart m_ResultHistogramChart;
+        private System.Windows.Forms.ToolTip m_ToolTip;
     }
 }

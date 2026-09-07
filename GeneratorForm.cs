@@ -14,6 +14,8 @@
 //                            messages while waiting for the device update to finish on close
 // 2026/09/07 - Mike Pullen - Reworked the presentation: status bar, statistic readouts, number formats, and
 //                            one emphasised button per state
+// 2026/09/07 - Mike Pullen - Session in the window title, a status message that says what to do next, and
+//                            no value shown for a measure nothing has been measured for yet
 //*********************************************************************************************************************
 
 // Enable to dump the USB device information
@@ -117,7 +119,7 @@ namespace RandomNumberGenerator
             RestoreWindowPlacement();
 
             // Set the info box to idle
-            m_StatusLabel.Text = m_sIDLE_MESSAGE;
+            m_StatusLabel.Text = IdleMessage;
             m_StatusLabel.ForeColor = StatusPalette.NormalText;
             m_StatusLabel.BackColor = StatusPalette.NormalBackground;
 
@@ -514,9 +516,10 @@ namespace RandomNumberGenerator
                         // Set the file path in the session data
                         m_Data.FilePath = sSelectedFile;
                         
-                        // Update the file display
+                        // Update the file display and the window title, which carries the file too
                         m_FileTextBox.Text = Path.GetFileName(sSelectedFile);
-                        
+                        UpdateWindowTitle();
+
                         // Show success status
                         SetStatusBoxState($"New file selected: {Path.GetFileName(sSelectedFile)}. Ready for new session.", 
                                         StatusPalette.SuccessText, StatusPalette.SuccessBackground);
@@ -1062,6 +1065,8 @@ namespace RandomNumberGenerator
             // Ending the session is now the action to take next
             SetPrimaryButton(m_StopButton);
 
+            UpdateWindowTitle();
+
             // Start a new session (will continue existing session if already in progress)
             StartSession();
         }
@@ -1202,8 +1207,10 @@ namespace RandomNumberGenerator
             // Starting a session is the action to take next
             SetPrimaryButton(m_StartButton);
 
+            UpdateWindowTitle();
+
             // Update the info box
-            SetStatusBoxState(m_sIDLE_MESSAGE, StatusPalette.NormalText, StatusPalette.NormalBackground);
+            SetStatusBoxState(IdleMessage, StatusPalette.NormalText, StatusPalette.NormalBackground);
         }
 
         /// <summary>
@@ -1247,8 +1254,9 @@ namespace RandomNumberGenerator
             m_Timer.Enabled = true;
             m_Data.ResumeSession();
 
-            // Update the info box message
-            SetStatusBoxState(m_sIDLE_MESSAGE, StatusPalette.NormalText, StatusPalette.NormalBackground);
+            // Report that the session is running again. This said "Idle" before, which was left over from
+            // the pause and disagreed with the session that had just been picked back up.
+            SetStatusBoxState(RunningMessage, StatusPalette.NormalText, StatusPalette.NormalBackground);
         }
 
         /// <summary>
@@ -1489,6 +1497,9 @@ namespace RandomNumberGenerator
             m_MeanDeviationTextBox.Text = MeanDeviation;
             m_StandardDeviationTextBox.Text = StandardDeviation;
             m_SessionTimerTextBox.Text = m_Data.SessionTime;
+
+            // The title carries the session too, and it costs nothing when nothing in it has changed
+            UpdateWindowTitle();
         }
 
         /// <summary>
@@ -1863,6 +1874,43 @@ namespace RandomNumberGenerator
         }
 
         /// <summary>
+        /// Puts the session in the window title, so which file is being recorded into and how long it has
+        /// been running can be read from the task bar without bringing the window to the front.
+        /// </summary>
+        private void UpdateWindowTitle()
+        {
+            string sFileName = m_FileTextBox.Text;
+            bool bFileChosen = (false == string.IsNullOrEmpty(sFileName));
+            bool bRecording = ((RngGuiStates.Running == m_State) || (RngGuiStates.Paused == m_State));
+
+            if (false == bFileChosen)
+            {
+                Text = m_sAPPLICATION_NAME;
+            }
+            else if (false == bRecording)
+            {
+                Text = $"{sFileName}{m_sTITLE_SEPARATOR}{m_sAPPLICATION_NAME}";
+            }
+            else
+            {
+                Text = $"{sFileName}{m_sTITLE_SEPARATOR}{m_Data.SessionTime}{m_sTITLE_SEPARATOR}{m_sAPPLICATION_NAME}";
+            }
+        }
+
+        /// <summary>
+        /// The message to show while nothing is running, which says what to do next rather than reporting
+        /// that nothing is happening. Until a file is chosen there is nothing else the user can usefully do.
+        /// </summary>
+        private string IdleMessage
+        {
+            get
+            {
+                bool bFileChosen = (false == string.IsNullOrEmpty(m_FileTextBox.Text));
+                return bFileChosen ? m_sREADY_MESSAGE : m_sNO_FILE_MESSAGE;
+            }
+        }
+
+        /// <summary>
         /// Names a loaded analysis file along with how many readings it holds. Two sessions of very
         /// different lengths are not a fair comparison, and that has to be visible before the comparison is
         /// read rather than after.
@@ -2050,7 +2098,17 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Current average string (read-only)
         /// </summary>
-        private string CurrentAverage { get => m_Data.CurrentAverage.ToString(m_sVALUE_FORMAT); }
+        /// <summary>
+        /// Whether any readings have been taken or loaded (read-only). A mean, a deviation and a spread all
+        /// need something to be taken from, so before the first reading arrives they are shown as having no
+        /// value rather than as being zero, which would be a measurement the session has not made.
+        /// </summary>
+        private bool HasReadings { get => (0 < m_Data.NumDataPoints); }
+
+        /// <summary>
+        /// Current average of the session, or no value if nothing has been recorded yet (read-only)
+        /// </summary>
+        private string CurrentAverage { get => HasReadings ? m_Data.CurrentAverage.ToString(m_sVALUE_FORMAT) : m_sNO_VALUE; }
 
         /// <summary>
         /// Number of data points gathered
@@ -2060,12 +2118,12 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Deviation from the statistical mean
         /// </summary>
-        private string MeanDeviation { get => m_Data.MeanDeviation.ToString(m_sVALUE_FORMAT); }
+        private string MeanDeviation { get => HasReadings ? m_Data.MeanDeviation.ToString(m_sVALUE_FORMAT) : m_sNO_VALUE; }
 
         /// <summary>
         /// Standard deviation of the data set
         /// </summary>
-        private string StandardDeviation { get => m_Data.StandardDeviation.ToString(m_sVALUE_FORMAT); }
+        private string StandardDeviation { get => HasReadings ? m_Data.StandardDeviation.ToString(m_sVALUE_FORMAT) : m_sNO_VALUE; }
 
         /// <summary>
         /// Message to display in the info box while a session is running (read-only)
@@ -2154,6 +2212,10 @@ namespace RandomNumberGenerator
         private static readonly Color m_PRIMARY_HOVER_COLOR = Color.FromArgb(42, 112, 181);
         private static readonly Color m_PRIMARY_PRESSED_COLOR = Color.FromArgb(23, 72, 121);
 
+        // Window title
+        private const string m_sAPPLICATION_NAME = "Random Number Generator";
+        private const string m_sTITLE_SEPARATOR = " - ";
+
         // Button text
         internal const string m_sPAUSE_BUTTON = "&Pause";
         internal const string m_sRESUME_BUTTON = "&Resume";
@@ -2163,7 +2225,8 @@ namespace RandomNumberGenerator
         private const string m_sDEVICE_INIT_ERROR = "Error initializing TruRNGpro. Please verify device is connected and correct COM port is selected.";
         private const string m_sDEVICE_READ_ERROR = "Error reading from TruRNGpro. Please verify device is connected and correct COM port is selected.";
         private const string m_sINIT_MESSAGE = "Initialized";
-        private const string m_sIDLE_MESSAGE = "Idle";
+        private const string m_sNO_FILE_MESSAGE = "Choose a data file to record into.";
+        private const string m_sREADY_MESSAGE = "Ready. Press Start to record.";
         private const string m_sPAUSED_MESSAGE = "Paused";
         private const string m_sCLOSE_STOP_SESSION = "Ending current session...";
         private const string m_sCLOSE_STOP_DEVICE_UPDATE = "Waiting for USB device search to end...";
