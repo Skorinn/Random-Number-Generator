@@ -8,6 +8,8 @@
 // Revision History: 
 //====================================================================================================================
 // 2025/08/13 - Mike Pullen - Initial version
+// 2026/09/07 - Mike Pullen - Choose the bin count from the sample size, label the axes to tick precision,
+//                            and put the key above the plot
 //*********************************************************************************************************************
 using System;
 using System.Collections.Generic;
@@ -41,15 +43,44 @@ namespace RandomNumberGenerator
             };
 
             this.ChartAreas.Add(mainChartArea);
-            
-            // Add the legend
+
+            // Add the legend, above the plot rather than beside it so the distribution keeps the full width
             Legend legendHistogram = new Legend();
             legendHistogram.Name = "legendHistogram";
+            legendHistogram.Docking = Docking.Top;
+            legendHistogram.Alignment = StringAlignment.Far;
+            legendHistogram.IsDockedInsideChartArea = false;
             Legends.Add(legendHistogram);
         }
 
         #endregion
         #region Methods
+
+        /// <summary>
+        /// Plots histogram data for two data sets, choosing how many bins to divide them into from how much
+        /// data there is. Too many bins for the sample leaves single readings standing alone as spikes,
+        /// which reads as a scatter of lines rather than as a distribution with a shape.
+        /// </summary>
+        /// <param name="data1">IN - First data set to plot</param>
+        /// <param name="label1">IN - Label for the first data set</param>
+        /// <param name="data2">IN - Second data set to plot</param>
+        /// <param name="label2">IN - Label for the second data set</param>
+        /// <exception cref="ArgumentNullException">Thrown when data1 or data2 is null</exception>
+        public void Plot(List<double> data1, string label1, List<double> data2, string label2)
+        {
+            // Validate before counting, so a null set is reported rather than dereferenced
+            if (null == data1)
+            {
+                throw new ArgumentNullException(nameof(data1), "First data set cannot be null");
+            }
+
+            if (null == data2)
+            {
+                throw new ArgumentNullException(nameof(data2), "Second data set cannot be null");
+            }
+
+            Plot(data1, label1, data2, label2, ChooseBinCount(data1.Count + data2.Count));
+        }
 
         /// <summary>
         /// Plots histogram data for two data sets with specified labels and bin count
@@ -58,10 +89,10 @@ namespace RandomNumberGenerator
         /// <param name="label1">IN - Label for the first data set</param>
         /// <param name="data2">IN - Second data set to plot</param>
         /// <param name="label2">IN - Label for the second data set</param>
-        /// <param name="binCount">IN - Number of bins for the histogram (default 100)</param>
+        /// <param name="binCount">IN - Number of bins for the histogram</param>
         /// <exception cref="ArgumentNullException">Thrown when data1 or data2 is null</exception>
         /// <exception cref="ArgumentException">Thrown when binCount is less than or equal to zero</exception>
-        public void Plot(List<double> data1, string label1, List<double> data2, string label2, int binCount = m_iDEFAULT_BIN_COUNT)
+        public void Plot(List<double> data1, string label1, List<double> data2, string label2, int binCount)
         {
             // Validate input parameters
             if (null == data1)
@@ -128,6 +159,44 @@ namespace RandomNumberGenerator
             // Add series to chart
             this.Series.Add(firstSeries);
             this.Series.Add(secondSeries);
+        }
+
+        /// <summary>
+        /// Chooses how many bins to divide the data into. The count follows the cube root of the sample
+        /// size, which is the usual rule for keeping the bars wide enough to show a shape without smoothing
+        /// the distribution away, and is held between a floor and a ceiling so that a handful of readings
+        /// still produces a readable chart and a long session does not produce a comb.
+        /// </summary>
+        /// <param name="iSampleCount">IN - How many readings there are across both data sets</param>
+        /// <returns>The number of bins to use</returns>
+        private static int ChooseBinCount(int iSampleCount)
+        {
+            if (m_iMINIMUM_BIN_COUNT >= iSampleCount)
+            {
+                return m_iMINIMUM_BIN_COUNT;
+            }
+
+            int iChosen = (int)Math.Ceiling(m_fBIN_COUNT_FACTOR * Math.Pow(iSampleCount, m_fBIN_COUNT_EXPONENT));
+            return Math.Min(Math.Max(iChosen, m_iMINIMUM_BIN_COUNT), m_iMAXIMUM_BIN_COUNT);
+        }
+
+        /// <summary>
+        /// The number of decimal places an axis label needs to tell one tick from the next. Printing a
+        /// double at full precision fills the axis with digits that carry no information and collide with
+        /// the label beside them.
+        /// </summary>
+        /// <param name="fInterval">IN - The interval between ticks</param>
+        /// <returns>A numeric format string for the axis labels</returns>
+        private static string GetAxisLabelFormat(double fInterval)
+        {
+            if (0 >= fInterval)
+            {
+                return m_sDEFAULT_LABEL_FORMAT;
+            }
+
+            int iDecimals = (int)Math.Ceiling(-Math.Log10(fInterval));
+            iDecimals = Math.Min(Math.Max(iDecimals, 0), m_iMAXIMUM_LABEL_DECIMALS);
+            return "0." + new string('0', iDecimals);
         }
 
         /// <summary>
@@ -211,6 +280,10 @@ namespace RandomNumberGenerator
                 double fXInterval = CalculateOptimalInterval(fXRange);
                 mainChartArea.AxisX.Interval = fXInterval;
 
+                // Label the ticks to the precision that tells them apart, and no further. Left to itself the
+                // chart prints the full double, which runs the labels into one another.
+                mainChartArea.AxisX.LabelStyle.Format = GetAxisLabelFormat(fXInterval);
+
                 // Set Y-axis range with dynamic scaling
                 mainChartArea.AxisY.Minimum = fMinYValue;
                 mainChartArea.AxisY.Maximum = fMaxYValue;
@@ -219,6 +292,9 @@ namespace RandomNumberGenerator
                 double fYRange = fMaxYValue - fMinYValue;
                 double fYInterval = CalculateOptimalYInterval(fYRange);
                 mainChartArea.AxisY.Interval = fYInterval;
+
+                // Frequencies are counts, so the axis is labelled with whole numbers
+                mainChartArea.AxisY.LabelStyle.Format = m_sFREQUENCY_LABEL_FORMAT;
             }
         }
 
@@ -339,8 +415,14 @@ namespace RandomNumberGenerator
             {
                 ChartType = SeriesChartType.Column,
                 ChartArea = m_sMAIN_CHART_AREA_NAME,
-                Color = Color.FromArgb(iAlpha, baseColor)
+                Color = Color.FromArgb(iAlpha, baseColor),
+                BorderColor = Color.FromArgb(iAlpha, baseColor),
+                BorderWidth = 0
             };
+
+            // Fill most of the space each bin is given, so the bars read as a distribution rather than as a
+            // row of separated lines
+            histogramSeries["PointWidth"] = m_sPOINT_WIDTH;
 
             return histogramSeries;
         }
@@ -404,7 +486,21 @@ namespace RandomNumberGenerator
         private const string m_sMAIN_CHART_AREA_NAME = "chartAreaHistogram";
         private const string m_sX_AXIS_TITLE = "Value";
         private const string m_sY_AXIS_TITLE = "Frequency";
-        private const int m_iDEFAULT_BIN_COUNT = 100;
+
+        // Choosing the bin count. The factor and exponent are the usual cube-root rule; the floor and
+        // ceiling keep a small sample readable and a long session from turning into a comb.
+        private const double m_fBIN_COUNT_FACTOR = 2.0;
+        private const double m_fBIN_COUNT_EXPONENT = 1.0 / 3.0;
+        private const int m_iMINIMUM_BIN_COUNT = 10;
+        private const int m_iMAXIMUM_BIN_COUNT = 60;
+
+        // Axis labelling
+        private const string m_sDEFAULT_LABEL_FORMAT = "0.000";
+        private const string m_sFREQUENCY_LABEL_FORMAT = "0";
+        private const int m_iMAXIMUM_LABEL_DECIMALS = 6;
+
+        // How much of the space a bin is given the bar fills
+        private const string m_sPOINT_WIDTH = "0.9";
 
         // Dynamic range calculation constants
         private const double m_fDEFAULT_X_AXIS_MINIMUM = 0.0;

@@ -1690,7 +1690,7 @@ namespace RandomNumberGenerator
             if (bSuccess)
             {
                 // Update the baseline file display
-                m_BaselineTextBox.Text = Path.GetFileName(sFilePath);
+                m_BaselineTextBox.Text = DescribeLoadedFile(sFilePath, m_BaselineAnalysis);
 
                 // Update the histogram chart with baseline data
                 UpdateHistogramChartWithBaseline();
@@ -1729,7 +1729,7 @@ namespace RandomNumberGenerator
             if (bSuccess)
             {
                 // Update the result file display
-                m_ResultTextBox.Text = Path.GetFileName(sFilePath);
+                m_ResultTextBox.Text = DescribeLoadedFile(sFilePath, m_ResultAnalysis);
 
                 // Update the histogram chart with result data
                 UpdateHistogramChartWithResult();
@@ -1860,6 +1860,27 @@ namespace RandomNumberGenerator
                 m_ComparisonList.Items.Add(measureRow);
             }
             m_ComparisonList.EndUpdate();
+        }
+
+        /// <summary>
+        /// Names a loaded analysis file along with how many readings it holds. Two sessions of very
+        /// different lengths are not a fair comparison, and that has to be visible before the comparison is
+        /// read rather than after.
+        /// </summary>
+        /// <param name="sFilePath">IN - Path of the file that was loaded</param>
+        /// <param name="analysis">IN - The analysis it was loaded into, which may be null</param>
+        /// <returns>The file name, followed by the reading count when one is known</returns>
+        private static string DescribeLoadedFile(string sFilePath, StatisticalAnalysis analysis)
+        {
+            string sFileName = Path.GetFileName(sFilePath);
+            List<double> loadedData = analysis?.LoadedFileData;
+            if (null == loadedData)
+            {
+                return sFileName;
+            }
+
+            string sReadings = (1 == loadedData.Count) ? m_sSINGLE_READING : m_sMANY_READINGS;
+            return $"{sFileName}  —  {loadedData.Count:N0} {sReadings}";
         }
 
         /// <summary>
@@ -2105,6 +2126,10 @@ namespace RandomNumberGenerator
         // The value an unbiased generator's bit averages sit around, which the deviation is measured from
         private const double m_fSTATISTICAL_MEAN = 0.5;
         private const string m_sMEAN_LABEL_FORMAT = "0.0";
+
+        // How a loaded analysis file reports the amount of data behind it
+        private const string m_sSINGLE_READING = "reading";
+        private const string m_sMANY_READINGS = "readings";
 
         // Rows of the comparison table, in the order BuildComparisonTable adds them. Only the first of the
         // two unbounded measures is named, as the code needs it to tell the two groups of format apart.

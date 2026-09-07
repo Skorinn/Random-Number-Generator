@@ -8,6 +8,7 @@
 // Revision History: 
 //====================================================================================================================
 // 2025/01/20 - Mike Pullen - Original implementation.
+// 2026/09/07 - Mike Pullen - Cover the chosen bin count and the axis label precision
 //*********************************************************************************************************************
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
@@ -80,6 +81,14 @@ namespace RandomNumberGenerator.Test
         private const int m_iLARGE_BIN_COUNT = 20;
         private const int m_iINVALID_BIN_COUNT_ZERO = 0;
         private const int m_iINVALID_BIN_COUNT_NEGATIVE = -5;
+
+        // Sample sizes for checking how the bin count is chosen, and the bounds it is held between
+        private const int m_iTINY_SAMPLE_SIZE = 5;
+        private const int m_iMODERATE_SAMPLE_SIZE = 200;
+        private const int m_iLARGE_SAMPLE_SIZE = 100000;
+        private const int m_iMINIMUM_BIN_COUNT = 10;
+        private const int m_iMAXIMUM_BIN_COUNT = 60;
+        private const int m_iMAXIMUM_LABEL_DECIMALS = 6;
 
         // Y-axis scaling test constants
         private const double m_fEXPECTED_Y_AXIS_TOLERANCE = 0.01; // Tolerance for Y-axis value comparisons
@@ -906,8 +915,160 @@ namespace RandomNumberGenerator.Test
             // Verify Y-axis scales independently based on frequency data
             Assert.AreEqual(m_fDEFAULT_Y_MINIMUM, fYAxisMinimum, m_fEXPECTED_Y_AXIS_TOLERANCE, 
                            "Y-axis minimum should be independent of X-axis range");
-            Assert.IsTrue((fYAxisMaximum > m_fDEFAULT_Y_MAXIMUM_EMPTY), 
+            Assert.IsTrue((fYAxisMaximum > m_fDEFAULT_Y_MAXIMUM_EMPTY),
                          $"Y-axis maximum should scale based on frequency, not X-axis range. Actual: {fYAxisMaximum}");
+        }
+
+        #endregion
+        #region Bin Count and Axis Labelling Tests
+
+        /// <summary>
+        /// Tests that a plot with no bin count given divides the data into bins that follow the sample size
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void Plot_NoBinCount_ChoosesBinCountFromSampleSize()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            HistogramChart histogramChart = new HistogramChart();
+
+            // Two hundred readings spread over a range, which the cube root rule divides into twelve bins
+            List<double> spreadData = BuildSpreadData(m_iMODERATE_SAMPLE_SIZE);
+            const int iEXPECTED_BINS = 12;
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            histogramChart.Plot(spreadData, m_sTEST_LABEL_1, new List<double>(), m_sTEST_LABEL_2);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            Assert.AreEqual(iEXPECTED_BINS, histogramChart.Series[0].Points.Count,
+                            "The bin count should follow the cube root of the sample size");
+        }
+
+        /// <summary>
+        /// Tests that a handful of readings still produces enough bins to show a shape
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void Plot_TinySample_UsesTheMinimumBinCount()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            HistogramChart histogramChart = new HistogramChart();
+            List<double> tinyData = BuildSpreadData(m_iTINY_SAMPLE_SIZE);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            histogramChart.Plot(tinyData, m_sTEST_LABEL_1, new List<double>(), m_sTEST_LABEL_2);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            Assert.AreEqual(m_iMINIMUM_BIN_COUNT, histogramChart.Series[0].Points.Count,
+                            "A sample smaller than the floor should still be given the floor");
+        }
+
+        /// <summary>
+        /// Tests that a long session does not produce more bins than the chart can show as bars
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void Plot_LargeSample_CapsTheBinCount()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            HistogramChart histogramChart = new HistogramChart();
+            List<double> largeData = BuildSpreadData(m_iLARGE_SAMPLE_SIZE);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            histogramChart.Plot(largeData, m_sTEST_LABEL_1, new List<double>(), m_sTEST_LABEL_2);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            Assert.AreEqual(m_iMAXIMUM_BIN_COUNT, histogramChart.Series[0].Points.Count,
+                            "A sample large enough to exceed the ceiling should be held at it");
+        }
+
+        /// <summary>
+        /// Tests that the axis labels are printed to the precision that tells one tick from the next, rather
+        /// than at the full precision of a double, which runs the labels into one another
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void Plot_BitAverages_LabelsAxisToTickPrecision()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            HistogramChart histogramChart = new HistogramChart();
+
+            // Values of the shape the device produces, which are what showed the full precision on the axis
+            List<double> bitAverages = new List<double>();
+            for (int iIndex = 0; iIndex < m_iMODERATE_SAMPLE_SIZE; iIndex++)
+            {
+                bitAverages.Add(0.489044189453125 + (iIndex * 0.0001220703125));
+            }
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            histogramChart.Plot(bitAverages, m_sTEST_LABEL_1, new List<double>(), m_sTEST_LABEL_2);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            var chartArea = histogramChart.ChartAreas[0];
+            string sFormat = chartArea.AxisX.LabelStyle.Format;
+            Assert.IsFalse(string.IsNullOrEmpty(sFormat), "The x-axis should be given a label format");
+
+            // The label the axis minimum produces has to be short enough to sit beside its neighbour
+            string sLabel = chartArea.AxisX.Minimum.ToString(sFormat);
+            int iDecimals = (sLabel.Length - sLabel.IndexOf('.') - 1);
+            Assert.IsTrue((iDecimals <= m_iMAXIMUM_LABEL_DECIMALS),
+                          $"An axis label should not run to more than {m_iMAXIMUM_LABEL_DECIMALS} decimals. Actual: '{sLabel}'");
+
+            // The frequency axis counts readings, so it is labelled with whole numbers
+            string sFrequencyLabel = 3.0.ToString(chartArea.AxisY.LabelStyle.Format);
+            Assert.AreEqual("3", sFrequencyLabel, "The frequency axis should be labelled with whole numbers");
+        }
+
+        /// <summary>
+        /// Builds a set of readings spread evenly over a range, so the bins they fall into are decided by
+        /// how many of them there are rather than by where they happen to sit
+        /// </summary>
+        /// <param name="iCount">IN - How many readings to build</param>
+        /// <returns>The readings</returns>
+        private static List<double> BuildSpreadData(int iCount)
+        {
+            List<double> data = new List<double>(iCount);
+            for (int iIndex = 0; iIndex < iCount; iIndex++)
+            {
+                data.Add(iIndex / (double)iCount);
+            }
+            return data;
         }
 
         #endregion
