@@ -20,6 +20,7 @@
 //#define DUMP_DEVICES
 
 using DeviceInterfaces;
+using MathNet.Numerics.Statistics;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -111,6 +112,10 @@ namespace RandomNumberGenerator
             m_ActionFontRegular = m_PauseButton.Font;
             m_ActionFontBold = new Font(m_ActionFontRegular, FontStyle.Bold);
 
+            // Lay out the comparison table and restore the window to where it was left
+            BuildComparisonTable();
+            RestoreWindowPlacement();
+
             // Set the info box to idle
             m_StatusLabel.Text = m_sIDLE_MESSAGE;
             m_StatusLabel.ForeColor = StatusPalette.NormalText;
@@ -199,6 +204,20 @@ namespace RandomNumberGenerator
                         break;
                 }
             }
+        }
+
+        /// <summary>
+        /// Event handler for the comparison table being resized, which happens whenever the window is
+        /// </summary>
+        /// <param name="sender">IN - Sender of the event (not used)</param>
+        /// <param name="e">IN - The event arguments (not used)</param>
+        private void ComparisonList_SizeChanged(object sender, EventArgs e)
+        {
+            // Discard unused parameters
+            _ = sender;
+            _ = e;
+
+            SizeComparisonColumns();
         }
 
         /// <summary>
@@ -633,6 +652,9 @@ namespace RandomNumberGenerator
             // Set the state to terminating
             m_State = RngGuiStates.Terminating;
 
+            // Record where the window was left, before it is taken down
+            SaveWindowPlacement();
+
             // Reset the info box to the message state
             m_StatusLabel.ForeColor = StatusPalette.NormalText;
             m_StatusLabel.BackColor = StatusPalette.NormalBackground;
@@ -1042,6 +1064,69 @@ namespace RandomNumberGenerator
 
             // Start a new session (will continue existing session if already in progress)
             StartSession();
+        }
+
+        /// <summary>
+        /// Puts the window back to the size and position it was last closed at. A size that was never
+        /// recorded, or one that would put the window somewhere the user cannot reach it - a screen that has
+        /// since been unplugged, say - is ignored and the window opens where the designer places it.
+        /// </summary>
+        private void RestoreWindowPlacement()
+        {
+            System.Drawing.Size savedSize = Properties.Settings.Default.WindowSize;
+            System.Drawing.Point savedLocation = Properties.Settings.Default.WindowLocation;
+
+            // Nothing has been saved yet on the first run
+            bool bSizeSaved = ((savedSize.Width >= MinimumSize.Width) && (savedSize.Height >= MinimumSize.Height));
+            if (false == bSizeSaved)
+            {
+                return;
+            }
+
+            // Only take the position if the window would still land on a screen that is attached
+            System.Drawing.Rectangle savedBounds = new System.Drawing.Rectangle(savedLocation, savedSize);
+            bool bOnScreen = false;
+            foreach (Screen screen in Screen.AllScreens)
+            {
+                bOnScreen = (bOnScreen || screen.WorkingArea.IntersectsWith(savedBounds));
+            }
+
+            Size = savedSize;
+            if (true == bOnScreen)
+            {
+                StartPosition = FormStartPosition.Manual;
+                Location = savedLocation;
+            }
+
+            if (true == Properties.Settings.Default.WindowMaximised)
+            {
+                WindowState = FormWindowState.Maximized;
+            }
+        }
+
+        /// <summary>
+        /// Records the size and position of the window so the next run opens where this one was left. The
+        /// restored bounds are saved rather than the current ones, so a window closed while maximised comes
+        /// back maximised and returns to a sensible size when it is restored.
+        /// </summary>
+        private void SaveWindowPlacement()
+        {
+            try
+            {
+                bool bMaximised = (FormWindowState.Maximized == WindowState);
+                System.Drawing.Rectangle bounds = (FormWindowState.Normal == WindowState) ? Bounds : RestoreBounds;
+
+                Properties.Settings.Default.WindowMaximised = bMaximised;
+                Properties.Settings.Default.WindowLocation = bounds.Location;
+                Properties.Settings.Default.WindowSize = bounds.Size;
+                Properties.Settings.Default.Save();
+            }
+            catch (System.Configuration.ConfigurationErrorsException configEx)
+            {
+                // Failing to remember where the window was is not worth stopping the close for, but it is
+                // worth saying so rather than closing as though nothing happened
+                SetStatusBoxError($"Unable to save the window position: {configEx.Message}");
+            }
         }
 
         /// <summary>
@@ -1607,27 +1692,25 @@ namespace RandomNumberGenerator
                 // Update the baseline file display
                 m_BaselineTextBox.Text = Path.GetFileName(sFilePath);
 
-                // Update all baseline statistical fields with data from the loaded baseline analysis
-                UpdateBaselineStatisticalFields();
-
                 // Update the histogram chart with baseline data
                 UpdateHistogramChartWithBaseline();
 
-                // Update comparison statistics if both files are loaded
-                UpdateComparisonStatistics();
+                // Show the baseline column, and the difference if a result is loaded as well
+                UpdateComparisonTable();
 
                 // Show the success status, or anything that needs raising about the file that was loaded
                 ReportAnalysisLoaded(m_BaselineAnalysis,
-                                     $" Baseline file loaded: {Path.GetFileName(sFilePath)}. Ready for analysis.");
+                                     $"Baseline file loaded: {Path.GetFileName(sFilePath)}. Ready for analysis.");
             }
             else
             {
                 // Clear any previous baseline data
                 m_BaselineAnalysis = null;
-                
+
                 // Clear the baseline UI fields
-                ClearBaselineStatisticalFields();
-                
+                m_BaselineTextBox.Text = string.Empty;
+                UpdateComparisonTable();
+
                 // Show error status - specific error message already set by LoadBaselineFile
                 // Keep the existing error message in the status box
             }
@@ -1648,27 +1731,25 @@ namespace RandomNumberGenerator
                 // Update the result file display
                 m_ResultTextBox.Text = Path.GetFileName(sFilePath);
 
-                // Update all result statistical fields with data from the loaded result analysis
-                UpdateResultStatisticalFields();
-
                 // Update the histogram chart with result data
                 UpdateHistogramChartWithResult();
 
-                // Update comparison statistics if both files are loaded
-                UpdateComparisonStatistics();
+                // Show the result column, and the difference if a baseline is loaded as well
+                UpdateComparisonTable();
 
                 // Show the success status, or anything that needs raising about the file that was loaded
                 ReportAnalysisLoaded(m_ResultAnalysis,
-                                     $" Result file loaded: {Path.GetFileName(sFilePath)}. Ready for analysis.");
+                                     $"Result file loaded: {Path.GetFileName(sFilePath)}. Ready for analysis.");
             }
             else
             {
                 // Clear any previous result data
                 m_ResultAnalysis = null;
-                
+
                 // Clear the result UI fields
-                ClearResultStatisticalFields();
-                
+                m_ResultTextBox.Text = string.Empty;
+                UpdateComparisonTable();
+
                 // Show error status - specific error message already set by LoadResultFile
                 // Keep the existing error message in the status box
             }
@@ -1753,126 +1834,116 @@ namespace RandomNumberGenerator
         }
 
         /// <summary>
-        /// Updates all baseline statistical fields with data from the loaded baseline analysis
+        /// Builds the rows of the comparison table. The measures are fixed, so the rows are made once and
+        /// their values replaced as files are loaded, rather than the table being rebuilt each time.
+        /// NOTE: The order here is the order the row constants name, and the two have to be kept in step.
         /// </summary>
-        private void UpdateBaselineStatisticalFields()
+        private void BuildComparisonTable()
         {
-            // Verify baseline analysis data is available
-            if (m_BaselineAnalysis?.LoadedFileStats != null)
+            string[] sMeasures = new string[]
             {
-                var stats = m_BaselineAnalysis.LoadedFileStats;
+                "Mean",
+                $"Deviation from {m_fSTATISTICAL_MEAN.ToString(m_sMEAN_LABEL_FORMAT)}",
+                "Standard deviation",
+                "Skewness",
+                "Kurtosis"
+            };
 
-                // Update the baseline statistical display fields using the same format as the main statistics
-                m_BaselineMeanTextBox.Text = stats.Mean.ToString(m_sVALUE_FORMAT);
-                m_BaselineStdDevTextBox.Text = stats.StandardDeviation.ToString(m_sVALUE_FORMAT);
-                m_BaselineSkewnessTextBox.Text = stats.Skewness.ToString(m_sMOMENT_FORMAT);
-                m_BaselineKurtosisTextBox.Text = stats.Kurtosis.ToString(m_sMOMENT_FORMAT);
-            }
-            else
+            m_ComparisonList.BeginUpdate();
+            m_ComparisonList.Items.Clear();
+            foreach (string sMeasure in sMeasures)
             {
-                // Clear fields if no data is available
-                ClearBaselineStatisticalFields();
+                ListViewItem measureRow = new ListViewItem(sMeasure);
+                measureRow.SubItems.Add(m_sNO_VALUE);
+                measureRow.SubItems.Add(m_sNO_VALUE);
+                measureRow.SubItems.Add(m_sNO_VALUE);
+                m_ComparisonList.Items.Add(measureRow);
             }
+            m_ComparisonList.EndUpdate();
         }
 
         /// <summary>
-        /// Clears all baseline statistical fields
+        /// Spreads the comparison columns over the width of the table, rather than leaving the values
+        /// bunched to the left with empty space beside them. The measure column takes the larger share
+        /// because it holds words while the others hold a fixed number of digits.
         /// </summary>
-        private void ClearBaselineStatisticalFields()
+        private void SizeComparisonColumns()
         {
-            m_BaselineTextBox.Text = string.Empty;
-            m_BaselineMeanTextBox.Text = m_sNO_VALUE;
-            m_BaselineStdDevTextBox.Text = m_sNO_VALUE;
-            m_BaselineSkewnessTextBox.Text = m_sNO_VALUE;
-            m_BaselineKurtosisTextBox.Text = m_sNO_VALUE;
-        }
-
-        /// <summary>
-        /// Updates all result statistical fields with data from the loaded result analysis
-        /// </summary>
-        private void UpdateResultStatisticalFields()
-        {
-            // Verify result analysis data is available
-            if (m_ResultAnalysis?.LoadedFileStats != null)
+            // Leave a little back so the last column does not sit under the border
+            const int iEDGE_ALLOWANCE = 4;
+            int iAvailable = (m_ComparisonList.ClientSize.Width - iEDGE_ALLOWANCE);
+            if (0 >= iAvailable)
             {
-                var stats = m_ResultAnalysis.LoadedFileStats;
+                return;
+            }
 
-                // Update the result statistical display fields using the same format as the main statistics
-                m_ResultMeanTextBox.Text = stats.Mean.ToString(m_sVALUE_FORMAT);
-                m_ResultStdDevTextBox.Text = stats.StandardDeviation.ToString(m_sVALUE_FORMAT);
-                m_ResultSkewnessTextBox.Text = stats.Skewness.ToString(m_sMOMENT_FORMAT);
-                m_ResultKurtosisTextBox.Text = stats.Kurtosis.ToString(m_sMOMENT_FORMAT);
-            }
-            else
-            {
-                // Clear fields if no data is available
-                ClearResultStatisticalFields();
-            }
+            const double fVALUE_SHARE = 0.2;
+            int iValueWidth = (int)(iAvailable * fVALUE_SHARE);
+
+            // The measure column takes what the rounding of the others leaves, so the widths always add up
+            m_BaselineColumn.Width = iValueWidth;
+            m_ResultColumn.Width = iValueWidth;
+            m_DifferenceColumn.Width = iValueWidth;
+            m_MeasureColumn.Width = (iAvailable - (iValueWidth * 3));
         }
 
         /// <summary>
-        /// Clears all result statistical fields
+        /// The measures shown in the comparison table, taken from one set of statistics, in the row order
+        /// the table is built in
         /// </summary>
-        private void ClearResultStatisticalFields()
+        /// <param name="stats">IN - The statistics to take the measures from (cannot be null)</param>
+        /// <returns>The measures, one per row of the table</returns>
+        private static double[] GetComparisonValues(DescriptiveStatistics stats)
         {
-            m_ResultTextBox.Text = string.Empty;
-            m_ResultMeanTextBox.Text = m_sNO_VALUE;
-            m_ResultStdDevTextBox.Text = m_sNO_VALUE;
-            m_ResultSkewnessTextBox.Text = m_sNO_VALUE;
-            m_ResultKurtosisTextBox.Text = m_sNO_VALUE;
+            return new double[]
+            {
+                stats.Mean,
+                Math.Abs(stats.Mean - m_fSTATISTICAL_MEAN),
+                stats.StandardDeviation,
+                stats.Skewness,
+                stats.Kurtosis
+            };
         }
 
         /// <summary>
-        /// Updates the comparison statistics fields when both baseline and result files are loaded
+        /// Fills the comparison table from whichever of the two files is loaded. A measure with nothing
+        /// behind it shows as having no value rather than as a zero, and the difference is only shown when
+        /// there is something on both sides of it to subtract.
         /// </summary>
-        private void UpdateComparisonStatistics()
+        private void UpdateComparisonTable()
         {
             try
             {
-                // Check if both baseline and result data are available
-                if (m_BaselineAnalysis?.LoadedFileData != null && m_BaselineAnalysis.LoadedFileData.Count > 0 &&
-                    m_ResultAnalysis?.LoadedFileData != null && m_ResultAnalysis.LoadedFileData.Count > 0)
+                DescriptiveStatistics baselineStats = m_BaselineAnalysis?.LoadedFileStats;
+                DescriptiveStatistics resultStats = m_ResultAnalysis?.LoadedFileStats;
+                double[] baselineValues = (null == baselineStats) ? null : GetComparisonValues(baselineStats);
+                double[] resultValues = (null == resultStats) ? null : GetComparisonValues(resultStats);
+                bool bBothLoaded = ((null != baselineValues) && (null != resultValues));
+
+                m_ComparisonList.BeginUpdate();
+                for (int iRow = 0; iRow < m_ComparisonList.Items.Count; iRow++)
                 {
-                    // Get the statistical data
-                    var baselineStats = m_BaselineAnalysis.LoadedFileStats;
-                    var resultStats = m_ResultAnalysis.LoadedFileStats;
+                    // Skewness and kurtosis are unbounded, so they are shown less precisely than the
+                    // measures that sit within a unit range
+                    bool bIsMoment = (iRow >= m_iSKEWNESS_ROW);
+                    string sValueFormat = bIsMoment ? m_sMOMENT_FORMAT : m_sVALUE_FORMAT;
+                    string sDifferenceFormat = bIsMoment ? m_sMOMENT_DIFFERENCE_FORMAT : m_sVALUE_DIFFERENCE_FORMAT;
 
-                    // Calculate mean difference
-                    double fMeanDifference = resultStats.Mean - baselineStats.Mean;
-                    m_MeanDifferenceTextBox.Text = fMeanDifference.ToString(m_sVALUE_DIFFERENCE_FORMAT);
-
-                    // Calculate skewness difference
-                    double fSkewnessDifference = resultStats.Skewness - baselineStats.Skewness;
-                    m_SkewnessTextBox.Text = fSkewnessDifference.ToString(m_sMOMENT_DIFFERENCE_FORMAT);
-
-                    // Update the histogram chart with both datasets
-                    List<double> baselineData = m_BaselineAnalysis.LoadedFileData;
-                    List<double> resultData = m_ResultAnalysis.LoadedFileData;
-                    string baselineLabel = $"Baseline ({m_BaselineAnalysis.LoadedFileName})";
-                    string resultLabel = $"Result ({m_ResultAnalysis.LoadedFileName})";
-                    
-                    m_ResultHistogramChart.Plot(baselineData, baselineLabel, resultData, resultLabel);
+                    ListViewItem measureRow = m_ComparisonList.Items[iRow];
+                    measureRow.SubItems[m_iBASELINE_COLUMN].Text = (null == baselineValues)
+                        ? m_sNO_VALUE : baselineValues[iRow].ToString(sValueFormat);
+                    measureRow.SubItems[m_iRESULT_COLUMN].Text = (null == resultValues)
+                        ? m_sNO_VALUE : resultValues[iRow].ToString(sValueFormat);
+                    measureRow.SubItems[m_iDIFFERENCE_COLUMN].Text = (false == bBothLoaded)
+                        ? m_sNO_VALUE : (resultValues[iRow] - baselineValues[iRow]).ToString(sDifferenceFormat);
                 }
-                else
-                {
-                    // Clear comparison fields if both files are not loaded
-                    ClearComparisonFields();
-                }
+                m_ComparisonList.EndUpdate();
             }
             catch (Exception ex)
             {
                 // Handle any errors during comparison update
                 SetStatusBoxError($"Error updating comparison statistics: {ex.Message}");
             }
-        }
-
-        /// <summary>
-        /// Clears all comparison statistical fields
-        /// </summary>
-        private void ClearComparisonFields()
-        {
-            m_MeanDifferenceTextBox.Text = m_sNO_VALUE;
-            m_SkewnessTextBox.Text = m_sNO_VALUE;
         }
 
         #endregion
@@ -2031,6 +2102,19 @@ namespace RandomNumberGenerator
         private const string m_sMOMENT_DIFFERENCE_FORMAT = "+0.000;-0.000";
         private const string m_sNO_VALUE = "—";
 
+        // The value an unbiased generator's bit averages sit around, which the deviation is measured from
+        private const double m_fSTATISTICAL_MEAN = 0.5;
+        private const string m_sMEAN_LABEL_FORMAT = "0.0";
+
+        // Rows of the comparison table, in the order BuildComparisonTable adds them. Only the first of the
+        // two unbounded measures is named, as the code needs it to tell the two groups of format apart.
+        private const int m_iSKEWNESS_ROW = 3;
+
+        // Columns of the comparison table. Column zero names the measure and is never rewritten.
+        private const int m_iBASELINE_COLUMN = 1;
+        private const int m_iRESULT_COLUMN = 2;
+        private const int m_iDIFFERENCE_COLUMN = 3;
+
         // Guards the status bar, which is written to from the device read path as well as the UI
         private readonly object m_StatusLock = new object();
 
@@ -2046,8 +2130,8 @@ namespace RandomNumberGenerator
         private static readonly Color m_PRIMARY_PRESSED_COLOR = Color.FromArgb(23, 72, 121);
 
         // Button text
-        internal const string m_sPAUSE_BUTTON = "Pause";
-        internal const string m_sRESUME_BUTTON = "Resume";
+        internal const string m_sPAUSE_BUTTON = "&Pause";
+        internal const string m_sRESUME_BUTTON = "&Resume";
 
         // Status and error messages for the info box
         private const string m_sINVALID_SEED_ERROR = "Specified seed is not valid. Must be positive integer. Reset to last valid value.";

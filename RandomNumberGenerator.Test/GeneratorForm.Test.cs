@@ -16,6 +16,7 @@ using System.ComponentModel;
 using System.Drawing;
 using System.IO;
 using System.Reflection;
+using System.Windows.Forms;
 
 namespace RandomNumberGenerator.Test
 {
@@ -1445,8 +1446,8 @@ namespace RandomNumberGenerator.Test
             // Act
             //**************************************************************//
 
-            // Use reflection to call the private UpdateComparisonStatistics method
-            MethodInfo updateMethod = typeof(GeneratorForm).GetMethod("UpdateComparisonStatistics", 
+            // Use reflection to call the private UpdateComparisonTable method
+            MethodInfo updateMethod = typeof(GeneratorForm).GetMethod("UpdateComparisonTable",
                               BindingFlags.NonPublic | BindingFlags.Instance);
             updateMethod.Invoke(generatorForm, new object[] { });
 
@@ -1454,10 +1455,28 @@ namespace RandomNumberGenerator.Test
             // Assert
             //**************************************************************//
 
-            // Verify comparison fields were cleared
-            // We can't directly verify the UI fields without accessing them via reflection or making them testable
-            // But we can verify the method completed without throwing exceptions
-            Assert.IsNotNull(generatorForm, "UpdateComparisonStatistics should complete without exception");
+            // The table keeps its rows whether or not anything is loaded, so every measure is still named
+            FieldInfo listField = typeof(GeneratorForm).GetField("m_ComparisonList",
+                              BindingFlags.NonPublic | BindingFlags.Instance);
+            ListView comparisonList = (ListView)listField.GetValue(generatorForm);
+            Assert.IsTrue(comparisonList.Items.Count > 0, "The table should keep one row per measure");
+
+            // Take the placeholder from the form rather than repeating it here, so this cannot pass against
+            // a form that shows something else entirely
+            FieldInfo noValueField = typeof(GeneratorForm).GetField("m_sNO_VALUE",
+                              BindingFlags.NonPublic | BindingFlags.Static);
+            string sNoValue = (string)noValueField.GetRawConstantValue();
+
+            // With no file loaded, every value reads as having no value rather than as a zero
+            foreach (ListViewItem measureRow in comparisonList.Items)
+            {
+                Assert.IsFalse(string.IsNullOrEmpty(measureRow.Text), "Each row should still name its measure");
+                for (int iColumn = 1; iColumn < measureRow.SubItems.Count; iColumn++)
+                {
+                    Assert.AreEqual(sNoValue, measureRow.SubItems[iColumn].Text,
+                                    $"Row '{measureRow.Text}' column {iColumn} should show no value");
+                }
+            }
         }
 
         #endregion
