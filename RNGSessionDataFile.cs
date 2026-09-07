@@ -155,7 +155,7 @@ namespace RandomNumberGenerator
                 else
                 {
                     // Invalid writer - likely no file path set
-                    throw new InvalidOperationException(" No data file selected. Please select a file before starting a session.");
+                    throw new InvalidOperationException("No data file selected. Please select a file before starting a session.");
                 }
             }
             catch (InvalidOperationException)
@@ -249,7 +249,7 @@ namespace RandomNumberGenerator
                         string sErrorMessage = m_Reader.LastError;
                         if (string.IsNullOrEmpty(sErrorMessage))
                         {
-                            sErrorMessage = $" Unknown error loading file '{Path.GetFileName(sFilePath)}'.";
+                            sErrorMessage = $"Unknown error loading file '{Path.GetFileName(sFilePath)}'.";
                         }
                         throw new InvalidDataException(sErrorMessage);
                     }
@@ -263,7 +263,7 @@ namespace RandomNumberGenerator
                 catch (IOException ioException)
                 {
                     // Re-throw IO exceptions to be handled by calling code
-                    throw new IOException($" File I/O error accessing '{Path.GetFileName(sFilePath)}': {ioException.Message}", ioException);
+                    throw new IOException($"File I/O error accessing '{Path.GetFileName(sFilePath)}': {ioException.Message}", ioException);
                 }
                 catch (InvalidDataException)
                 {
@@ -279,13 +279,13 @@ namespace RandomNumberGenerator
                 catch (Exception generalException)
                 {
                     // Wrap other exceptions with file context
-                    throw new Exception($" Unexpected error loading file '{Path.GetFileName(sFilePath)}': {generalException.Message}", generalException);
+                    throw new Exception($"Unexpected error loading file '{Path.GetFileName(sFilePath)}': {generalException.Message}", generalException);
                 }
             }
             else
             {
                 // No reader available - cannot load sessions
-                throw new InvalidOperationException(" No XML reader available for loading session data. Use constructor with reader parameter.");
+                throw new InvalidOperationException("No XML reader available for loading session data. Use constructor with reader parameter.");
             }
 
             return bStatus;
@@ -310,7 +310,7 @@ namespace RandomNumberGenerator
             // overwrite the file that has just been loaded.
             if (false == bPrepared)
             {
-                throw new InvalidOperationException($" Unable to prepare '{Path.GetFileName(sFilePath)}' for" +
+                throw new InvalidOperationException($"Unable to prepare '{Path.GetFileName(sFilePath)}' for" +
                                                     $" appending, so the session cannot be continued.");
             }
 

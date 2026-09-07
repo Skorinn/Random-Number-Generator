@@ -164,8 +164,10 @@ non-obvious rules new code is expected to match:
   (`if (null == x)`, `if (false == bStatus)`). Explicit parentheses in compound/boolean expressions.
 - `string.Empty` over `""`; string interpolation over concatenation; named `const` locals instead of bare
   `true`/`false`/magic numbers at call sites; `_ = sender;` to discard unused event parameters.
-- Errors bubble up: throw with a user-facing message (leading space is the house style) rather than
-  swallowing and returning `false`; the form catches them and renders via `SetStatusBoxError`.
+- Errors bubble up: throw with a user-facing message rather than swallowing and returning `false`; the form
+  catches them and renders via `SetStatusBoxError`. Messages start at the first word — the leading space
+  that used to be the house style was padding for a status box that had none, and the status bar that
+  replaced it has real padding.
 - Tests: `[ClassName]Tests`, `[Method]_[Scenario]_[ExpectedResult]`, banner-commented Arrange/Act/Assert
   sections, Moq for collaborators, `[TestCategory("Component")]`.
 

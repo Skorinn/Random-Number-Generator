@@ -129,7 +129,7 @@ namespace RandomNumberGenerator
             this.m_CurrentAverageTextBox.Size = new System.Drawing.Size(144, 26);
             this.m_CurrentAverageTextBox.TabIndex = 1;
             this.m_CurrentAverageTextBox.TabStop = false;
-            this.m_CurrentAverageTextBox.Text = "0.000000000";
+            this.m_CurrentAverageTextBox.Text = "0.000000";
             this.m_CurrentAverageTextBox.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             // 
             // m_SessionTimerTextBox
@@ -425,7 +425,7 @@ namespace RandomNumberGenerator
             this.m_MeanDeviationTextBox.Size = new System.Drawing.Size(144, 26);
             this.m_MeanDeviationTextBox.TabIndex = 8;
             this.m_MeanDeviationTextBox.TabStop = false;
-            this.m_MeanDeviationTextBox.Text = "0.000000e0";
+            this.m_MeanDeviationTextBox.Text = "0.000000";
             this.m_MeanDeviationTextBox.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             this.m_MeanDeviationTextBox.WordWrap = false;
             // 
@@ -450,7 +450,7 @@ namespace RandomNumberGenerator
             this.m_StandardDeviationTextBox.Size = new System.Drawing.Size(144, 26);
             this.m_StandardDeviationTextBox.TabIndex = 6;
             this.m_StandardDeviationTextBox.TabStop = false;
-            this.m_StandardDeviationTextBox.Text = "0.000000e0";
+            this.m_StandardDeviationTextBox.Text = "0.000000";
             this.m_StandardDeviationTextBox.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             this.m_StandardDeviationTextBox.WordWrap = false;
             // 

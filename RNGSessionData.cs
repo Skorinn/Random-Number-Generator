@@ -117,7 +117,7 @@ namespace RandomNumberGenerator
                 // Validate data file exists
                 if (null == m_DataFile)
                 {
-                    throw new InvalidOperationException(" No data file interface available.");
+                    throw new InvalidOperationException("No data file interface available.");
                 }
 
                 // Start the file session
@@ -283,7 +283,7 @@ namespace RandomNumberGenerator
                 {
                     if (null == m_DataFile)
                     {
-                        throw new InvalidOperationException(" No data file available for writing.");
+                        throw new InvalidOperationException("No data file available for writing.");
                     }
 
                     // Write the pending data points using the dedicated helper method
@@ -362,7 +362,7 @@ namespace RandomNumberGenerator
 
                     if (!bStatus)
                     {
-                        throw new InvalidOperationException($" Failed to write data point {uIndex + 1} of {uPointsToWrite} to file.");
+                        throw new InvalidOperationException($"Failed to write data point {uIndex + 1} of {uPointsToWrite} to file.");
                     }
 
                     // Account for each point as it is written rather than all of them at the end, so a write
@@ -380,7 +380,7 @@ namespace RandomNumberGenerator
             }
             else
             {
-                throw new InvalidOperationException(" Failed to extract pending data points for writing.");
+                throw new InvalidOperationException("Failed to extract pending data points for writing.");
             }
 
             return bStatus;

@@ -94,7 +94,7 @@ namespace RandomNumberGenerator
                 if (string.IsNullOrEmpty(m_sFilePath))
                 {
                     // Throw exception for missing file path - this will bubble up to the GUI
-                    throw new InvalidOperationException(" No file selected. Please select a data file before starting a session.");
+                    throw new InvalidOperationException("No file selected. Please select a data file before starting a session.");
                 }
 
                 // Create (or recreate) the writer
@@ -121,28 +121,28 @@ namespace RandomNumberGenerator
                     catch (InvalidOperationException)
                     {
                         // Writer is in an invalid state
-                        throw new InvalidOperationException(" XML writer error: Unable to start session. The file may be corrupted or in use.");
+                        throw new InvalidOperationException("XML writer error: Unable to start session. The file may be corrupted or in use.");
                     }
                     catch (System.UnauthorizedAccessException)
                     {
                         // File access denied
-                        throw new UnauthorizedAccessException(" File access denied. Please check file permissions and ensure the file is not open in another application.");
+                        throw new UnauthorizedAccessException("File access denied. Please check file permissions and ensure the file is not open in another application.");
                     }
                     catch (System.IO.IOException ioEx)
                     {
                         // File I/O error
-                        throw new System.IO.IOException($" File I/O error: {ioEx.Message}");
+                        throw new System.IO.IOException($"File I/O error: {ioEx.Message}");
                     }
                     catch (Exception ex)
                     {
                         // Any other writing error
-                        throw new Exception($" Unexpected error starting session: {ex.Message}");
+                        throw new Exception($"Unexpected error starting session: {ex.Message}");
                     }
                 }
                 else
                 {
                     // Writer creation failed
-                    throw new InvalidOperationException(" Unable to create XML writer. Please check the file path and ensure the directory exists.");
+                    throw new InvalidOperationException("Unable to create XML writer. Please check the file path and ensure the directory exists.");
                 }
             }
 
@@ -163,7 +163,7 @@ namespace RandomNumberGenerator
             // Validate the data point
             if (null == dataPoint)
             {
-                throw new ArgumentNullException(" Data point cannot be null.");
+                throw new ArgumentNullException("Data point cannot be null.");
             }
 
             // Limit access to the file to one thread at a time
@@ -182,24 +182,24 @@ namespace RandomNumberGenerator
                     bool bStatus = dataPoint.WriteDataPoint(m_Writer);
                     if (!bStatus)
                     {
-                        throw new InvalidOperationException(" Failed to write data point to file. The XML writer may be in an invalid state.");
+                        throw new InvalidOperationException("Failed to write data point to file. The XML writer may be in an invalid state.");
                     }
                     return bStatus;
                 }
                 catch (InvalidOperationException)
                 {
                     // Re-throw with context
-                    throw new InvalidOperationException(" Error writing data point: XML writer is in an invalid state.");
+                    throw new InvalidOperationException("Error writing data point: XML writer is in an invalid state.");
                 }
                 catch (System.IO.IOException ioEx)
                 {
                     // File I/O error
-                    throw new System.IO.IOException($" File I/O error writing data point: {ioEx.Message}");
+                    throw new System.IO.IOException($"File I/O error writing data point: {ioEx.Message}");
                 }
                 catch (Exception ex)
                 {
                     // Any other writing error
-                    throw new Exception($" Unexpected error writing data point: {ex.Message}");
+                    throw new Exception($"Unexpected error writing data point: {ex.Message}");
                 }
             }
         }
@@ -267,23 +267,23 @@ namespace RandomNumberGenerator
                     catch (InvalidOperationException)
                     {
                         // Writer is in an invalid state
-                        throw new InvalidOperationException(" Error ending session: XML writer is in an invalid state.");
+                        throw new InvalidOperationException("Error ending session: XML writer is in an invalid state.");
                     }
                     catch (System.IO.IOException ioEx)
                     {
                         // File I/O error
-                        throw new System.IO.IOException($" File I/O error ending session: {ioEx.Message}");
+                        throw new System.IO.IOException($"File I/O error ending session: {ioEx.Message}");
                     }
                     catch (Exception ex)
                     {
                         // Any other writing error
-                        throw new Exception($" Unexpected error ending session: {ex.Message}");
+                        throw new Exception($"Unexpected error ending session: {ex.Message}");
                     }
                 }
                 else
                 {
                     // Writer creation/access failed
-                    throw new InvalidOperationException(" Unable to access XML writer for ending session.");
+                    throw new InvalidOperationException("Unable to access XML writer for ending session.");
                 }
             }
 
@@ -340,7 +340,7 @@ namespace RandomNumberGenerator
                         bStatus = CreateWriter(bAPPEND_MODE, bRECREATE);
                         if (!bStatus)
                         {
-                            throw new InvalidOperationException(" Unable to create XML writer after preparing file for append.");
+                            throw new InvalidOperationException("Unable to create XML writer after preparing file for append.");
                         }
                         
                         // DO NOT write a new Session start element here!
@@ -349,7 +349,7 @@ namespace RandomNumberGenerator
                     }
                     else
                     {
-                        throw new InvalidOperationException(" Unable to prepare file for appending. The file may be corrupted or have invalid XML structure.");
+                        throw new InvalidOperationException("Unable to prepare file for appending. The file may be corrupted or have invalid XML structure.");
                     }
                 }
                 catch (System.IO.IOException)
@@ -370,7 +370,7 @@ namespace RandomNumberGenerator
                 catch (Exception ex)
                 {
                     // Wrap other exceptions with context
-                    throw new Exception($" Unexpected error preparing file for append: {ex.Message}", ex);
+                    throw new Exception($"Unexpected error preparing file for append: {ex.Message}", ex);
                 }
             }
 
@@ -438,7 +438,7 @@ namespace RandomNumberGenerator
                     if (0 > iSessionIndex)
                     {
                         // No session element at all, so this is not a session file
-                        throw new InvalidOperationException($" Invalid XML structure: No {XMLConstants.SESSION_ELEMENT} element found in file or file format is not recognized.");
+                        throw new InvalidOperationException($"Invalid XML structure: No {XMLConstants.SESSION_ELEMENT} element found in file or file format is not recognized.");
                     }
 
                     // Case 2: an empty session closes itself, so the tag is reopened to hold the new data
@@ -491,7 +491,7 @@ namespace RandomNumberGenerator
             catch (Exception ex)
             {
                 // Wrap other exceptions as IO errors since this is a file operation
-                throw new System.IO.IOException($" Error reading or writing file during append preparation: {ex.Message}", ex);
+                throw new System.IO.IOException($"Error reading or writing file during append preparation: {ex.Message}", ex);
             }
         }
 
@@ -642,7 +642,7 @@ namespace RandomNumberGenerator
                     // Validate file path is set
                     if (string.IsNullOrEmpty(m_sFilePath))
                     {
-                        throw new InvalidOperationException(" File path is not set. Cannot create XML writer without a valid file path.");
+                        throw new InvalidOperationException("File path is not set. Cannot create XML writer without a valid file path.");
                     }
 
                     // Create writer based on mode (append vs. new file)
@@ -710,13 +710,13 @@ namespace RandomNumberGenerator
                     
                     if (!bStatus)
                     {
-                        throw new InvalidOperationException(" Failed to create XML writer for unknown reasons.");
+                        throw new InvalidOperationException("Failed to create XML writer for unknown reasons.");
                     }
                 }
                 catch (System.ArgumentException argEx)
                 {
                     // Path or settings are not valid
-                    throw new System.ArgumentException($" Invalid file path or XML settings: {argEx.Message}", argEx);
+                    throw new System.ArgumentException($"Invalid file path or XML settings: {argEx.Message}", argEx);
                 }
                 catch (UnauthorizedAccessException)
                 {
@@ -741,7 +741,7 @@ namespace RandomNumberGenerator
                 catch (Exception ex)
                 {
                     // Any other exception - wrap with context
-                    throw new Exception($" Unexpected error creating XML writer: {ex.Message}", ex);
+                    throw new Exception($"Unexpected error creating XML writer: {ex.Message}", ex);
                 }
             }
 

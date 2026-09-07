@@ -84,7 +84,7 @@ namespace RandomNumberGenerator
             // Validate parameters
             if (null == sessionData)
             {
-                m_sLastError = " Session data object cannot be null.";
+                m_sLastError = "Session data object cannot be null.";
                 return false;
             }
 
@@ -134,26 +134,26 @@ namespace RandomNumberGenerator
                         bool bErrorEmpty = string.IsNullOrEmpty(m_sLastError);
                         if (bErrorEmpty)
                         {
-                            m_sLastError = $" Unable to create XML reader for file '{System.IO.Path.GetFileName(m_sFilePath)}'.";
+                            m_sLastError = $"Unable to create XML reader for file '{System.IO.Path.GetFileName(m_sFilePath)}'.";
                         }
                     }
                 }
                 catch (XmlException xmlException)
                 {
                     // XML parsing errors - invalid file format
-                    m_sLastError = $" XML parsing error in file '{System.IO.Path.GetFileName(m_sFilePath)}': {xmlException.Message}";
+                    m_sLastError = $"XML parsing error in file '{System.IO.Path.GetFileName(m_sFilePath)}': {xmlException.Message}";
                     bStatus = false;
                 }
                 catch (IOException ioException)
                 {
                     // File I/O errors - file access issues
-                    m_sLastError = $" File I/O error accessing '{System.IO.Path.GetFileName(m_sFilePath)}': {ioException.Message}";
+                    m_sLastError = $"File I/O error accessing '{System.IO.Path.GetFileName(m_sFilePath)}': {ioException.Message}";
                     bStatus = false;
                 }
                 catch (Exception generalException)
                 {
                     // Any other unexpected errors
-                    m_sLastError = $" Unexpected error loading file '{System.IO.Path.GetFileName(m_sFilePath)}': {generalException.Message}";
+                    m_sLastError = $"Unexpected error loading file '{System.IO.Path.GetFileName(m_sFilePath)}': {generalException.Message}";
                     bStatus = false;
                 }
                 finally
@@ -243,7 +243,7 @@ namespace RandomNumberGenerator
             }
             else
             {
-                m_sLastError = $" Invalid XML file format: No '{XMLConstants.SESSION_ELEMENT}' element found in file '{System.IO.Path.GetFileName(m_sFilePath)}'.";
+                m_sLastError = $"Invalid XML file format: No '{XMLConstants.SESSION_ELEMENT}' element found in file '{System.IO.Path.GetFileName(m_sFilePath)}'.";
                 return false;
             }
         }
@@ -324,7 +324,7 @@ namespace RandomNumberGenerator
                             bool bBatchLoaded = sessionData.LoadDataPointsBatch(dataBatch, uBatchSize);
                             if (false == bBatchLoaded)
                             {
-                                m_sLastError = " Failed to load data points batch into session.";
+                                m_sLastError = "Failed to load data points batch into session.";
                                 bStatus = false;
                                 break;
                             }
@@ -347,7 +347,7 @@ namespace RandomNumberGenerator
                 {
                     // The session was closed but the file still does not parse, so it is damaged rather
                     // than simply unfinished and is not something that can be recovered from
-                    m_sLastError = $" XML file appears to be incomplete or corrupted. Loaded {sessionData.NumDataPoints} data points successfully before encountering: {xmlException.Message}";
+                    m_sLastError = $"XML file appears to be incomplete or corrupted. Loaded {sessionData.NumDataPoints} data points successfully before encountering: {xmlException.Message}";
                     bStatus = false;
                 }
             }
@@ -359,7 +359,7 @@ namespace RandomNumberGenerator
                 bStatus = sessionData.LoadDataPointsBatch(dataBatch, (uint)dataBatch.Count);
                 if (false == bStatus)
                 {
-                    m_sLastError = " Failed to load final data points batch into session.";
+                    m_sLastError = "Failed to load final data points batch into session.";
                 }
             }
 
@@ -367,7 +367,7 @@ namespace RandomNumberGenerator
             if (bStatus && bFileIncomplete)
             {
                 string sFileName = System.IO.Path.GetFileName(m_sFilePath);
-                m_sLastError = $" File '{sFileName}' was not closed properly, which happens when the application is" +
+                m_sLastError = $"File '{sFileName}' was not closed properly, which happens when the application is" +
                                $" stopped while recording. Recovered {sessionData.NumDataPoints} data points ({sIncompleteDetail})";
             }
 
@@ -469,7 +469,7 @@ namespace RandomNumberGenerator
                     bool bFileExists = File.Exists(m_sFilePath);
                     if (false == bFileExists)
                     {
-                        m_sLastError = $" File '{System.IO.Path.GetFileName(m_sFilePath)}' does not exist or cannot be accessed.";
+                        m_sLastError = $"File '{System.IO.Path.GetFileName(m_sFilePath)}' does not exist or cannot be accessed.";
                         return false;
                     }
 
@@ -481,25 +481,25 @@ namespace RandomNumberGenerator
                     
                     if (false == bStatus)
                     {
-                        m_sLastError = $" Failed to create XML reader for file '{System.IO.Path.GetFileName(m_sFilePath)}'.";
+                        m_sLastError = $"Failed to create XML reader for file '{System.IO.Path.GetFileName(m_sFilePath)}'.";
                     }
                 }
                 catch (ArgumentException argException)
                 {
                     // Path or settings are not valid
-                    m_sLastError = $" Invalid file path or XML reader settings for '{System.IO.Path.GetFileName(m_sFilePath)}': {argException.Message}";
+                    m_sLastError = $"Invalid file path or XML reader settings for '{System.IO.Path.GetFileName(m_sFilePath)}': {argException.Message}";
                     bStatus = false;
                 }
                 catch (IOException ioException)
                 {
                     // File I/O errors
-                    m_sLastError = $" File I/O error accessing '{System.IO.Path.GetFileName(m_sFilePath)}': {ioException.Message}";
+                    m_sLastError = $"File I/O error accessing '{System.IO.Path.GetFileName(m_sFilePath)}': {ioException.Message}";
                     bStatus = false;
                 }
                 catch (Exception generalException)
                 {
                     // Any other unexpected errors
-                    m_sLastError = $" Unexpected error creating XML reader for '{System.IO.Path.GetFileName(m_sFilePath)}': {generalException.Message}";
+                    m_sLastError = $"Unexpected error creating XML reader for '{System.IO.Path.GetFileName(m_sFilePath)}': {generalException.Message}";
                     bStatus = false;
                 }
             }
