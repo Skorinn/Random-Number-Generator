@@ -53,7 +53,7 @@
     <StartupObject>RandomNumberGenerator.Program</StartupObject>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="CommonControls, Version=1.0.1.0, Culture=neutral, processorArchitecture=MSIL">
+    <Reference Include="CommonControls, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>Externals\CommonControls.dll</HintPath>
     </Reference>

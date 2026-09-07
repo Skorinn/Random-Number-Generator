@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>DeviceInterfaces</name>
+    </assembly>
+    <members>
+        <member name="T:DeviceInterfaces.USBDeviceNotification">
+            <summary>
+            Registers a window for notifications about USB devices being connected and removed
+            </summary>
+        </member>
+        <member name="T:DeviceInterfaces.USBDeviceNotification.NotificationFilterStr">
+            <summary>
+            Structure for filling the notificationFilter parameter buffer for RegisterDeviceNotification
+            </summary>
+        </member>
+        <member name="M:DeviceInterfaces.USBDeviceNotification.RegisterUsbDeviceNotification(System.IntPtr)">
+            <summary>
+            Registers a window to receive notifications when USB devices are connected or removed
+            </summary>
+            <param name="pWindowHandle">IN - Handle to the window to be notified</param>
+            <returns>The notification handle, which must be passed to UnregisterUsbDeviceNotification</returns>
+            <exception cref="T:System.ComponentModel.Win32Exception">Thrown when the window could not be registered for device notifications</exception>
+        </member>
+        <member name="M:DeviceInterfaces.USBDeviceNotification.UnregisterUsbDeviceNotification(System.IntPtr)">
+            <summary>
+            Unregisters the window for USB device notifications
+            </summary>
+            <param name="pNotificationHandle">IN - Notification handle returned by RegisterUsbDeviceNotification</param>
+        </member>
+        <member name="F:DeviceInterfaces.USBDeviceNotification.iDEVICE_CONNECTED">
+            <summary>
+            Value of wParam on a WM_DEVICECHANGE message reporting that a device was connected
+            </summary>
+        </member>
+        <member name="F:DeviceInterfaces.USBDeviceNotification.iDEVICE_REMOVED">
+            <summary>
+            Value of wParam on a WM_DEVICECHANGE message reporting that a device was removed
+            </summary>
+        </member>
+        <member name="F:DeviceInterfaces.USBDeviceNotification.iWM_DEVICECHANGE">
+            <summary>
+            Window message raised when a device is connected or removed
+            </summary>
+        </member>
+    </members>
+</doc>
