@@ -54,7 +54,7 @@ namespace RandomNumberGenerator.Test
         private const string m_sTEST_STATUS_TEXT = "Test Status Text";
         private readonly Color m_TEST_STATUS_TEXT_COLOR = Color.Blue;
         private readonly Color m_TEST_STATUS_BACK_COLOR = Color.Yellow;
-        private const string m_sREADING_DEVICES_MESSAGE = " Checking attached devices and updating port list...";
+        private const string m_sREADING_DEVICES_MESSAGE = "Checking attached devices and updating port list...";
         private const string m_sSESSION_RUNNING_MESSAGE = " Running session";
 
         #endregion

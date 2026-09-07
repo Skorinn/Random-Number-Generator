@@ -12,6 +12,8 @@
 // 2023/12/02 - Mike Pullen - Added simulate, pause, and target value
 // 2026/08/31 - Mike Pullen - Report recovered files, dispose through the standard pattern, and keep processing
 //                            messages while waiting for the device update to finish on close
+// 2026/09/07 - Mike Pullen - Reworked the presentation: status bar, statistic readouts, number formats, and
+//                            one emphasised button per state
 //*********************************************************************************************************************
 
 // Enable to dump the USB device information
@@ -104,9 +106,15 @@ namespace RandomNumberGenerator
             // Initialize GUI
             InitializeComponent();
 
+            // Build the button fonts from the one the designer set, so the emphasis follows the design rather
+            // than naming a family and size a second time
+            m_ActionFontRegular = m_PauseButton.Font;
+            m_ActionFontBold = new Font(m_ActionFontRegular, FontStyle.Bold);
+
             // Set the info box to idle
-            m_StatusTextBox.Text = m_sIDLE_MESSAGE;
-            m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
+            m_StatusLabel.Text = m_sIDLE_MESSAGE;
+            m_StatusLabel.ForeColor = StatusPalette.NormalText;
+            m_StatusLabel.BackColor = StatusPalette.NormalBackground;
 
             // Start the device update thread and trigger an update
             DeviceUpdateThread.Parent = this;
@@ -299,6 +307,17 @@ namespace RandomNumberGenerator
             _ = sender;
             _ = e;
 
+            // Clearing throws away everything recorded so far and cannot be undone, so ask first. It sits
+            // beside the buttons that run a session and is the only one of them that destroys anything.
+            const string sCaption = "Clear Session";
+            const string sMessage = "This discards the readings shown and resets the statistics.\n\nContinue?";
+            DialogResult clearResult = MessageBox.Show(sMessage, sCaption, MessageBoxButtons.YesNo,
+                                                       MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
+            if (DialogResult.Yes != clearResult)
+            {
+                return;
+            }
+
             // Reset the session data
             m_Data.Reset();
 
@@ -308,12 +327,9 @@ namespace RandomNumberGenerator
             // Clear the chart data and add a point so the area is displayed
             m_ResultChart.Clear();
 
-            // Update the timer and average displayed
-            m_SessionTimerTextBox.Text = m_Data.SessionTime;
-            m_CurrentAverageTextBox.Text = m_sFLOAT_FORMAT;
-            m_DataPointsTextBox.Text = m_sINTEGER_FORMAT;
-            m_MeanDeviationTextBox.Text = m_sEXP_FLOAT_FORMAT;
-            m_StandardDeviationTextBox.Text = m_sEXP_FLOAT_FORMAT;
+            // Show the values the reset has left behind rather than a set of fixed strings, so the readouts
+            // cannot say something the session data does not
+            UpdateStatisticsDisplay();
         }
 
         /// <summary>
@@ -357,8 +373,7 @@ namespace RandomNumberGenerator
                 if (false == bValid)
                 {
                     // Display error in info box
-                    m_StatusTextBox.BackColor = System.Drawing.Color.Red;
-                    m_StatusTextBox.Text = m_sINVALID_SEED_ERROR;
+                    SetStatusBoxError(m_sINVALID_SEED_ERROR);
 
                     // Cancel the input
                     e.Cancel = true;
@@ -484,8 +499,8 @@ namespace RandomNumberGenerator
                         m_FileTextBox.Text = Path.GetFileName(sSelectedFile);
                         
                         // Show success status
-                        SetStatusBoxState($" New file selected: {Path.GetFileName(sSelectedFile)}. Ready for new session.", 
-                                        System.Drawing.Color.Black, System.Drawing.Color.LightGreen);
+                        SetStatusBoxState($"New file selected: {Path.GetFileName(sSelectedFile)}. Ready for new session.", 
+                                        StatusPalette.SuccessText, StatusPalette.SuccessBackground);
                     }
 
                     // Re-enable session actions for new file scenario
@@ -619,18 +634,18 @@ namespace RandomNumberGenerator
             m_State = RngGuiStates.Terminating;
 
             // Reset the info box to the message state
-            m_StatusTextBox.ForeColor = System.Drawing.Color.Black;
-            m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
+            m_StatusLabel.ForeColor = StatusPalette.NormalText;
+            m_StatusLabel.BackColor = StatusPalette.NormalBackground;
 
             // Make sure any session is closed out. The session is ended directly rather than through the
             // idle transition, which only ends a session while the state is running or paused and so would
             // not end one now that the state is terminating, nor one left open for appending by a load.
-            m_StatusTextBox.Text = m_sCLOSE_STOP_SESSION;
+            m_StatusLabel.Text = m_sCLOSE_STOP_SESSION;
             m_Timer.Stop();
             EndSession();
 
             // Signal the background work to stop and wait for it to complete (10 second timeout)
-            m_StatusTextBox.Text = m_sCLOSE_STOP_DEVICE_UPDATE;
+            m_StatusLabel.Text = m_sCLOSE_STOP_DEVICE_UPDATE;
             WaitForBackgroundWork();
         }
 
@@ -682,11 +697,11 @@ namespace RandomNumberGenerator
             bool bWarningReported = (false == string.IsNullOrEmpty(sLoadWarning));
             if (bWarningReported)
             {
-                SetStatusBoxState(sLoadWarning, System.Drawing.Color.Black, System.Drawing.Color.Khaki);
+                SetStatusBoxState(sLoadWarning, StatusPalette.WarningText, StatusPalette.WarningBackground);
             }
             else
             {
-                SetStatusBoxState(sSuccessMessage, System.Drawing.Color.Black, System.Drawing.Color.LightGreen);
+                SetStatusBoxState(sSuccessMessage, StatusPalette.SuccessText, StatusPalette.SuccessBackground);
             }
         }
 
@@ -747,9 +762,19 @@ namespace RandomNumberGenerator
             // Record the GUI is terminating so any running device update stops touching the controls
             m_State = RngGuiStates.Terminating;
 
-            if (disposing && (null != components))
+            if (disposing)
             {
-                components.Dispose();
+                if (null != components)
+                {
+                    components.Dispose();
+                }
+
+                // Only the bold font is created here; the regular one belongs to the designer
+                if (null != m_ActionFontBold)
+                {
+                    m_ActionFontBold.Dispose();
+                    m_ActionFontBold = null;
+                }
             }
 
             base.Dispose(disposing);
@@ -762,21 +787,21 @@ namespace RandomNumberGenerator
         {
             // Initialize output parameters
             sText = string.Empty;
-            textColor = System.Drawing.Color.Black;
-            backColor = System.Drawing.SystemColors.Info;
+            textColor = StatusPalette.NormalText;
+            backColor = StatusPalette.NormalBackground;
 
             // Get UI state on the main thread
             if (InvokeRequired)
             {
                 string tempText = string.Empty;
-                Color tempTextColor = System.Drawing.Color.Black;
-                Color tempBackColor = System.Drawing.SystemColors.Info;
+                Color tempTextColor = StatusPalette.NormalText;
+                Color tempBackColor = StatusPalette.NormalBackground;
 
                 Invoke(new Action(() =>
                 {
-                    tempText = m_StatusTextBox.Text;
-                    tempTextColor = m_StatusTextBox.ForeColor;
-                    tempBackColor = m_StatusTextBox.BackColor;
+                    tempText = m_StatusLabel.Text;
+                    tempTextColor = m_StatusLabel.ForeColor;
+                    tempBackColor = m_StatusLabel.BackColor;
                 }));
 
                 sText = tempText;
@@ -785,9 +810,9 @@ namespace RandomNumberGenerator
             }
             else
             {
-                sText = m_StatusTextBox.Text;
-                textColor = m_StatusTextBox.ForeColor;
-                backColor = m_StatusTextBox.BackColor;
+                sText = m_StatusLabel.Text;
+                textColor = m_StatusLabel.ForeColor;
+                backColor = m_StatusLabel.BackColor;
             }
         }
 
@@ -797,7 +822,7 @@ namespace RandomNumberGenerator
         public void RecordReadResult(double fResult)
         {
             // Lock the status box object
-            lock (m_StatusTextBox)
+            lock (m_StatusLock)
             {
                 // If there was a read error
                 if (double.MaxValue == fResult)
@@ -816,14 +841,11 @@ namespace RandomNumberGenerator
                         // Record the new data point (this will trigger the chart update via callback)
                         RecordDataPoint(fResult);
 
-                        // Update the displayed average
-                        m_CurrentAverageTextBox.Text = CurrentAverage;
-                        m_DataPointsTextBox.Text = NumDataPoints;
-                        m_MeanDeviationTextBox.Text = MeanDeviation;
-                        m_StandardDeviationTextBox.Text = StandardDeviation;
+                        // Update the displayed statistics
+                        UpdateStatisticsDisplay();
 
                         // Clear any displayed errors 
-                        SetStatusBoxState(RunningMessage, System.Drawing.Color.Black, System.Drawing.SystemColors.Info);
+                        SetStatusBoxState(RunningMessage, StatusPalette.NormalText, StatusPalette.NormalBackground);
                     }
                     catch (InvalidOperationException invalidOpEx)
                     {
@@ -841,13 +863,13 @@ namespace RandomNumberGenerator
                     {
                         // Handle file I/O errors and display in status bar
                         SetIdleState();
-                        SetStatusBoxError($" File I/O error: {ioEx.Message}");
+                        SetStatusBoxError($"File I/O error: {ioEx.Message}");
                     }
                     catch (Exception generalEx)
                     {
                         // Handle any other errors and display in status bar
                         SetIdleState();
-                        SetStatusBoxError($" Unexpected error recording data: {generalEx.Message}");
+                        SetStatusBoxError($"Unexpected error recording data: {generalEx.Message}");
                     }
                 }
             }
@@ -913,7 +935,7 @@ namespace RandomNumberGenerator
             else
             {
                 // Initialized successfully to clear any displayed errors
-                SetStatusBoxState(m_sINIT_MESSAGE, System.Drawing.Color.Black, System.Drawing.SystemColors.Info);
+                SetStatusBoxState(m_sINIT_MESSAGE, StatusPalette.NormalText, StatusPalette.NormalBackground);
             }
 
             // Restore the cursor
@@ -1015,8 +1037,47 @@ namespace RandomNumberGenerator
             m_StopButton.Enabled = true;
             m_PauseButton.Enabled = true;
 
+            // Ending the session is now the action to take next
+            SetPrimaryButton(m_StopButton);
+
             // Start a new session (will continue existing session if already in progress)
             StartSession();
+        }
+
+        /// <summary>
+        /// Emphasises the one button that carries the action to take next, leaving the others in the system
+        /// style. Which button that is changes with the state - starting a session while idle, ending it
+        /// while one is running - so it is set as part of each state transition rather than fixed once.
+        /// NOTE: The designer applies the same emphasis to the start button, as that is the state the form
+        /// opens in and the designer cannot call this.
+        /// </summary>
+        /// <param name="primaryButton">IN - The button to emphasise, which is left plain if it is disabled</param>
+        private void SetPrimaryButton(Button primaryButton)
+        {
+            Button[] actionButtons = new Button[] { m_StartButton, m_PauseButton, m_StopButton };
+            foreach (Button actionButton in actionButtons)
+            {
+                bool bIsPrimary = ((actionButton == primaryButton) && (true == actionButton.Enabled));
+                if (true == bIsPrimary)
+                {
+                    actionButton.FlatStyle = FlatStyle.Flat;
+                    actionButton.FlatAppearance.BorderSize = 0;
+                    actionButton.FlatAppearance.MouseOverBackColor = m_PRIMARY_HOVER_COLOR;
+                    actionButton.FlatAppearance.MouseDownBackColor = m_PRIMARY_PRESSED_COLOR;
+                    actionButton.BackColor = m_PRIMARY_COLOR;
+                    actionButton.ForeColor = Color.White;
+                    actionButton.UseVisualStyleBackColor = false;
+                    actionButton.Font = m_ActionFontBold;
+                }
+                else
+                {
+                    actionButton.FlatStyle = FlatStyle.Standard;
+                    actionButton.UseVisualStyleBackColor = true;
+                    actionButton.BackColor = SystemColors.Control;
+                    actionButton.ForeColor = SystemColors.ControlText;
+                    actionButton.Font = m_ActionFontRegular;
+                }
+            }
         }
 
         /// <summary>
@@ -1053,8 +1114,11 @@ namespace RandomNumberGenerator
             m_SimulateToggle.Enabled = true;
             m_PortComboBox.Enabled = true;
 
+            // Starting a session is the action to take next
+            SetPrimaryButton(m_StartButton);
+
             // Update the info box
-            SetStatusBoxState(m_sIDLE_MESSAGE, System.Drawing.Color.Black, System.Drawing.SystemColors.Info);
+            SetStatusBoxState(m_sIDLE_MESSAGE, StatusPalette.NormalText, StatusPalette.NormalBackground);
         }
 
         /// <summary>
@@ -1068,12 +1132,16 @@ namespace RandomNumberGenerator
             // Change the button to resume
             m_PauseButton.Text = m_sRESUME_BUTTON;
 
+            // Picking the session back up is what a pause is usually followed by, so that button takes the
+            // emphasis while it is paused rather than the one that ends the session for good
+            SetPrimaryButton(m_PauseButton);
+
             // Disable the timers
             m_Timer.Enabled = false;
             m_Data.PauseSession();
 
             // Update the info box message
-            SetStatusBoxState(m_sPAUSED_MESSAGE, System.Drawing.Color.Black, System.Drawing.SystemColors.Info);
+            SetStatusBoxState(m_sPAUSED_MESSAGE, StatusPalette.NormalText, StatusPalette.NormalBackground);
         }
 
         /// <summary>
@@ -1087,12 +1155,15 @@ namespace RandomNumberGenerator
             // Change the button back to pause
             m_PauseButton.Text = m_sPAUSE_BUTTON;
 
+            // Ending the session remains the action to take next
+            SetPrimaryButton(m_StopButton);
+
             // Re-enable the timers
             m_Timer.Enabled = true;
             m_Data.ResumeSession();
 
             // Update the info box message
-            SetStatusBoxState(m_sIDLE_MESSAGE, System.Drawing.Color.Black, System.Drawing.SystemColors.Info);
+            SetStatusBoxState(m_sIDLE_MESSAGE, StatusPalette.NormalText, StatusPalette.NormalBackground);
         }
 
         /// <summary>
@@ -1113,7 +1184,7 @@ namespace RandomNumberGenerator
                 }
 
                 // Update the info box after initializing the device, which updates the status box as well
-                SetStatusBoxState(RunningMessage, System.Drawing.Color.Black, System.Drawing.SystemColors.Info);
+                SetStatusBoxState(RunningMessage, StatusPalette.NormalText, StatusPalette.NormalBackground);
 
                 // Start a new data session
                 bStatus = m_Data.StartSession();
@@ -1136,13 +1207,13 @@ namespace RandomNumberGenerator
             catch (System.IO.IOException ioEx)
             {
                 // Handle file I/O errors and display in status bar
-                SetStatusBoxError($" File I/O error: {ioEx.Message}");
+                SetStatusBoxError($"File I/O error: {ioEx.Message}");
                 bStatus = false;
             }
             catch (Exception generalEx)
             {
                 // Handle any other errors and display in status bar
-                SetStatusBoxError($" Unexpected error starting session: {generalEx.Message}");
+                SetStatusBoxError($"Unexpected error starting session: {generalEx.Message}");
                 bStatus = false;
             }
 
@@ -1264,13 +1335,13 @@ namespace RandomNumberGenerator
             catch (IOException fileIOException)
             {
                 // Display file I/O error using helper method
-                SetStatusBoxError($" File I/O error accessing file {Path.GetFileName(sFilePath)}: {fileIOException.Message}");
+                SetStatusBoxError($"File I/O error accessing file {Path.GetFileName(sFilePath)}: {fileIOException.Message}");
                 bStatus = false;
             }
             catch (Exception generalException)
             {
                 // Display general error using helper method
-                SetStatusBoxError($" Unexpected error accessing file {Path.GetFileName(sFilePath)}: {generalException.Message}");
+                SetStatusBoxError($"Unexpected error accessing file {Path.GetFileName(sFilePath)}: {generalException.Message}");
                 bStatus = false;
             }
 
@@ -1305,20 +1376,34 @@ namespace RandomNumberGenerator
                 if (bWarningReported)
                 {
                     // Show the warning rather than the plain success message
-                    SetStatusBoxState(sLoadWarning, System.Drawing.Color.Black, System.Drawing.Color.Khaki);
+                    SetStatusBoxState(sLoadWarning, StatusPalette.WarningText, StatusPalette.WarningBackground);
                 }
                 else
                 {
                     // Show success status using helper method
-                    SetStatusBoxState($" File loaded: {Path.GetFileName(sFilePath)}. {m_Data.NumDataPoints} data points loaded. Ready for new session.",
-                                    System.Drawing.Color.Black, System.Drawing.Color.LightGreen);
+                    SetStatusBoxState($"File loaded: {Path.GetFileName(sFilePath)}. {m_Data.NumDataPoints} data points loaded. Ready for new session.",
+                                    StatusPalette.SuccessText, StatusPalette.SuccessBackground);
                 }
             }
             else
             {
                 // Show error status using helper method
-                SetStatusBoxError($" Error accessing file {Path.GetFileName(sFilePath)}. Please verify the file exists and is readable.");
+                SetStatusBoxError($"Error accessing file {Path.GetFileName(sFilePath)}. Please verify the file exists and is readable.");
             }
+        }
+
+        /// <summary>
+        /// Shows the statistics currently held by the session data. Every place that changes the session -
+        /// recording a reading, loading a file, clearing - reports through here, so the readouts can only
+        /// ever show what the session data actually holds.
+        /// </summary>
+        private void UpdateStatisticsDisplay()
+        {
+            m_CurrentAverageTextBox.Text = CurrentAverage;
+            m_DataPointsTextBox.Text = NumDataPoints;
+            m_MeanDeviationTextBox.Text = MeanDeviation;
+            m_StandardDeviationTextBox.Text = StandardDeviation;
+            m_SessionTimerTextBox.Text = m_Data.SessionTime;
         }
 
         /// <summary>
@@ -1327,11 +1412,7 @@ namespace RandomNumberGenerator
         private void UpdateUIFromLoadedSession()
         {
             // Update the statistics display fields
-            m_CurrentAverageTextBox.Text = CurrentAverage;
-            m_DataPointsTextBox.Text = NumDataPoints;
-            m_MeanDeviationTextBox.Text = MeanDeviation;
-            m_StandardDeviationTextBox.Text = StandardDeviation;
-            m_SessionTimerTextBox.Text = m_Data.SessionTime;
+            UpdateStatisticsDisplay();
 
             // Update the target combo box if a target value was loaded
             if (m_Data.TargetValue != TargetValues.NO_VALUE_SET)
@@ -1352,8 +1433,7 @@ namespace RandomNumberGenerator
         private void ShowLoadingProgress(string fileName)
         {
             // Update status to show loading in progress
-            SetStatusBoxState($" Loading file: {fileName}...", 
-                            System.Drawing.Color.Black, System.Drawing.Color.LightBlue);
+            SetStatusBoxState($"Loading file: {fileName}...", StatusPalette.BusyText, StatusPalette.BusyBackground);
             
             // Set cursor to wait cursor to indicate loading
             Cursor.Current = Cursors.WaitCursor;
@@ -1383,16 +1463,16 @@ namespace RandomNumberGenerator
             {
                 Invoke(new Action(() =>
                 {
-                    m_StatusTextBox.Text = sText;
-                    m_StatusTextBox.ForeColor = textColor;
-                    m_StatusTextBox.BackColor = backColor;
+                    m_StatusLabel.Text = sText;
+                    m_StatusLabel.ForeColor = textColor;
+                    m_StatusLabel.BackColor = backColor;
                 }));
             }
             else
             {
-                m_StatusTextBox.Text = sText;
-                m_StatusTextBox.ForeColor = textColor;
-                m_StatusTextBox.BackColor = backColor;
+                m_StatusLabel.Text = sText;
+                m_StatusLabel.ForeColor = textColor;
+                m_StatusLabel.BackColor = backColor;
             }
         }
 
@@ -1402,7 +1482,7 @@ namespace RandomNumberGenerator
         /// <param name="sText">IN - Error text to display</param>
         public void SetStatusBoxError(string sText)
         {
-            SetStatusBoxState(sText, System.Drawing.Color.Black, System.Drawing.Color.Red);
+            SetStatusBoxState(sText, StatusPalette.ErrorText, StatusPalette.ErrorBackground);
         }
 
         /// <summary>
@@ -1428,31 +1508,31 @@ namespace RandomNumberGenerator
             catch (ArgumentException argEx)
             {
                 // Handle argument validation errors
-                SetStatusBoxError($" Baseline file error: {argEx.Message}");
+                SetStatusBoxError($"Baseline file error: {argEx.Message}");
                 bStatus = false;
             }
             catch (System.IO.FileNotFoundException)
             {
                 // Handle file not found errors
-                SetStatusBoxError($" Baseline file not found: {Path.GetFileName(sFilePath)}");
+                SetStatusBoxError($"Baseline file not found: {Path.GetFileName(sFilePath)}");
                 bStatus = false;
             }
             catch (System.IO.IOException ioEx)
             {
                 // Handle file I/O errors
-                SetStatusBoxError($" Baseline file I/O error: {ioEx.Message}");
+                SetStatusBoxError($"Baseline file I/O error: {ioEx.Message}");
                 bStatus = false;
             }
             catch (InvalidOperationException invalidOpEx)
             {
                 // Handle file loading/parsing errors
-                SetStatusBoxError($" Baseline file loading error: {invalidOpEx.Message}");
+                SetStatusBoxError($"Baseline file loading error: {invalidOpEx.Message}");
                 bStatus = false;
             }
             catch (Exception generalEx)
             {
                 // Handle any other errors
-                SetStatusBoxError($" Unexpected error loading baseline file: {generalEx.Message}");
+                SetStatusBoxError($"Unexpected error loading baseline file: {generalEx.Message}");
                 bStatus = false;
             }
 
@@ -1482,31 +1562,31 @@ namespace RandomNumberGenerator
             catch (ArgumentException argEx)
             {
                 // Handle argument validation errors
-                SetStatusBoxError($" Result file error: {argEx.Message}");
+                SetStatusBoxError($"Result file error: {argEx.Message}");
                 bStatus = false;
             }
             catch (System.IO.FileNotFoundException)
             {
                 // Handle file not found errors
-                SetStatusBoxError($" Result file not found: {Path.GetFileName(sFilePath)}");
+                SetStatusBoxError($"Result file not found: {Path.GetFileName(sFilePath)}");
                 bStatus = false;
             }
             catch (System.IO.IOException ioEx)
             {
                 // Handle file I/O errors
-                SetStatusBoxError($" Result file I/O error: {ioEx.Message}");
+                SetStatusBoxError($"Result file I/O error: {ioEx.Message}");
                 bStatus = false;
             }
             catch (InvalidOperationException invalidOpEx)
             {
                 // Handle file loading/parsing errors
-                SetStatusBoxError($" Result file loading error: {invalidOpEx.Message}");
+                SetStatusBoxError($"Result file loading error: {invalidOpEx.Message}");
                 bStatus = false;
             }
             catch (Exception generalEx)
             {
                 // Handle any other errors
-                SetStatusBoxError($" Unexpected error loading result file: {generalEx.Message}");
+                SetStatusBoxError($"Unexpected error loading result file: {generalEx.Message}");
                 bStatus = false;
             }
 
@@ -1629,7 +1709,7 @@ namespace RandomNumberGenerator
             catch (Exception ex)
             {
                 // Handle any errors during chart update
-                SetStatusBoxError($" Error updating histogram chart: {ex.Message}");
+                SetStatusBoxError($"Error updating histogram chart: {ex.Message}");
             }
         }
 
@@ -1668,7 +1748,7 @@ namespace RandomNumberGenerator
             catch (Exception ex)
             {
                 // Handle any errors during chart update
-                SetStatusBoxError($" Error updating histogram chart: {ex.Message}");
+                SetStatusBoxError($"Error updating histogram chart: {ex.Message}");
             }
         }
 
@@ -1683,10 +1763,10 @@ namespace RandomNumberGenerator
                 var stats = m_BaselineAnalysis.LoadedFileStats;
 
                 // Update the baseline statistical display fields using the same format as the main statistics
-                m_BaselineMeanTextBox.Text = stats.Mean.ToString(m_sFLOAT_FORMAT);
-                m_BaselineStdDevTextBox.Text = stats.StandardDeviation.ToString(m_sEXP_FLOAT_FORMAT);
-                m_BaselineSkewnessTextBox.Text = stats.Skewness.ToString(m_sEXP_FLOAT_FORMAT);
-                m_BaselineKurtosisTextBox.Text = stats.Kurtosis.ToString(m_sEXP_FLOAT_FORMAT);
+                m_BaselineMeanTextBox.Text = stats.Mean.ToString(m_sVALUE_FORMAT);
+                m_BaselineStdDevTextBox.Text = stats.StandardDeviation.ToString(m_sVALUE_FORMAT);
+                m_BaselineSkewnessTextBox.Text = stats.Skewness.ToString(m_sMOMENT_FORMAT);
+                m_BaselineKurtosisTextBox.Text = stats.Kurtosis.ToString(m_sMOMENT_FORMAT);
             }
             else
             {
@@ -1701,10 +1781,10 @@ namespace RandomNumberGenerator
         private void ClearBaselineStatisticalFields()
         {
             m_BaselineTextBox.Text = string.Empty;
-            m_BaselineMeanTextBox.Text = m_sFLOAT_FORMAT;
-            m_BaselineStdDevTextBox.Text = m_sEXP_FLOAT_FORMAT;
-            m_BaselineSkewnessTextBox.Text = m_sEXP_FLOAT_FORMAT;
-            m_BaselineKurtosisTextBox.Text = m_sEXP_FLOAT_FORMAT;
+            m_BaselineMeanTextBox.Text = m_sNO_VALUE;
+            m_BaselineStdDevTextBox.Text = m_sNO_VALUE;
+            m_BaselineSkewnessTextBox.Text = m_sNO_VALUE;
+            m_BaselineKurtosisTextBox.Text = m_sNO_VALUE;
         }
 
         /// <summary>
@@ -1718,10 +1798,10 @@ namespace RandomNumberGenerator
                 var stats = m_ResultAnalysis.LoadedFileStats;
 
                 // Update the result statistical display fields using the same format as the main statistics
-                m_ResultMeanTextBox.Text = stats.Mean.ToString(m_sFLOAT_FORMAT);
-                m_ResultStdDevTextBox.Text = stats.StandardDeviation.ToString(m_sEXP_FLOAT_FORMAT);
-                m_ResultSkewnessTextBox.Text = stats.Skewness.ToString(m_sEXP_FLOAT_FORMAT);
-                m_ResultKurtosisTextBox.Text = stats.Kurtosis.ToString(m_sEXP_FLOAT_FORMAT);
+                m_ResultMeanTextBox.Text = stats.Mean.ToString(m_sVALUE_FORMAT);
+                m_ResultStdDevTextBox.Text = stats.StandardDeviation.ToString(m_sVALUE_FORMAT);
+                m_ResultSkewnessTextBox.Text = stats.Skewness.ToString(m_sMOMENT_FORMAT);
+                m_ResultKurtosisTextBox.Text = stats.Kurtosis.ToString(m_sMOMENT_FORMAT);
             }
             else
             {
@@ -1736,10 +1816,10 @@ namespace RandomNumberGenerator
         private void ClearResultStatisticalFields()
         {
             m_ResultTextBox.Text = string.Empty;
-            m_ResultMeanTextBox.Text = m_sFLOAT_FORMAT;
-            m_ResultStdDevTextBox.Text = m_sEXP_FLOAT_FORMAT;
-            m_ResultSkewnessTextBox.Text = m_sEXP_FLOAT_FORMAT;
-            m_ResultKurtosisTextBox.Text = m_sEXP_FLOAT_FORMAT;
+            m_ResultMeanTextBox.Text = m_sNO_VALUE;
+            m_ResultStdDevTextBox.Text = m_sNO_VALUE;
+            m_ResultSkewnessTextBox.Text = m_sNO_VALUE;
+            m_ResultKurtosisTextBox.Text = m_sNO_VALUE;
         }
 
         /// <summary>
@@ -1759,11 +1839,11 @@ namespace RandomNumberGenerator
 
                     // Calculate mean difference
                     double fMeanDifference = resultStats.Mean - baselineStats.Mean;
-                    m_MeanDifferenceTextBox.Text = fMeanDifference.ToString(m_sEXP_FLOAT_FORMAT);
+                    m_MeanDifferenceTextBox.Text = fMeanDifference.ToString(m_sVALUE_DIFFERENCE_FORMAT);
 
                     // Calculate skewness difference
                     double fSkewnessDifference = resultStats.Skewness - baselineStats.Skewness;
-                    m_SkewnessTextBox.Text = fSkewnessDifference.ToString(m_sEXP_FLOAT_FORMAT);
+                    m_SkewnessTextBox.Text = fSkewnessDifference.ToString(m_sMOMENT_DIFFERENCE_FORMAT);
 
                     // Update the histogram chart with both datasets
                     List<double> baselineData = m_BaselineAnalysis.LoadedFileData;
@@ -1782,7 +1862,7 @@ namespace RandomNumberGenerator
             catch (Exception ex)
             {
                 // Handle any errors during comparison update
-                SetStatusBoxError($" Error updating comparison statistics: {ex.Message}");
+                SetStatusBoxError($"Error updating comparison statistics: {ex.Message}");
             }
         }
 
@@ -1791,8 +1871,8 @@ namespace RandomNumberGenerator
         /// </summary>
         private void ClearComparisonFields()
         {
-            m_MeanDifferenceTextBox.Text = m_sEXP_FLOAT_FORMAT;
-            m_SkewnessTextBox.Text = m_sEXP_FLOAT_FORMAT;
+            m_MeanDifferenceTextBox.Text = m_sNO_VALUE;
+            m_SkewnessTextBox.Text = m_sNO_VALUE;
         }
 
         #endregion
@@ -1858,17 +1938,17 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Background color of the status box
         /// </summary>
-        public Color StatusBoxBackColor { get => m_StatusTextBox.BackColor; set => m_StatusTextBox.BackColor = value; }
+        public Color StatusBoxBackColor { get => m_StatusLabel.BackColor; set => m_StatusLabel.BackColor = value; }
 
         /// <summary>
         /// Text displayed in the statatus box
         /// </summary>
-        public string StatusBoxText { get => m_StatusTextBox.Text; set => m_StatusTextBox.Text = value; }
+        public string StatusBoxText { get => m_StatusLabel.Text; set => m_StatusLabel.Text = value; }
 
         /// <summary>
         /// Text color of the status box
         /// </summary>
-        public Color StatusBoxTextColor { get => m_StatusTextBox.ForeColor; set => m_StatusTextBox.ForeColor = value; }
+        public Color StatusBoxTextColor { get => m_StatusLabel.ForeColor; set => m_StatusLabel.ForeColor = value; }
 
         /// <summary>
         /// The current state of the GUI (read-only)
@@ -1878,7 +1958,7 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Current average string (read-only)
         /// </summary>
-        private string CurrentAverage { get => m_Data.CurrentAverage.ToString(m_sFLOAT_FORMAT); }
+        private string CurrentAverage { get => m_Data.CurrentAverage.ToString(m_sVALUE_FORMAT); }
 
         /// <summary>
         /// Number of data points gathered
@@ -1888,12 +1968,12 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Deviation from the statistical mean
         /// </summary>
-        private string MeanDeviation { get => m_Data.MeanDeviation.ToString(m_sEXP_FLOAT_FORMAT); }
+        private string MeanDeviation { get => m_Data.MeanDeviation.ToString(m_sVALUE_FORMAT); }
 
         /// <summary>
         /// Standard deviation of the data set
         /// </summary>
-        private string StandardDeviation { get => m_Data.StandardDeviation.ToString(m_sEXP_FLOAT_FORMAT); }
+        private string StandardDeviation { get => m_Data.StandardDeviation.ToString(m_sVALUE_FORMAT); }
 
         /// <summary>
         /// Message to display in the info box while a session is running (read-only)
@@ -1940,25 +2020,45 @@ namespace RandomNumberGenerator
         // Statistical analysis for result data
         private StatisticalAnalysis m_ResultAnalysis = null;
 
-        // Display settings
-        private const string m_sFLOAT_FORMAT = "0.000000000";
+        // Display settings. Bit averages and the deviations taken from them all sit within a unit range, so
+        // they are shown to a fixed six decimals rather than in exponent form, which puts every value on the
+        // same scale and lets two of them be compared by eye. Skewness and kurtosis are unbounded and are
+        // shown to three, and differences carry an explicit sign so the direction of a change is visible.
+        private const string m_sVALUE_FORMAT = "0.000000";
         private const string m_sINTEGER_FORMAT = "0";
-        private const string m_sEXP_FLOAT_FORMAT = "0.000000e0";
+        private const string m_sMOMENT_FORMAT = "0.000";
+        private const string m_sVALUE_DIFFERENCE_FORMAT = "+0.000000;-0.000000";
+        private const string m_sMOMENT_DIFFERENCE_FORMAT = "+0.000;-0.000";
+        private const string m_sNO_VALUE = "—";
+
+        // Guards the status bar, which is written to from the device read path as well as the UI
+        private readonly object m_StatusLock = new object();
+
+        // Fonts for the session buttons, built once rather than per state change. The regular one belongs to
+        // the designer and is not disposed here; the bold one is created here and is.
+        private Font m_ActionFontRegular = null;
+        private Font m_ActionFontBold = null;
+
+        // Fill for the button carrying the action to take next. The designer sets the same colour on the
+        // start button for the idle state the form opens in, so the two have to be kept in step.
+        private static readonly Color m_PRIMARY_COLOR = Color.FromArgb(31, 92, 153);
+        private static readonly Color m_PRIMARY_HOVER_COLOR = Color.FromArgb(42, 112, 181);
+        private static readonly Color m_PRIMARY_PRESSED_COLOR = Color.FromArgb(23, 72, 121);
 
         // Button text
-        internal const string m_sPAUSE_BUTTON = "PAUSE";
-        internal const string m_sRESUME_BUTTON = "RESUME";
+        internal const string m_sPAUSE_BUTTON = "Pause";
+        internal const string m_sRESUME_BUTTON = "Resume";
 
         // Status and error messages for the info box
-        private const string m_sINVALID_SEED_ERROR = " Specified seed is not valid. Must be positive integer. Reset to last valid value.";
-        private const string m_sDEVICE_INIT_ERROR = " Error initializing TruRNGpro. Please verify device is connected and correct COM port is selected.";
-        private const string m_sDEVICE_READ_ERROR = " Error reading from TruRNGpro. Please verify device is connected and correct COM port is selected.";
-        private const string m_sINIT_MESSAGE = " Initialized";
-        private const string m_sIDLE_MESSAGE = " Idle";
-        private const string m_sPAUSED_MESSAGE = " Paused";
-        private const string m_sCLOSE_STOP_SESSION = " Ending current session...";
-        private const string m_sCLOSE_STOP_DEVICE_UPDATE = " Waiting for USB device search to end...";
-        private const string m_sFILE_LOAD_ERROR = " Error loading file. Please verify the file format is correct.";
+        private const string m_sINVALID_SEED_ERROR = "Specified seed is not valid. Must be positive integer. Reset to last valid value.";
+        private const string m_sDEVICE_INIT_ERROR = "Error initializing TruRNGpro. Please verify device is connected and correct COM port is selected.";
+        private const string m_sDEVICE_READ_ERROR = "Error reading from TruRNGpro. Please verify device is connected and correct COM port is selected.";
+        private const string m_sINIT_MESSAGE = "Initialized";
+        private const string m_sIDLE_MESSAGE = "Idle";
+        private const string m_sPAUSED_MESSAGE = "Paused";
+        private const string m_sCLOSE_STOP_SESSION = "Ending current session...";
+        private const string m_sCLOSE_STOP_DEVICE_UPDATE = "Waiting for USB device search to end...";
+        private const string m_sFILE_LOAD_ERROR = "Error loading file. Please verify the file format is correct.";
 
         #endregion
     }

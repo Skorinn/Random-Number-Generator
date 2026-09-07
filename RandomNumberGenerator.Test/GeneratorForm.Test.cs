@@ -56,7 +56,7 @@ namespace RandomNumberGenerator.Test
         #region Data Members
 
         // Test constants for GUI testing
-        private const string m_sEXPECTED_DEFAULT_TEXT = " Idle";
+        private const string m_sEXPECTED_DEFAULT_TEXT = "Idle";
         private const string m_sEXPECTED_RUNNING_TEXT = "Running";
         private const string m_sEXPECTED_ERROR_TEXT = "Error reading";
 
@@ -400,8 +400,8 @@ namespace RandomNumberGenerator.Test
 
             // Create the expected values
             const string sEXPECTED_TEXT = "Running";
-            Color expectedTextColor = System.Drawing.Color.Black;
-            Color expectedBackColor = System.Drawing.SystemColors.Info;
+            Color expectedTextColor = StatusPalette.NormalText;
+            Color expectedBackColor = StatusPalette.NormalBackground;
 
             // Mock the session timer and setup the properties
             Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
@@ -450,8 +450,8 @@ namespace RandomNumberGenerator.Test
 
             // Create the expected values
             const string sEXPECTED_TEXT = "Error reading";
-            Color expectedTextColor = System.Drawing.Color.Black;
-            Color expectedBackColor = System.Drawing.Color.Red;
+            Color expectedTextColor = StatusPalette.ErrorText;
+            Color expectedBackColor = StatusPalette.ErrorBackground;
 
             // Mock the session timer and setup the properties
             Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
@@ -760,7 +760,7 @@ namespace RandomNumberGenerator.Test
 
             // Expected error handling
             const string sEXPECTED_ERROR_MESSAGE = "Test invalid operation error";
-            Color expectedBackColor = System.Drawing.Color.Red;
+            Color expectedBackColor = StatusPalette.ErrorBackground;
 
             // Mock the session timer and setup the properties
             Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
@@ -806,7 +806,7 @@ namespace RandomNumberGenerator.Test
 
             // Expected error handling
             const string sEXPECTED_ERROR_MESSAGE = "File access denied";
-            Color expectedBackColor = System.Drawing.Color.Red;
+            Color expectedBackColor = StatusPalette.ErrorBackground;
 
             // Mock the session timer and setup the properties
             Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
@@ -852,7 +852,7 @@ namespace RandomNumberGenerator.Test
 
             // Expected error handling
             const string sEXPECTED_ERROR_MESSAGE = "File I/O error";
-            Color expectedBackColor = System.Drawing.Color.Red;
+            Color expectedBackColor = StatusPalette.ErrorBackground;
 
             // Mock the session timer and setup the properties
             Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
@@ -899,7 +899,7 @@ namespace RandomNumberGenerator.Test
 
             // Expected error handling
             const string sEXPECTED_ERROR_MESSAGE = "Unexpected general error";
-            Color expectedBackColor = System.Drawing.Color.Red;
+            Color expectedBackColor = StatusPalette.ErrorBackground;
 
             // Mock the session timer and setup the properties
             Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
@@ -1027,8 +1027,8 @@ namespace RandomNumberGenerator.Test
 
             // Create the expected values
             const string sEXPECTED_TEXT = "Running";
-            Color expectedTextColor = System.Drawing.Color.Black;
-            Color expectedBackColor = System.Drawing.SystemColors.Info;
+            Color expectedTextColor = StatusPalette.NormalText;
+            Color expectedBackColor = StatusPalette.NormalBackground;
 
             Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
             mockSessionTimer.SetupAllProperties();
@@ -1325,7 +1325,7 @@ namespace RandomNumberGenerator.Test
 
             // Verify success status was set
             StringAssert.Contains(generatorForm.StatusBoxText, "Baseline file loaded");
-            Assert.AreEqual(System.Drawing.Color.LightGreen, generatorForm.StatusBoxBackColor);
+            Assert.AreEqual(StatusPalette.SuccessBackground, generatorForm.StatusBoxBackColor);
         }
 
         /// <summary>
@@ -1417,7 +1417,7 @@ namespace RandomNumberGenerator.Test
 
             // Verify success status was set
             StringAssert.Contains(generatorForm.StatusBoxText, "Result file loaded");
-            Assert.AreEqual(System.Drawing.Color.LightGreen, generatorForm.StatusBoxBackColor);
+            Assert.AreEqual(StatusPalette.SuccessBackground, generatorForm.StatusBoxBackColor);
         }
 
         /// <summary>

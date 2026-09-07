@@ -10,6 +10,7 @@
 // 2022/09/10 - Mike Pullen - Original implementation.
 // 2022/10/30 - Mike Pullen - Recreated under VS2022 and added ARM64 support.
 // 2023/12/02 - Mike Pullen - Added simulate, pause, and target value
+// 2026/09/07 - Mike Pullen - Status bar, borderless statistic readouts, and an emphasised primary button
 //*********************************************************************************************************************
 
 namespace RandomNumberGenerator
@@ -41,7 +42,8 @@ namespace RandomNumberGenerator
             this.m_StartButton = new System.Windows.Forms.Button();
             this.m_PortLabel = new System.Windows.Forms.Label();
             this.m_PortComboBox = new System.Windows.Forms.ComboBox();
-            this.m_StatusTextBox = new System.Windows.Forms.TextBox();
+            this.m_StatusStrip = new System.Windows.Forms.StatusStrip();
+            this.m_StatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             this.m_ResultChart = new RandomNumberGenerator.RNGChart();
             this.MainTabControl = new System.Windows.Forms.TabControl();
             this.ExecuteTabPage = new System.Windows.Forms.TabPage();
@@ -102,6 +104,7 @@ namespace RandomNumberGenerator
             this.m_ResultGroupBox.SuspendLayout();
             this.m_BaselineGroupBox.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.m_ResultHistogramChart)).BeginInit();
+            this.m_StatusStrip.SuspendLayout();
             this.SuspendLayout();
             // 
             // m_CurrentAverageLabel
@@ -112,12 +115,14 @@ namespace RandomNumberGenerator
             this.m_CurrentAverageLabel.Name = "m_CurrentAverageLabel";
             this.m_CurrentAverageLabel.Size = new System.Drawing.Size(115, 19);
             this.m_CurrentAverageLabel.TabIndex = 0;
-            this.m_CurrentAverageLabel.Text = "Currrent Average";
+            this.m_CurrentAverageLabel.Text = "Current Average";
             this.m_CurrentAverageLabel.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
             // 
             // m_CurrentAverageTextBox
             // 
-            this.m_CurrentAverageTextBox.Font = new System.Drawing.Font("Courier New", 12F);
+            this.m_CurrentAverageTextBox.BackColor = System.Drawing.SystemColors.Control;
+            this.m_CurrentAverageTextBox.BorderStyle = System.Windows.Forms.BorderStyle.None;
+            this.m_CurrentAverageTextBox.Font = new System.Drawing.Font("Consolas", 12F);
             this.m_CurrentAverageTextBox.Location = new System.Drawing.Point(6, 96);
             this.m_CurrentAverageTextBox.Name = "m_CurrentAverageTextBox";
             this.m_CurrentAverageTextBox.ReadOnly = true;
@@ -129,7 +134,9 @@ namespace RandomNumberGenerator
             // 
             // m_SessionTimerTextBox
             // 
-            this.m_SessionTimerTextBox.Font = new System.Drawing.Font("Courier New", 12F);
+            this.m_SessionTimerTextBox.BackColor = System.Drawing.SystemColors.Control;
+            this.m_SessionTimerTextBox.BorderStyle = System.Windows.Forms.BorderStyle.None;
+            this.m_SessionTimerTextBox.Font = new System.Drawing.Font("Consolas", 12F);
             this.m_SessionTimerTextBox.Location = new System.Drawing.Point(6, 41);
             this.m_SessionTimerTextBox.Name = "m_SessionTimerTextBox";
             this.m_SessionTimerTextBox.ReadOnly = true;
@@ -153,12 +160,15 @@ namespace RandomNumberGenerator
             // m_ClearButton
             // 
             this.m_ClearButton.CausesValidation = false;
-            this.m_ClearButton.Font = new System.Drawing.Font("Segoe UI", 12F);
-            this.m_ClearButton.Location = new System.Drawing.Point(330, 143);
+            this.m_ClearButton.FlatAppearance.BorderColor = System.Drawing.SystemColors.ControlDark;
+            this.m_ClearButton.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.m_ClearButton.Font = new System.Drawing.Font("Segoe UI", 10F);
+            this.m_ClearButton.ForeColor = System.Drawing.SystemColors.ControlDarkDark;
+            this.m_ClearButton.Location = new System.Drawing.Point(342, 143);
             this.m_ClearButton.Name = "m_ClearButton";
-            this.m_ClearButton.Size = new System.Drawing.Size(91, 35);
+            this.m_ClearButton.Size = new System.Drawing.Size(80, 35);
             this.m_ClearButton.TabIndex = 9;
-            this.m_ClearButton.Text = "CLEAR";
+            this.m_ClearButton.Text = "Clear";
             this.m_ClearButton.UseVisualStyleBackColor = true;
             this.m_ClearButton.Click += new System.EventHandler(this.ClearButton_Click);
             // 
@@ -166,25 +176,29 @@ namespace RandomNumberGenerator
             // 
             this.m_StopButton.CausesValidation = false;
             this.m_StopButton.Enabled = false;
-            this.m_StopButton.Font = new System.Drawing.Font("Segoe UI", 12F);
-            this.m_StopButton.Location = new System.Drawing.Point(224, 143);
+            this.m_StopButton.Font = new System.Drawing.Font("Segoe UI", 10F);
+            this.m_StopButton.Location = new System.Drawing.Point(237, 143);
             this.m_StopButton.Name = "m_StopButton";
-            this.m_StopButton.Size = new System.Drawing.Size(91, 35);
+            this.m_StopButton.Size = new System.Drawing.Size(95, 35);
             this.m_StopButton.TabIndex = 8;
-            this.m_StopButton.Text = "STOP";
+            this.m_StopButton.Text = "Stop";
             this.m_StopButton.UseVisualStyleBackColor = true;
             this.m_StopButton.Click += new System.EventHandler(this.StopButton_Click);
             // 
             // m_StartButton
             // 
+            this.m_StartButton.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(31)))), ((int)(((byte)(92)))), ((int)(((byte)(153)))));
             this.m_StartButton.CausesValidation = false;
-            this.m_StartButton.Font = new System.Drawing.Font("Segoe UI", 12F);
+            this.m_StartButton.FlatAppearance.BorderSize = 0;
+            this.m_StartButton.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.m_StartButton.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
+            this.m_StartButton.ForeColor = System.Drawing.Color.White;
             this.m_StartButton.Location = new System.Drawing.Point(12, 143);
             this.m_StartButton.Name = "m_StartButton";
-            this.m_StartButton.Size = new System.Drawing.Size(91, 35);
+            this.m_StartButton.Size = new System.Drawing.Size(110, 35);
             this.m_StartButton.TabIndex = 6;
-            this.m_StartButton.Text = "START";
-            this.m_StartButton.UseVisualStyleBackColor = true;
+            this.m_StartButton.Text = "Start";
+            this.m_StartButton.UseVisualStyleBackColor = false;
             this.m_StartButton.Click += new System.EventHandler(this.StartButton_Click);
             // 
             // m_PortLabel
@@ -209,19 +223,25 @@ namespace RandomNumberGenerator
             this.m_PortComboBox.SelectedIndexChanged += new System.EventHandler(this.PortComboBox_SelectedIndexChanged);
             this.m_PortComboBox.Validating += new System.ComponentModel.CancelEventHandler(this.PortTextBox_Validating);
             // 
-            // m_StatusTextBox
-            // 
-            this.m_StatusTextBox.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.m_StatusTextBox.BackColor = System.Drawing.SystemColors.Info;
-            this.m_StatusTextBox.Font = new System.Drawing.Font("Microsoft Sans Serif", 10F);
-            this.m_StatusTextBox.Location = new System.Drawing.Point(3, 671);
-            this.m_StatusTextBox.Name = "m_StatusTextBox";
-            this.m_StatusTextBox.ReadOnly = true;
-            this.m_StatusTextBox.Size = new System.Drawing.Size(751, 23);
-            this.m_StatusTextBox.TabIndex = 8;
-            this.m_StatusTextBox.TabStop = false;
-            this.m_StatusTextBox.WordWrap = false;
+            // m_StatusStrip
+            //
+            this.m_StatusStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.m_StatusLabel});
+            this.m_StatusStrip.Location = new System.Drawing.Point(0, 710);
+            this.m_StatusStrip.Name = "m_StatusStrip";
+            this.m_StatusStrip.Padding = new System.Windows.Forms.Padding(6, 0, 12, 0);
+            this.m_StatusStrip.RenderMode = System.Windows.Forms.ToolStripRenderMode.System;
+            this.m_StatusStrip.Size = new System.Drawing.Size(773, 22);
+            this.m_StatusStrip.SizingGrip = false;
+            this.m_StatusStrip.TabIndex = 8;
+            //
+            // m_StatusLabel
+            //
+            this.m_StatusLabel.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.m_StatusLabel.Name = "m_StatusLabel";
+            this.m_StatusLabel.Size = new System.Drawing.Size(755, 17);
+            this.m_StatusLabel.Spring = true;
+            this.m_StatusLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             // 
             // m_ResultChart
             // 
@@ -231,7 +251,7 @@ namespace RandomNumberGenerator
             this.m_ResultChart.BackColor = System.Drawing.Color.Transparent;
             this.m_ResultChart.Location = new System.Drawing.Point(6, 202);
             this.m_ResultChart.Name = "m_ResultChart";
-            this.m_ResultChart.Size = new System.Drawing.Size(748, 463);
+            this.m_ResultChart.Size = new System.Drawing.Size(748, 464);
             this.m_ResultChart.TabIndex = 9;
             this.m_ResultChart.TabStop = false;
             // 
@@ -247,7 +267,7 @@ namespace RandomNumberGenerator
             this.MainTabControl.Location = new System.Drawing.Point(3, 4);
             this.MainTabControl.Name = "MainTabControl";
             this.MainTabControl.SelectedIndex = 0;
-            this.MainTabControl.Size = new System.Drawing.Size(768, 726);
+            this.MainTabControl.Size = new System.Drawing.Size(768, 704);
             this.MainTabControl.SizeMode = System.Windows.Forms.TabSizeMode.Fixed;
             this.MainTabControl.TabIndex = 10;
             // 
@@ -256,11 +276,10 @@ namespace RandomNumberGenerator
             this.ExecuteTabPage.Controls.Add(this.m_SetupGroupBox);
             this.ExecuteTabPage.Controls.Add(this.m_StatisticsGroupBox);
             this.ExecuteTabPage.Controls.Add(this.m_ResultChart);
-            this.ExecuteTabPage.Controls.Add(this.m_StatusTextBox);
             this.ExecuteTabPage.Location = new System.Drawing.Point(4, 25);
             this.ExecuteTabPage.Name = "ExecuteTabPage";
             this.ExecuteTabPage.Padding = new System.Windows.Forms.Padding(3);
-            this.ExecuteTabPage.Size = new System.Drawing.Size(760, 697);
+            this.ExecuteTabPage.Size = new System.Drawing.Size(760, 675);
             this.ExecuteTabPage.TabIndex = 0;
             this.ExecuteTabPage.Text = "Execute";
             this.ExecuteTabPage.UseVisualStyleBackColor = true;
@@ -318,20 +337,21 @@ namespace RandomNumberGenerator
             // m_PauseButton
             // 
             this.m_PauseButton.CausesValidation = false;
-            this.m_PauseButton.Font = new System.Drawing.Font("Segoe UI", 12F);
-            this.m_PauseButton.Location = new System.Drawing.Point(118, 143);
+            this.m_PauseButton.Font = new System.Drawing.Font("Segoe UI", 10F);
+            this.m_PauseButton.Location = new System.Drawing.Point(132, 143);
             this.m_PauseButton.Name = "m_PauseButton";
-            this.m_PauseButton.Size = new System.Drawing.Size(91, 35);
+            this.m_PauseButton.Size = new System.Drawing.Size(95, 35);
             this.m_PauseButton.TabIndex = 7;
-            this.m_PauseButton.Text = "PAUSE";
+            this.m_PauseButton.Text = "Pause";
             this.m_PauseButton.UseVisualStyleBackColor = true;
             this.m_PauseButton.Click += new System.EventHandler(this.PauseButton_Click);
             // 
             // m_FileBrowseButton
             // 
-            this.m_FileBrowseButton.Location = new System.Drawing.Point(347, 40);
+            this.m_FileBrowseButton.Font = new System.Drawing.Font("Segoe UI", 10F);
+            this.m_FileBrowseButton.Location = new System.Drawing.Point(347, 41);
             this.m_FileBrowseButton.Name = "m_FileBrowseButton";
-            this.m_FileBrowseButton.Size = new System.Drawing.Size(75, 29);
+            this.m_FileBrowseButton.Size = new System.Drawing.Size(75, 27);
             this.m_FileBrowseButton.TabIndex = 2;
             this.m_FileBrowseButton.Text = "Browse...";
             this.m_FileBrowseButton.UseVisualStyleBackColor = true;
@@ -396,7 +416,9 @@ namespace RandomNumberGenerator
             // 
             // m_MeanDeviationTextBox
             // 
-            this.m_MeanDeviationTextBox.Font = new System.Drawing.Font("Courier New", 12F);
+            this.m_MeanDeviationTextBox.BackColor = System.Drawing.SystemColors.Control;
+            this.m_MeanDeviationTextBox.BorderStyle = System.Windows.Forms.BorderStyle.None;
+            this.m_MeanDeviationTextBox.Font = new System.Drawing.Font("Consolas", 12F);
             this.m_MeanDeviationTextBox.Location = new System.Drawing.Point(156, 96);
             this.m_MeanDeviationTextBox.Name = "m_MeanDeviationTextBox";
             this.m_MeanDeviationTextBox.ReadOnly = true;
@@ -419,7 +441,9 @@ namespace RandomNumberGenerator
             // 
             // m_StandardDeviationTextBox
             // 
-            this.m_StandardDeviationTextBox.Font = new System.Drawing.Font("Courier New", 12F);
+            this.m_StandardDeviationTextBox.BackColor = System.Drawing.SystemColors.Control;
+            this.m_StandardDeviationTextBox.BorderStyle = System.Windows.Forms.BorderStyle.None;
+            this.m_StandardDeviationTextBox.Font = new System.Drawing.Font("Consolas", 12F);
             this.m_StandardDeviationTextBox.Location = new System.Drawing.Point(156, 150);
             this.m_StandardDeviationTextBox.Name = "m_StandardDeviationTextBox";
             this.m_StandardDeviationTextBox.ReadOnly = true;
@@ -442,7 +466,9 @@ namespace RandomNumberGenerator
             // 
             // m_DataPointsTextBox
             // 
-            this.m_DataPointsTextBox.Font = new System.Drawing.Font("Courier New", 12F);
+            this.m_DataPointsTextBox.BackColor = System.Drawing.SystemColors.Control;
+            this.m_DataPointsTextBox.BorderStyle = System.Windows.Forms.BorderStyle.None;
+            this.m_DataPointsTextBox.Font = new System.Drawing.Font("Consolas", 12F);
             this.m_DataPointsTextBox.Location = new System.Drawing.Point(156, 42);
             this.m_DataPointsTextBox.Name = "m_DataPointsTextBox";
             this.m_DataPointsTextBox.ReadOnly = true;
@@ -472,7 +498,7 @@ namespace RandomNumberGenerator
             this.AnalyzeTabPage.Location = new System.Drawing.Point(4, 25);
             this.AnalyzeTabPage.Name = "AnalyzeTabPage";
             this.AnalyzeTabPage.Padding = new System.Windows.Forms.Padding(3);
-            this.AnalyzeTabPage.Size = new System.Drawing.Size(760, 697);
+            this.AnalyzeTabPage.Size = new System.Drawing.Size(760, 675);
             this.AnalyzeTabPage.TabIndex = 1;
             this.AnalyzeTabPage.Text = "Analyze";
             this.AnalyzeTabPage.UseVisualStyleBackColor = true;
@@ -631,11 +657,11 @@ namespace RandomNumberGenerator
             // m_ResultBrowseButton
             // 
             this.m_ResultBrowseButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.m_ResultBrowseButton.Location = new System.Drawing.Point(333, 15);
+            this.m_ResultBrowseButton.Location = new System.Drawing.Point(285, 14);
             this.m_ResultBrowseButton.Name = "m_ResultBrowseButton";
-            this.m_ResultBrowseButton.Size = new System.Drawing.Size(31, 23);
+            this.m_ResultBrowseButton.Size = new System.Drawing.Size(79, 25);
             this.m_ResultBrowseButton.TabIndex = 5;
-            this.m_ResultBrowseButton.Text = "...";
+            this.m_ResultBrowseButton.Text = "Browse...";
             this.m_ResultBrowseButton.UseVisualStyleBackColor = true;
             this.m_ResultBrowseButton.Click += new System.EventHandler(this.ResultBrowseButton_Click);
             // 
@@ -655,7 +681,7 @@ namespace RandomNumberGenerator
             this.m_ResultTextBox.Location = new System.Drawing.Point(38, 15);
             this.m_ResultTextBox.Name = "m_ResultTextBox";
             this.m_ResultTextBox.ReadOnly = true;
-            this.m_ResultTextBox.Size = new System.Drawing.Size(289, 20);
+            this.m_ResultTextBox.Size = new System.Drawing.Size(241, 20);
             this.m_ResultTextBox.TabIndex = 3;
             // 
             // m_BaselineGroupBox
@@ -765,11 +791,11 @@ namespace RandomNumberGenerator
             // m_BaselineBrowseButton
             // 
             this.m_BaselineBrowseButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.m_BaselineBrowseButton.Location = new System.Drawing.Point(333, 15);
+            this.m_BaselineBrowseButton.Location = new System.Drawing.Point(285, 14);
             this.m_BaselineBrowseButton.Name = "m_BaselineBrowseButton";
-            this.m_BaselineBrowseButton.Size = new System.Drawing.Size(31, 23);
+            this.m_BaselineBrowseButton.Size = new System.Drawing.Size(79, 25);
             this.m_BaselineBrowseButton.TabIndex = 5;
-            this.m_BaselineBrowseButton.Text = "...";
+            this.m_BaselineBrowseButton.Text = "Browse...";
             this.m_BaselineBrowseButton.UseVisualStyleBackColor = true;
             this.m_BaselineBrowseButton.Click += new System.EventHandler(this.BaselineBrowseButton_Click);
             // 
@@ -789,7 +815,7 @@ namespace RandomNumberGenerator
             this.m_BaselineTextBox.Location = new System.Drawing.Point(38, 15);
             this.m_BaselineTextBox.Name = "m_BaselineTextBox";
             this.m_BaselineTextBox.ReadOnly = true;
-            this.m_BaselineTextBox.Size = new System.Drawing.Size(289, 20);
+            this.m_BaselineTextBox.Size = new System.Drawing.Size(241, 20);
             this.m_BaselineTextBox.TabIndex = 3;
             // 
             // m_ResultHistogramChart
@@ -814,6 +840,7 @@ namespace RandomNumberGenerator
             this.BackgroundImageLayout = System.Windows.Forms.ImageLayout.None;
             this.ClientSize = new System.Drawing.Size(773, 732);
             this.Controls.Add(this.MainTabControl);
+            this.Controls.Add(this.m_StatusStrip);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
             this.Name = "GeneratorForm";
             this.ShowIcon = false;
@@ -836,7 +863,10 @@ namespace RandomNumberGenerator
             this.m_BaselineGroupBox.ResumeLayout(false);
             this.m_BaselineGroupBox.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.m_ResultHistogramChart)).EndInit();
+            this.m_StatusStrip.ResumeLayout(false);
+            this.m_StatusStrip.PerformLayout();
             this.ResumeLayout(false);
+            this.PerformLayout();
 
         }
 
@@ -851,7 +881,8 @@ namespace RandomNumberGenerator
         private System.Windows.Forms.Button m_StartButton;
         private System.Windows.Forms.Label m_PortLabel;
         private System.Windows.Forms.ComboBox m_PortComboBox;
-        private System.Windows.Forms.TextBox m_StatusTextBox;
+        private System.Windows.Forms.StatusStrip m_StatusStrip;
+        private System.Windows.Forms.ToolStripStatusLabel m_StatusLabel;
         private RNGChart m_ResultChart;
         private System.Windows.Forms.TabControl MainTabControl;
         private System.Windows.Forms.TabPage ExecuteTabPage;

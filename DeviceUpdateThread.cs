@@ -11,6 +11,7 @@
 // 2023/12/06 - Mike Pullen - Changed from an always-running watchdog to a thread pool
 // 2026/08/31 - Mike Pullen - Only restore the info box when the reading devices message is still displayed
 // 2026/09/01 - Mike Pullen - Release the searches run for each controller when they are finished with
+// 2026/09/07 - Mike Pullen - Report device status through the shared status palette
 //*********************************************************************************************************************
 using System;
 using System.ComponentModel;
@@ -258,11 +259,11 @@ namespace RandomNumberGenerator
         private static Color m_StatusBoxBackColor = System.Drawing.SystemColors.Info;
 
         // Message to display in the info box when reading devices
-        private static readonly string m_sREADING_DEVICES_MESSAGE = " Checking attached devices and updating port list...";
-        private static readonly string m_sREADING_DEVICES_ERROR = " Unable to check the attached devices. The port list has been left as it was.";
-        private static readonly Color m_DEVICE_ERROR_TEXTCOLOR = System.Drawing.Color.Black;
-        private static readonly Color m_DEVICE_ERROR_BACKCOLOR = System.Drawing.Color.Red;
-        private static readonly Color m_READING_DEVICES_TEXTCOLOR = System.Drawing.Color.White;
-        private static readonly Color m_READING_DEVICES_BACKCOLOR = System.Drawing.SystemColors.Highlight;
+        private static readonly string m_sREADING_DEVICES_MESSAGE = "Checking attached devices and updating port list...";
+        private static readonly string m_sREADING_DEVICES_ERROR = "Unable to check the attached devices. The port list has been left as it was.";
+        private static readonly Color m_DEVICE_ERROR_TEXTCOLOR = StatusPalette.ErrorText;
+        private static readonly Color m_DEVICE_ERROR_BACKCOLOR = StatusPalette.ErrorBackground;
+        private static readonly Color m_READING_DEVICES_TEXTCOLOR = StatusPalette.BusyText;
+        private static readonly Color m_READING_DEVICES_BACKCOLOR = StatusPalette.BusyBackground;
     }
 }
