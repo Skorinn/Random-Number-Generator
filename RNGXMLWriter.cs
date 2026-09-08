@@ -10,6 +10,8 @@
 // 2023/12/06 - Mike Pullen - Original implementation.
 // 2026/08/31 - Mike Pullen - Append without rewriting the whole file, allow the file to be read while recording,
 //                            and continue a session that was left open by the application stopping
+// 2026/09/08 - Mike Pullen - Kept the file the writer is pointed at when a session ends, so a second session
+//                            can be recorded into the same file without choosing it again
 //*********************************************************************************************************************
 using System;
 using System.Xml;
@@ -260,7 +262,9 @@ namespace RandomNumberGenerator
                             m_FileStream = null;
                         }
                         
-                        m_sFilePath = "";
+                        // The file the writer is pointed at is kept. Ending a session used to clear it, which
+                        // left the writer with nowhere to write and made the next start report that no data
+                        // file had been selected. What ends here is the session, not the choice of file.
                         m_bAppendMode = false; // Reset append mode flag
                         bStatus = true;
                     }

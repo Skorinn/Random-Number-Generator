@@ -17,6 +17,8 @@
 // 2026/09/07 - Mike Pullen - Session in the window title, a status message that says what to do next, and
 //                            no value shown for a measure nothing has been measured for yet
 // 2026/09/07 - Mike Pullen - Report whether the two analysed sessions differ by more than noise
+// 2026/09/08 - Mike Pullen - Kept the chosen data file when a session ends and added an optional session
+//                            length that stops the session once it has been reached
 //*********************************************************************************************************************
 
 // Enable to dump the USB device information
@@ -489,14 +491,14 @@ namespace RandomNumberGenerator
                 }
             }
 
-            // Check if the selection will have any effect
+            // A file was chosen, so it is opened, even when it is the one already chosen. Picking the same
+            // file used to be treated as changing nothing, which worked only because ending a session gave
+            // the file up: the same path could never come back. The file now stays chosen after a session
+            // ends, so re-opening it is how the readings already in it are put back on screen, and skipping
+            // that left the window empty with no sign of why.
             FileBrowseActive = (false == String.IsNullOrEmpty(sSelectedFile));
-            if (FileBrowseActive)
-            {
-                FileBrowseActive = (sSelectedFile != m_Data.FilePath);
-            }
 
-            // If the file is being changed
+            // If a file was chosen
             if (FileBrowseActive)
             {
                 // A new session file has been selected, so end the current session
@@ -903,6 +905,9 @@ namespace RandomNumberGenerator
 
                         // Clear any displayed errors 
                         SetStatusBoxState(RunningMessage, StatusPalette.NormalText, StatusPalette.NormalBackground);
+
+                        // Stop of its own accord if the session has run for as long as it was asked to
+                        CheckSessionLength();
                     }
                     catch (InvalidOperationException invalidOpEx)
                     {
@@ -1100,6 +1105,9 @@ namespace RandomNumberGenerator
             // Disable the target number field
             m_TargetComboBox.Enabled = false;
 
+            // The length is read while the session runs, so it is settled before the session starts
+            m_SessionLengthUpDown.Enabled = false;
+
             // Disable the file browser
             m_FileBrowseButton.Enabled = false;
 
@@ -1238,6 +1246,7 @@ namespace RandomNumberGenerator
 
             // Labels name a value rather than carrying one, so they recede behind it
             foreach (Label eyebrow in new Label[] { m_SimulateToggleLabel, m_PortLabel, m_FileLlabel, m_TargetLabel,
+                                                    m_SessionLengthLabel,
                                                     m_SessionTimerLabel, m_DataPointsLabel, m_CurrentAverageLabel,
                                                     m_MeanDeviationLabel, m_StandardDeviationLabel,
                                                     m_BaselineLabel, m_ResultLabel })
@@ -1287,6 +1296,10 @@ namespace RandomNumberGenerator
                 browseButton.ForeColor = UiPalette.CardText;
                 browseButton.UseVisualStyleBackColor = false;
             }
+
+            // The session length is a setting the user types into, so it takes the card rather than the ground
+            m_SessionLengthUpDown.BackColor = UiPalette.Card;
+            m_SessionLengthUpDown.ForeColor = UiPalette.CardText;
 
             m_ComparisonList.BackColor = UiPalette.Card;
             m_ComparisonList.ForeColor = UiPalette.CardText;
@@ -1409,6 +1422,7 @@ namespace RandomNumberGenerator
             // Enable the interface controls
             m_SimulateToggle.Enabled = true;
             m_PortComboBox.Enabled = true;
+            m_SessionLengthUpDown.Enabled = true;
 
             // Whether a session can be started at all depends on there being somewhere to record it
             UpdateStartAvailability();
@@ -1573,18 +1587,57 @@ namespace RandomNumberGenerator
             // Stop the read timer if running
             m_Timer.Stop();
 
-            // End the current session and clear the selected data file
+            // End the current session. The chosen file is kept: ending a session used to clear it, which
+            // meant browsing for the same file again before another session could be recorded into it.
             m_Data.EndSession();
-            m_FileTextBox.Text = string.Empty;
 
-            // With no file there is nowhere to record into, so starting is not offered again until one is
-            // chosen
+            // Starting is offered again straight away, as there is still somewhere to record into
             UpdateStartAvailability();
 
             // Enable the target number field for the next session
             m_TargetComboBox.Enabled = true;
 
             return bStatus;
+        }
+
+        /// <summary>
+        /// Stops the session once it has recorded for as long as it was asked to. A length of zero means no
+        /// limit was set, so the session runs until it is stopped by hand. This is checked as each reading
+        /// arrives rather than from the session timer, so the stop happens on the thread that owns the form
+        /// and needs no marshalling.
+        /// </summary>
+        private void CheckSessionLength()
+        {
+            // A session that is not running has no length to have reached
+            if (RngGuiStates.Running != m_State)
+            {
+                return;
+            }
+
+            // Zero is the "record until stopped" setting, which is what the field starts at
+            int iLimitMinutes = (int)m_SessionLengthUpDown.Value;
+            if (m_iNO_SESSION_LIMIT >= iLimitMinutes)
+            {
+                return;
+            }
+
+            // The elapsed time counts only the time the session has been running, as the timer stops while
+            // it is paused, so a paused session does not run its own clock out
+            int iLimitSeconds = (iLimitMinutes * m_iSECONDS_PER_MINUTE);
+            int iElapsedSeconds = m_Data.Timer.ElapsedSeconds;
+            bool bReached = (iElapsedSeconds >= iLimitSeconds);
+
+            // If the session still has time left to run
+            if (false == bReached)
+            {
+                return;
+            }
+
+            // End it as though Stop had been pressed, and then say why, because returning to idle writes
+            // the idle message over the status bar
+            SetIdleState();
+            SetStatusBoxState(SessionLengthReachedMessage, StatusPalette.NormalText,
+                              StatusPalette.NormalBackground);
         }
 
         /// <summary>
@@ -2523,6 +2576,21 @@ namespace RandomNumberGenerator
         }
 
         /// <summary>
+        /// Message to display in the info box once a session has stopped itself, having recorded for the
+        /// length it was given (read-only)
+        /// </summary>
+        private string SessionLengthReachedMessage
+        {
+            get
+            {
+                int iLimitMinutes = (int)m_SessionLengthUpDown.Value;
+                string sUnits = (m_iSINGLE_MINUTE == iLimitMinutes) ? m_sSINGLE_MINUTE : m_sMANY_MINUTES;
+
+                return $"Session stopped after {iLimitMinutes} {sUnits}.";
+            }
+        }
+
+        /// <summary>
         /// Selected target value
         /// </summary>
         private int SelectedTarget
@@ -2577,6 +2645,15 @@ namespace RandomNumberGenerator
         // How a loaded analysis file reports the amount of data behind it
         private const string m_sSINGLE_READING = "reading";
         private const string m_sMANY_READINGS = "readings";
+
+        // Wording for the length a session was given
+        private const string m_sSINGLE_MINUTE = "minute";
+        private const string m_sMANY_MINUTES = "minutes";
+        private const int m_iSINGLE_MINUTE = 1;
+
+        // A length of zero is the setting that lets a session run until it is stopped by hand
+        private const int m_iNO_SESSION_LIMIT = 0;
+        private const int m_iSECONDS_PER_MINUTE = 60;
 
         // Rows of the comparison table, in the order BuildComparisonTable adds them. The order there and
         // these have to be kept in step.

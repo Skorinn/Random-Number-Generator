@@ -385,6 +385,102 @@ namespace RandomNumberGenerator.Test
             Assert.AreEqual(sEXPECTED_VALUE, timerTextBox.Text);
         }
 
+        /// <summary>
+        /// Tests the elapsed time is reported in seconds, which is what a session length is measured against
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void ElapsedSeconds_TimerHasRun_ReportsTheWholeElapsedTime()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // An hour, two minutes and three seconds, so the hours and minutes have to be carried into the
+            // total rather than only the seconds being reported
+            const int iINTERVAL = 1000;
+            const uint iNUM_TICKS = 3723;
+            const int iEXPECTED_SECONDS = 3723;
+
+            // Create the session timer
+            IRNGSessionTimer timer = new RNGSessionTimer();
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            SimulateTimer(timer, iINTERVAL, iNUM_TICKS);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the elapsed time agrees with the time shown, so the two cannot drift apart
+            Assert.AreEqual(iEXPECTED_SECONDS, timer.ElapsedSeconds);
+            Assert.AreEqual("01:02:03", timer.SessionTime);
+        }
+
+        /// <summary>
+        /// Tests a timer that has not run reports nothing elapsed, so a session length is never reached
+        /// before the session has recorded anything
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void ElapsedSeconds_TimerNotStarted_ReportsZero()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            const int iEXPECTED_SECONDS = 0;
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Create the session timer
+            IRNGSessionTimer timer = new RNGSessionTimer();
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            Assert.AreEqual(iEXPECTED_SECONDS, timer.ElapsedSeconds);
+        }
+
+        /// <summary>
+        /// Tests resetting the timer takes the elapsed time back to nothing, so the length given to one
+        /// session is not counted as already part run by the next
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void ElapsedSeconds_TimerReset_ReportsZero()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            const int iINTERVAL = 1000;
+            const uint iNUM_TICKS = 90;
+            const int iEXPECTED_SECONDS = 0;
+
+            // Create the session timer and run it for a while
+            IRNGSessionTimer timer = new RNGSessionTimer();
+            SimulateTimer(timer, iINTERVAL, iNUM_TICKS);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            timer.Reset();
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            Assert.AreEqual(iEXPECTED_SECONDS, timer.ElapsedSeconds);
+        }
+
         #endregion
     }
 }

@@ -13,6 +13,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 using System;
 using System.IO;
+using System.Xml;
 
 namespace RandomNumberGenerator.Test
 {
@@ -56,6 +57,10 @@ namespace RandomNumberGenerator.Test
 
         // Paths for files used for testing
         private const string m_sTEST_FILE_PATH = "TestSessionDataFile.RNGSessionDataFileTests.xml";
+
+        // Owned by the tests that record two sessions into one file, so they never share a file with a test
+        // that only mocks the writer and leaves nothing on disk
+        private const string m_sAPPEND_FILE_PATH = "TestAppend.RNGSessionDataFileTests.xml";
 
         #endregion
         #region Additional test attributes
@@ -638,6 +643,118 @@ namespace RandomNumberGenerator.Test
 
             // Verify no session is left recorded against a file that was not prepared
             Assert.IsFalse(sessionDataFile.SessionInProgress);
+        }
+
+        /// <summary>
+        /// Tests a second session recorded into a file that already holds readings keeps them, rather than
+        /// writing over the readings already there
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void StartSession_FileAlreadyHoldsReadings_KeepsThemAndAppends()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            const int iEXPECTED_READINGS = 2;
+            const bool bNOT_SIMULATED = false;
+            const int iTARGET = 1;
+
+            // Start with nothing there, so the first session is the one that creates the file
+            if (File.Exists(m_sAPPEND_FILE_PATH))
+            {
+                File.Delete(m_sAPPEND_FILE_PATH);
+            }
+
+            // Mock the session the file is recorded against
+            var sessionDataMock = new Mock<IRNGSessionData>();
+            sessionDataMock.Setup(mock => mock.Simulated).Returns(bNOT_SIMULATED);
+            sessionDataMock.Setup(mock => mock.TargetValue).Returns(iTARGET);
+
+            // Record one reading and stop, which is what pressing Start and then Stop does
+            RNGSessionDataFile firstSession = new RNGSessionDataFile(new RNGXMLWriter(m_sAPPEND_FILE_PATH));
+            firstSession.StartSession(sessionDataMock.Object);
+            firstSession.WriteDataPoint(new XMLDataPoint("00:00:01", 0.111));
+            firstSession.EndSession();
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Press Start again with the same file still chosen, which is what keeping the file after a
+            // session ends now allows
+            RNGSessionDataFile secondSession = new RNGSessionDataFile(new RNGXMLWriter(m_sAPPEND_FILE_PATH));
+            secondSession.StartSession(sessionDataMock.Object);
+            secondSession.WriteDataPoint(new XMLDataPoint("00:00:02", 0.222));
+            secondSession.EndSession();
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the file still reads as a session, so the second start left it well formed
+            XmlDocument document = new XmlDocument();
+            document.Load(m_sAPPEND_FILE_PATH);
+            Assert.AreEqual(XMLConstants.SESSION_ELEMENT, document.DocumentElement.Name);
+
+            // Verify both sessions' readings are there, the first one having survived the second start
+            Assert.AreEqual(iEXPECTED_READINGS, document.DocumentElement.ChildNodes.Count);
+            Assert.AreEqual("0.111", document.DocumentElement.ChildNodes[0].InnerText);
+            Assert.AreEqual("0.222", document.DocumentElement.ChildNodes[1].InnerText);
+
+            // Clean up the file this test owns
+            File.Delete(m_sAPPEND_FILE_PATH);
+        }
+
+        /// <summary>
+        /// Tests starting a session on a file that already holds readings reopens it for appending instead
+        /// of writing a session start, which is the write that empties the file
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void StartSession_FileAlreadyHoldsReadings_PreparesForAppendInsteadOfWritingSessionStart()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            const bool bPREPARED = true;
+
+            // Put something in the file, as it is the file having content that decides which way this goes
+            File.WriteAllText(m_sAPPEND_FILE_PATH, "<Session Simulated=\"false\" Target=\"1\">");
+
+            // Mock a writer that reports the file was prepared successfully
+            var xmlWriterMock = new Mock<IRNGSessionFileWriter>();
+            xmlWriterMock.Setup(mock => mock.FilePath).Returns(m_sAPPEND_FILE_PATH);
+            xmlWriterMock.Setup(mock => mock.PrepareForAppend(It.IsAny<string>())).Returns(bPREPARED);
+
+            // Mock the session the file is recorded against
+            var sessionDataMock = new Mock<IRNGSessionData>();
+
+            // Create the object under test
+            RNGSessionDataFile sessionDataFile = new RNGSessionDataFile(xmlWriterMock.Object);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            bool bStatus = sessionDataFile.StartSession(sessionDataMock.Object);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the session started and is recorded as being in progress
+            Assert.IsTrue(bStatus);
+            Assert.IsTrue(sessionDataFile.SessionInProgress);
+
+            // Verify the file was reopened after what it already held, rather than started over
+            xmlWriterMock.Verify(mock => mock.PrepareForAppend(m_sAPPEND_FILE_PATH), Times.Once);
+            xmlWriterMock.Verify(mock => mock.WriteSessionStart(It.IsAny<bool>(), It.IsAny<int>()), Times.Never);
+
+            // Clean up the file this test owns
+            File.Delete(m_sAPPEND_FILE_PATH);
         }
 
         #endregion

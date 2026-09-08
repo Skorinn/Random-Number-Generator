@@ -492,8 +492,8 @@ namespace RandomNumberGenerator.Test
             // Verify the write was successful
             Assert.IsTrue(bStatus);
 
-            // Verify the session file was cleared
-            Assert.IsTrue(string.IsNullOrEmpty(xmlWriter.FilePath));
+            // Verify the file the writer is pointed at is kept, so another session can be recorded into it
+            Assert.AreEqual(m_sTEST_FILE_PATH, xmlWriter.FilePath);
 
             // Verify the file was created
             Assert.IsTrue(File.Exists(m_sTEST_FILE_PATH));

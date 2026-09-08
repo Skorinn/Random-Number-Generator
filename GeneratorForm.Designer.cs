@@ -57,6 +57,8 @@ namespace RandomNumberGenerator
             this.m_FileBrowseButton = new System.Windows.Forms.Button();
             this.m_TargetLabel = new System.Windows.Forms.Label();
             this.m_TargetComboBox = new System.Windows.Forms.ComboBox();
+            this.m_SessionLengthLabel = new System.Windows.Forms.Label();
+            this.m_SessionLengthUpDown = new System.Windows.Forms.NumericUpDown();
             this.m_ActionPanel = new System.Windows.Forms.FlowLayoutPanel();
             this.m_StopButton = new System.Windows.Forms.Button();
             this.m_PauseButton = new System.Windows.Forms.Button();
@@ -107,6 +109,7 @@ namespace RandomNumberGenerator
             this.m_SetupCard.SuspendLayout();
             this.m_SetupLayout.SuspendLayout();
             this.m_ActionPanel.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.m_SessionLengthUpDown)).BeginInit();
             this.m_StatisticsCard.SuspendLayout();
             this.m_StatisticsLayout.SuspendLayout();
             this.m_SessionTimerTile.SuspendLayout();
@@ -209,12 +212,13 @@ namespace RandomNumberGenerator
             // m_SetupLayout
             //
             this.m_SetupLayout.BackColor = System.Drawing.Color.Transparent;
-            this.m_SetupLayout.ColumnCount = 5;
+            this.m_SetupLayout.ColumnCount = 6;
             this.m_SetupLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 88F));
             this.m_SetupLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 96F));
             this.m_SetupLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
             this.m_SetupLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 116F));
-            this.m_SetupLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 124F));
+            this.m_SetupLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 112F));
+            this.m_SetupLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 118F));
             this.m_SetupLayout.Controls.Add(this.m_SimulateToggleLabel, 0, 0);
             this.m_SetupLayout.Controls.Add(this.m_SimulateToggle, 0, 1);
             this.m_SetupLayout.Controls.Add(this.m_PortLabel, 1, 0);
@@ -224,6 +228,8 @@ namespace RandomNumberGenerator
             this.m_SetupLayout.Controls.Add(this.m_FileBrowseButton, 3, 1);
             this.m_SetupLayout.Controls.Add(this.m_TargetLabel, 4, 0);
             this.m_SetupLayout.Controls.Add(this.m_TargetComboBox, 4, 1);
+            this.m_SetupLayout.Controls.Add(this.m_SessionLengthLabel, 5, 0);
+            this.m_SetupLayout.Controls.Add(this.m_SessionLengthUpDown, 5, 1);
             this.m_SetupLayout.Controls.Add(this.m_ActionPanel, 0, 2);
             this.m_SetupLayout.Dock = System.Windows.Forms.DockStyle.Fill;
             this.m_SetupLayout.Location = new System.Drawing.Point(14, 12);
@@ -329,7 +335,7 @@ namespace RandomNumberGenerator
             this.m_TargetLabel.AutoSize = true;
             this.m_TargetLabel.Dock = System.Windows.Forms.DockStyle.Fill;
             this.m_TargetLabel.Location = new System.Drawing.Point(587, 0);
-            this.m_TargetLabel.Margin = new System.Windows.Forms.Padding(0);
+            this.m_TargetLabel.Margin = new System.Windows.Forms.Padding(0, 0, 16, 0);
             this.m_TargetLabel.Name = "m_TargetLabel";
             this.m_TargetLabel.Size = new System.Drawing.Size(124, 18);
             this.m_TargetLabel.TabIndex = 0;
@@ -341,14 +347,37 @@ namespace RandomNumberGenerator
             this.m_TargetComboBox.Dock = System.Windows.Forms.DockStyle.Top;
             this.m_TargetComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.m_TargetComboBox.Location = new System.Drawing.Point(587, 18);
-            this.m_TargetComboBox.Margin = new System.Windows.Forms.Padding(0);
+            this.m_TargetComboBox.Margin = new System.Windows.Forms.Padding(0, 0, 16, 0);
             this.m_TargetComboBox.Name = "m_TargetComboBox";
             this.m_TargetComboBox.Size = new System.Drawing.Size(124, 23);
             this.m_TargetComboBox.TabIndex = 4;
             //
+            // m_SessionLengthLabel
+            //
+            this.m_SessionLengthLabel.AutoSize = true;
+            this.m_SessionLengthLabel.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.m_SessionLengthLabel.Location = new System.Drawing.Point(593, 0);
+            this.m_SessionLengthLabel.Margin = new System.Windows.Forms.Padding(0);
+            this.m_SessionLengthLabel.Name = "m_SessionLengthLabel";
+            this.m_SessionLengthLabel.Size = new System.Drawing.Size(118, 18);
+            this.m_SessionLengthLabel.TabIndex = 0;
+            this.m_SessionLengthLabel.Text = "STOP AFTER (MIN)";
+            this.m_SessionLengthLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            //
+            // m_SessionLengthUpDown
+            //
+            this.m_SessionLengthUpDown.Dock = System.Windows.Forms.DockStyle.Top;
+            this.m_SessionLengthUpDown.Location = new System.Drawing.Point(593, 18);
+            this.m_SessionLengthUpDown.Margin = new System.Windows.Forms.Padding(0);
+            this.m_SessionLengthUpDown.Maximum = new decimal(new int[] { 1440, 0, 0, 0});
+            this.m_SessionLengthUpDown.Name = "m_SessionLengthUpDown";
+            this.m_SessionLengthUpDown.Size = new System.Drawing.Size(118, 23);
+            this.m_SessionLengthUpDown.TabIndex = 5;
+            this.m_SessionLengthUpDown.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
+            //
             // m_ActionPanel
             //
-            this.m_SetupLayout.SetColumnSpan(this.m_ActionPanel, 5);
+            this.m_SetupLayout.SetColumnSpan(this.m_ActionPanel, 6);
             this.m_ActionPanel.BackColor = System.Drawing.Color.Transparent;
             this.m_ActionPanel.Controls.Add(this.m_StopButton);
             this.m_ActionPanel.Controls.Add(this.m_PauseButton);
@@ -878,17 +907,19 @@ namespace RandomNumberGenerator
             this.m_ToolTip.SetToolTip(this.m_MeanDeviationTextBox, "How far the mean sits from 0.5, the value an unbiased generator is expected to give.");
             this.m_ToolTip.SetToolTip(this.m_StandardDeviationLabel, "How spread out the readings are around their mean. A larger figure means noisier readings.");
             this.m_ToolTip.SetToolTip(this.m_StandardDeviationTextBox, "How spread out the readings are around their mean. A larger figure means noisier readings.");
+            this.m_ToolTip.SetToolTip(this.m_SessionLengthLabel, "How long to record for before the session stops on its own. Zero records until Stop is pressed.");
+            this.m_ToolTip.SetToolTip(this.m_SessionLengthUpDown, "How long to record for before the session stops on its own. Zero records until Stop is pressed.");
             //
             // GeneratorForm
             //
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(773, 734);
+            this.ClientSize = new System.Drawing.Size(879, 734);
             this.Controls.Add(this.MainTabControl);
             this.Controls.Add(this.m_StatusStrip);
             this.Font = new System.Drawing.Font("Segoe UI", 9F);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.Sizable;
-            this.MinimumSize = new System.Drawing.Size(780, 620);
+            this.MinimumSize = new System.Drawing.Size(886, 620);
             this.Name = "GeneratorForm";
             this.ShowIcon = false;
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
@@ -903,6 +934,7 @@ namespace RandomNumberGenerator
             this.m_SetupLayout.ResumeLayout(false);
             this.m_SetupLayout.PerformLayout();
             this.m_ActionPanel.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this.m_SessionLengthUpDown)).EndInit();
             this.m_StatisticsCard.ResumeLayout(false);
             this.m_StatisticsLayout.ResumeLayout(false);
             this.m_SessionTimerTile.ResumeLayout(false);
@@ -957,6 +989,8 @@ namespace RandomNumberGenerator
         private System.Windows.Forms.Button m_FileBrowseButton;
         private System.Windows.Forms.Label m_TargetLabel;
         private System.Windows.Forms.ComboBox m_TargetComboBox;
+        private System.Windows.Forms.Label m_SessionLengthLabel;
+        private System.Windows.Forms.NumericUpDown m_SessionLengthUpDown;
         private CardPanel m_StatisticsCard;
         private System.Windows.Forms.TableLayoutPanel m_StatisticsLayout;
         private System.Windows.Forms.Panel m_SessionTimerTile;

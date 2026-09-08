@@ -10,6 +10,7 @@
 // 2024/02/03 - Mike Pullen - Original implementation.
 // 2026/09/01 - Mike Pullen - Corrected the file header, rolled the session time over at 60 rather than 61, and
 //                            replaced the destructor with a dispose
+// 2026/09/08 - Mike Pullen - Report the elapsed time in seconds, so a session can be given a length
 //*********************************************************************************************************************
 using System;
 using System.Windows.Forms;
@@ -20,6 +21,7 @@ namespace RandomNumberGenerator
     {
         bool Enabled { get; set; }
         bool InProgress { get; }
+        int ElapsedSeconds { get; }
         int Interval { get; set; }
         string SessionTime { get; }
         TextBox TimerTextBox { set; }
@@ -208,6 +210,21 @@ namespace RandomNumberGenerator
         public bool InProgress { get => m_bInProgress; }
 
         /// <summary>
+        /// How long the session has been recording, in seconds, not counting time spent paused (read-only)
+        /// </summary>
+        public int ElapsedSeconds
+        {
+            get
+            {
+                lock (m_TimerLock)
+                {
+                    return ((m_iSessionHours * m_iSECONDS_PER_HOUR) + (m_iSessionMinutes * m_iSECONDS_PER_MINUTE) +
+                            m_iSessionSeconds);
+                }
+            }
+        }
+
+        /// <summary>
         /// Timer interval in milliseconds. Valid values are 1-1000.
         /// </summary>
         public int Interval
@@ -266,6 +283,10 @@ namespace RandomNumberGenerator
 
         // Text box for displaying the timer
         private TextBox m_TimerTextBox = null;
+
+        // Seconds in the larger units the elapsed time is kept in
+        private const int m_iSECONDS_PER_MINUTE = 60;
+        private const int m_iSECONDS_PER_HOUR = 3600;
 
         // Session timer counters
         private object m_TimerLock = new object();

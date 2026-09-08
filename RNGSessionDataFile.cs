@@ -9,6 +9,8 @@
 //====================================================================================================================
 // 2023/12/04 - Mike Pullen - Original implementation.
 // 2026/08/31 - Mike Pullen - Report anything that needs raising about a loaded file through LastError
+// 2026/09/08 - Mike Pullen - Appended to a file that already holds readings rather than writing over it, so
+//                            recording a second session into the same file keeps the first
 //*********************************************************************************************************************
 using System;
 using System.IO;
@@ -147,10 +149,26 @@ namespace RandomNumberGenerator
                 bool bValid = IsValid();
                 if (bValid)
                 {
-                    // Write the session start, recording the session as in progress only once it is, so a
-                    // write that reports failure does not leave the file looking like it holds a session
-                    bStatus = m_Writer.WriteSessionStart(sessionData.Simulated, sessionData.TargetValue);
-                    m_bSessionInProgress = bStatus;
+                    // A file that already holds readings is continued rather than started over. Starting a
+                    // session opens the file for writing from the beginning, so doing that to a file with a
+                    // session already in it would throw those readings away without asking. That could not
+                    // happen while ending a session also cleared the chosen file, because the only way back
+                    // to a file was to load it, and loading prepares it for appending; now that the file
+                    // stays chosen, pressing Start again has to be safe on its own.
+                    bool bHasReadings = FileHoldsData(FilePath);
+                    if (true == bHasReadings)
+                    {
+                        // Reopens the file after the end of the readings already in it
+                        PrepareWriterForAppend(FilePath);
+                        bStatus = true;
+                    }
+                    else
+                    {
+                        // Write the session start, recording the session as in progress only once it is, so a
+                        // write that reports failure does not leave the file looking like it holds a session
+                        bStatus = m_Writer.WriteSessionStart(sessionData.Simulated, sessionData.TargetValue);
+                        m_bSessionInProgress = bStatus;
+                    }
                 }
                 else
                 {
@@ -289,6 +307,23 @@ namespace RandomNumberGenerator
             }
 
             return bStatus;
+        }
+
+        /// <summary>
+        /// Whether a file is already holding readings, which decides whether starting a session continues it
+        /// or begins it. A file that does not exist yet, or that exists with nothing in it, is begun.
+        /// </summary>
+        /// <param name="sFilePath">IN - Path to the session file</param>
+        /// <returns>true if the file exists and has something in it; otherwise, false</returns>
+        private static bool FileHoldsData(string sFilePath)
+        {
+            if (string.IsNullOrEmpty(sFilePath))
+            {
+                return false;
+            }
+
+            FileInfo sessionFile = new FileInfo(sFilePath);
+            return (sessionFile.Exists && (0 < sessionFile.Length));
         }
 
         /// <summary>
