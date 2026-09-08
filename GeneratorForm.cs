@@ -1076,6 +1076,20 @@ namespace RandomNumberGenerator
         /// </summary>
         private void SetRunningState()
         {
+            // Check if the target number has changed, which has to be settled before the session records
+            // anything against it
+            CheckTargetChanged();
+
+            // Try to start before anything on the form is moved. A start that fails is not a session that
+            // has ended, and the form used to be put into the running state first and then taken back out
+            // of it by the failure, which ran the session end and threw away the data file that had been
+            // chosen for it. Nothing is given up until there is a session to give up.
+            bool bStarted = StartSession();
+            if (false == bStarted)
+            {
+                return;
+            }
+
             // Set the state
             m_State = RngGuiStates.Running;
 
@@ -1089,9 +1103,6 @@ namespace RandomNumberGenerator
             // Disable the file browser
             m_FileBrowseButton.Enabled = false;
 
-            // Check if the target number has changed
-            CheckTargetChanged();
-
             // Clear the chart
             m_ResultChart.Clear();
 
@@ -1104,9 +1115,6 @@ namespace RandomNumberGenerator
             SetPrimaryButton(m_StopButton);
 
             UpdateWindowTitle();
-
-            // Start a new session (will continue existing session if already in progress)
-            StartSession();
         }
 
         /// <summary>
@@ -1536,6 +1544,11 @@ namespace RandomNumberGenerator
             // If session start failed, ensure we're in idle state
             if (false == bStatus)
             {
+                // Close anything the data layer opened before it gave up, but leave the chosen file alone.
+                // The session never started, so there is nothing the user should have to choose again.
+                m_Timer.Stop();
+                m_Data.EndSession();
+
                 SetIdleState();
 
                 // Now that the status bar has been reset by the return to idle, say what went wrong
