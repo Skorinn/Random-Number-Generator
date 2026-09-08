@@ -75,9 +75,7 @@ namespace RandomNumberGenerator
                 Interval = 0,
                 StripWidth = 0,
                 BorderWidth = m_iEXPECTED_VALUE_WIDTH,
-                BorderDashStyle = ChartDashStyle.Dash,
-                Text = m_sEXPECTED_VALUE_TEXT,
-                TextAlignment = System.Drawing.StringAlignment.Far
+                BorderDashStyle = ChartDashStyle.Dash
             };
             AverageChartYAxis.StripLines.Add(expectedValueLine);
 
@@ -126,7 +124,6 @@ namespace RandomNumberGenerator
             foreach (StripLine expectedValueLine in resultsYAxis.StripLines)
             {
                 expectedValueLine.BorderColor = UiPalette.Expected;
-                expectedValueLine.ForeColor = UiPalette.Expected;
             }
 
             foreach (Title chartTitle in Titles)
@@ -338,7 +335,6 @@ namespace RandomNumberGenerator
         private const string m_sYAXIS_TITLE = "Bit average";
         private const string m_sDATA_POINT_LEGEND = "Reading";
         private const string m_sAVERAGE_LEGEND = "Running mean";
-        private const string m_sEXPECTED_VALUE_TEXT = "Expected";
         private const int m_iEXPECTED_VALUE_WIDTH = 1;
 
         #endregion

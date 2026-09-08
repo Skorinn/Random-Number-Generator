@@ -253,10 +253,6 @@ namespace RandomNumberGenerator
             // Record the device interface requires initialization
             m_Timer.Initialized = false;
 
-            // Say which source the toggle is on. A switch with nothing beside it says only that there are
-            // two of something, not which one is in use.
-            m_SourceModeLabel.Text = m_Data.Simulated ? m_sSIMULATOR_SOURCE : m_sDEVICE_SOURCE;
-
             // If simulating
             if (m_Data.Simulated)
             {
@@ -1213,7 +1209,6 @@ namespace RandomNumberGenerator
             // The switch is drawn on the card, so the corners its rounded shape does not reach take the card
             m_SimulateToggle.BackColor = UiPalette.Card;
 
-            m_SourceModeLabel.ForeColor = UiPalette.CardText;
 
             // Clearing is the one action here that destroys something, so it is the quietest thing on the card
             m_ClearButton.BackColor = UiPalette.Card;
@@ -2512,10 +2507,6 @@ namespace RandomNumberGenerator
         // created here and disposed with the form.
         private static readonly Font m_EyebrowFont = new Font("Segoe UI", 8F, FontStyle.Regular);
         private static readonly Font m_ReadoutFont = new Font("Consolas", 15F, FontStyle.Regular);
-
-        // The two sources the toggle switches between, named beside it
-        private const string m_sDEVICE_SOURCE = "Device";
-        private const string m_sSIMULATOR_SOURCE = "Simulator";
 
         // The two things the same field means, depending on where the readings come from
         private const string m_sPORT_LABEL = "PORT";
