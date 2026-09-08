@@ -19,6 +19,8 @@
 // 2026/09/07 - Mike Pullen - Report whether the two analysed sessions differ by more than noise
 // 2026/09/08 - Mike Pullen - Kept the chosen data file when a session ends and added an optional session
 //                            length that stops the session once it has been reached
+// 2026/09/08 - Mike Pullen - Cleared the chart when a file is chosen rather than when a session starts, so
+//                            it shows the same readings the statistics beside it are worked out from
 //*********************************************************************************************************************
 
 // Enable to dump the USB device information
@@ -503,6 +505,11 @@ namespace RandomNumberGenerator
             {
                 // A new session file has been selected, so end the current session
                 EndSession();
+
+                // The chart shows what is in the file, so it starts empty for the file being opened. An
+                // existing file fills it back in as it loads; without this the file being opened was drawn
+                // on top of the one before it.
+                m_ResultChart.Clear();
 
                 // Check if the file exists
                 bool bFileExists = File.Exists(sSelectedFile);
@@ -1111,8 +1118,10 @@ namespace RandomNumberGenerator
             // Disable the file browser
             m_FileBrowseButton.Enabled = false;
 
-            // Clear the chart
-            m_ResultChart.Clear();
+            // The chart is left alone. It shows the same readings the statistics beside it are worked out
+            // from, so clearing one without the other left an empty chart beside a count of several hundred.
+            // What the two of them describe is the file, so the chart is cleared when a different file is
+            // chosen rather than when a session starts.
 
             // Update button statuses
             m_StartButton.Enabled = false;
