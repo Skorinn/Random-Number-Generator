@@ -146,6 +146,20 @@ The analysis UI (baseline vs. result comparison) uses `StatisticalAnalysis` (Mat
 `DescriptiveStatistics`) and `HistogramChart`; both charts derive from
 `System.Windows.Forms.DataVisualization.Charting.Chart`.
 
+The analysis tab exists to answer one question: **did the result session shift by more than noise?**
+`SignificanceTest` answers it — `CompareMeans` is Welch's t-test between the two sessions (unequal sizes and
+spreads, because a baseline is usually recorded for far longer than the run compared against it), and
+`CompareWithExpected` tests one session against the 0.5 an unbiased generator gives. Both are two-tailed: a
+one-tailed test would find a shift toward a target more easily, but only holds when the direction was
+predicted before the readings were taken, which the application cannot know. Every path that cannot produce
+a number — fewer than two readings, or readings with no spread — returns `Valid = false` rather than a
+probability, and `Significant` is false whenever the test did not run.
+
+The verdict is stated in words under the table rather than left to be read off the numbers, and is
+emphasised only when there is a shift to notice. `HistogramChart` plots each session as a percentage of its
+own readings, not as counts: on counts the longer session stands taller in every bin and hides the shift the
+comparison exists to show.
+
 The comparison is a single `ListView` — measure, baseline, result, difference — rather than the two
 mirrored sets of fields it used to be. `BuildComparisonTable` makes the rows once and `UpdateComparisonTable`
 rewrites their values; the row order there and the `m_iSKEWNESS_ROW` constant that tells the bounded

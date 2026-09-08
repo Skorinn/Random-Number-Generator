@@ -10,6 +10,8 @@
 // 2025/08/13 - Mike Pullen - Initial version
 // 2026/09/07 - Mike Pullen - Choose the bin count from the sample size, label the axes to tick precision,
 //                            and put the key above the plot
+// 2026/09/07 - Mike Pullen - Plot each session as a share of its own readings, so two sessions of
+//                            different lengths can be compared
 //*********************************************************************************************************************
 using System;
 using System.Collections.Generic;
@@ -136,8 +138,14 @@ namespace RandomNumberGenerator
                 iBins2[iBinIndex]++;
             }
 
-            // Calculate dynamic y-axis range based on bin frequencies
-            (double fMinYValue, double fMaxYValue) = CalculateFrequencyRange(iBins1, iBins2);
+            // Show each set as a share of its own readings rather than as a count of them. Two sessions are
+            // rarely the same length, and on raw counts the longer one stands taller in every bin, which
+            // hides the thing the comparison exists to show: whether the shape has shifted.
+            double[] fShare1 = CalculateShares(iBins1, data1.Count);
+            double[] fShare2 = CalculateShares(iBins2, data2.Count);
+
+            // Calculate dynamic y-axis range based on the bin shares
+            (double fMinYValue, double fMaxYValue) = CalculateFrequencyRange(fShare1, fShare2);
 
             // Update the chart area with dynamic x-axis and y-axis ranges
             UpdateChartAxisRange(fMinValue, fMaxValue, fMinYValue, fMaxYValue);
@@ -152,8 +160,8 @@ namespace RandomNumberGenerator
             for (int iBinIndex = 0; iBinIndex < binCount; iBinIndex++)
             {
                 double fBinCenter = fMinValue + (iBinIndex + m_fBIN_CENTER_OFFSET) * fBinWidth;
-                firstSeries.Points.AddXY(fBinCenter, iBins1[iBinIndex]);
-                secondSeries.Points.AddXY(fBinCenter, iBins2[iBinIndex]);
+                firstSeries.Points.AddXY(fBinCenter, fShare1[iBinIndex]);
+                secondSeries.Points.AddXY(fBinCenter, fShare2[iBinIndex]);
             }
 
             // Add series to chart
@@ -428,17 +436,39 @@ namespace RandomNumberGenerator
         }
 
         /// <summary>
+        /// Turns bin counts into the share of the readings that fell into each bin, as a percentage of the
+        /// set they came from. A set with nothing in it contributes nothing rather than dividing by zero.
+        /// </summary>
+        /// <param name="iBins">IN - The number of readings that fell into each bin</param>
+        /// <param name="iTotalReadings">IN - How many readings the set held altogether</param>
+        /// <returns>The share of the set in each bin, as a percentage</returns>
+        private static double[] CalculateShares(int[] iBins, int iTotalReadings)
+        {
+            double[] fShares = new double[iBins.Length];
+            if (0 >= iTotalReadings)
+            {
+                return fShares;
+            }
+
+            for (int iBinIndex = 0; iBinIndex < iBins.Length; iBinIndex++)
+            {
+                fShares[iBinIndex] = ((iBins[iBinIndex] * m_fPERCENT) / iTotalReadings);
+            }
+            return fShares;
+        }
+
+        /// <summary>
         /// Calculates the frequency range from both bin arrays for dynamic Y-axis scaling
         /// </summary>
-        /// <param name="iBins1">IN - First bin array</param>
-        /// <param name="iBins2">IN - Second bin array</param>
+        /// <param name="fBins1">IN - First bin array</param>
+        /// <param name="fBins2">IN - Second bin array</param>
         /// <returns>Tuple containing minimum and maximum frequency values</returns>
-        private (double fMinYValue, double fMaxYValue) CalculateFrequencyRange(int[] iBins1, int[] iBins2)
+        private (double fMinYValue, double fMaxYValue) CalculateFrequencyRange(double[] fBins1, double[] fBins2)
         {
-            int iMaxFrequency = 0;
+            double iMaxFrequency = 0;
 
             // Find the maximum frequency from both bin arrays
-            foreach (int iFrequency in iBins1)
+            foreach (double iFrequency in fBins1)
             {
                 if (iFrequency > iMaxFrequency)
                 {
@@ -446,7 +476,7 @@ namespace RandomNumberGenerator
                 }
             }
 
-            foreach (int iFrequency in iBins2)
+            foreach (double iFrequency in fBins2)
             {
                 if (iFrequency > iMaxFrequency)
                 {
@@ -458,7 +488,7 @@ namespace RandomNumberGenerator
             double fMinYValue = m_fDEFAULT_Y_AXIS_MINIMUM;
             double fMaxYValue;
 
-            if (iMaxFrequency == 0)
+            if (m_fMINIMUM_SHARE >= iMaxFrequency)
             {
                 // No data points - use default range
                 fMaxYValue = m_fDEFAULT_Y_AXIS_MAXIMUM;
@@ -485,7 +515,7 @@ namespace RandomNumberGenerator
         // Chart configuration constants
         private const string m_sMAIN_CHART_AREA_NAME = "chartAreaHistogram";
         private const string m_sX_AXIS_TITLE = "Value";
-        private const string m_sY_AXIS_TITLE = "Frequency";
+        private const string m_sY_AXIS_TITLE = "% of the session's readings";
 
         // Choosing the bin count. The factor and exponent are the usual cube-root rule; the floor and
         // ceiling keep a small sample readable and a long session from turning into a comb.
@@ -493,6 +523,11 @@ namespace RandomNumberGenerator
         private const double m_fBIN_COUNT_EXPONENT = 1.0 / 3.0;
         private const int m_iMINIMUM_BIN_COUNT = 10;
         private const int m_iMAXIMUM_BIN_COUNT = 60;
+
+        // Turning bin counts into shares. A bin holding nothing at all is treated as empty rather than as a
+        // share too small to see, so an empty comparison falls back to the default axis.
+        private const double m_fPERCENT = 100.0;
+        private const double m_fMINIMUM_SHARE = 0.0;
 
         // Axis labelling
         private const string m_sDEFAULT_LABEL_FORMAT = "0.000";

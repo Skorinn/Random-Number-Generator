@@ -80,9 +80,20 @@ what to do next at each step.
    before it does.
 
 To compare previous sessions, go to the **Analyse** tab and browse for a baseline file and a result file.
-Each is shown with how many readings it holds — two sessions of very different lengths are not a fair
-comparison — and the two are set against each other in one table, measure by measure, with the difference
-between them.
+The two are set against each other in one table, measure by measure, with the difference between them, and
+the question the tab exists to answer is stated underneath in words: whether the result shifted away from
+the baseline by more than the noise in the two of them accounts for.
+
+That verdict is [Welch's t-test](https://en.wikipedia.org/wiki/Welch%27s_t-test) between the two sessions,
+which does not assume they are the same length or equally spread — a baseline is usually recorded for far
+longer than the run being compared against it. It is two-tailed, so a shift in either direction counts; a
+one-tailed test would find a shift toward a target more easily, but only holds when the direction was
+predicted before the readings were taken. A shift is reported as significant when it would arise by chance
+less than one time in twenty. Each session is also tested on its own against the 0.5 an unbiased generator
+would give.
+
+The histogram plots each session as a percentage of its own readings rather than as a count of them, so a
+long session and a short one can be compared on the same chart.
 
 ### Recovering a session
 

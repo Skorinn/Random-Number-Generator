@@ -100,6 +100,7 @@
     <Compile Include="RNGSessionTimer.cs" />
     <Compile Include="RNGXMLReader.cs" />
     <Compile Include="StatisticalAnalysis.cs" />
+    <Compile Include="SignificanceTest.cs" />
     <Compile Include="StatusPalette.cs" />
     <Compile Include="XMLConstants.cs" />
     <Compile Include="XMLDataPoint.cs" />

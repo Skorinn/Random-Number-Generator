@@ -16,6 +16,7 @@
 //                            one emphasised button per state
 // 2026/09/07 - Mike Pullen - Session in the window title, a status message that says what to do next, and
 //                            no value shown for a measure nothing has been measured for yet
+// 2026/09/07 - Mike Pullen - Report whether the two analysed sessions differ by more than noise
 //*********************************************************************************************************************
 
 // Enable to dump the USB device information
@@ -113,9 +114,15 @@ namespace RandomNumberGenerator
             // than naming a family and size a second time
             m_ActionFontRegular = m_PauseButton.Font;
             m_ActionFontBold = new Font(m_ActionFontRegular, FontStyle.Bold);
+            m_VerdictFontRegular = m_VerdictLabel.Font;
+            m_VerdictFontBold = new Font(m_VerdictFontRegular, FontStyle.Bold);
 
-            // Lay out the comparison table and restore the window to where it was left
+            // Lay out the comparison table and fill it in, which puts the verdict into the state that says
+            // what has to be loaded before there is anything to compare
             BuildComparisonTable();
+            UpdateComparisonTable();
+
+            // Restore the window to where it was left
             RestoreWindowPlacement();
 
             // Set the info box to idle
@@ -794,11 +801,17 @@ namespace RandomNumberGenerator
                     components.Dispose();
                 }
 
-                // Only the bold font is created here; the regular one belongs to the designer
+                // Only the bold fonts are created here; the regular ones belong to the designer
                 if (null != m_ActionFontBold)
                 {
                     m_ActionFontBold.Dispose();
                     m_ActionFontBold = null;
+                }
+
+                if (null != m_VerdictFontBold)
+                {
+                    m_VerdictFontBold.Dispose();
+                    m_VerdictFontBold = null;
                 }
             }
 
@@ -1851,13 +1864,16 @@ namespace RandomNumberGenerator
         /// </summary>
         private void BuildComparisonTable()
         {
+            string sExpected = m_fSTATISTICAL_MEAN.ToString(m_sMEAN_LABEL_FORMAT);
             string[] sMeasures = new string[]
             {
+                "Readings",
                 "Mean",
-                $"Deviation from {m_fSTATISTICAL_MEAN.ToString(m_sMEAN_LABEL_FORMAT)}",
+                $"Deviation from {sExpected}",
                 "Standard deviation",
                 "Skewness",
-                "Kurtosis"
+                "Kurtosis",
+                $"Chance of this shift from {sExpected} being noise"
             };
 
             m_ComparisonList.BeginUpdate();
@@ -1957,62 +1973,197 @@ namespace RandomNumberGenerator
         }
 
         /// <summary>
-        /// The measures shown in the comparison table, taken from one set of statistics, in the row order
-        /// the table is built in
+        /// The value shown for one measure of one session, in the row order the table is built in
         /// </summary>
-        /// <param name="stats">IN - The statistics to take the measures from (cannot be null)</param>
-        /// <returns>The measures, one per row of the table</returns>
-        private static double[] GetComparisonValues(DescriptiveStatistics stats)
+        /// <param name="iRow">IN - The row of the table the measure sits on</param>
+        /// <param name="readings">IN - The readings the session holds, which may be null</param>
+        /// <param name="stats">IN - The statistics taken from them, which may be null</param>
+        /// <returns>The value to show, or no value when the session is not loaded</returns>
+        private static string FormatMeasure(int iRow, List<double> readings, DescriptiveStatistics stats)
         {
-            return new double[]
+            if ((null == readings) || (null == stats))
             {
-                stats.Mean,
-                Math.Abs(stats.Mean - m_fSTATISTICAL_MEAN),
-                stats.StandardDeviation,
-                stats.Skewness,
-                stats.Kurtosis
-            };
+                return m_sNO_VALUE;
+            }
+
+            switch (iRow)
+            {
+                case m_iREADINGS_ROW:
+                    return readings.Count.ToString(m_sCOUNT_FORMAT);
+                case m_iMEAN_ROW:
+                    return stats.Mean.ToString(m_sVALUE_FORMAT);
+                case m_iDEVIATION_ROW:
+                    return Math.Abs(stats.Mean - m_fSTATISTICAL_MEAN).ToString(m_sVALUE_FORMAT);
+                case m_iSTD_DEV_ROW:
+                    return stats.StandardDeviation.ToString(m_sVALUE_FORMAT);
+                case m_iSKEWNESS_ROW:
+                    return stats.Skewness.ToString(m_sMOMENT_FORMAT);
+                case m_iKURTOSIS_ROW:
+                    return stats.Kurtosis.ToString(m_sMOMENT_FORMAT);
+                case m_iPROBABILITY_ROW:
+                    return FormatProbability(SignificanceTest.CompareWithExpected(readings, m_fSTATISTICAL_MEAN));
+                default:
+                    return m_sNO_VALUE;
+            }
         }
 
         /// <summary>
-        /// Fills the comparison table from whichever of the two files is loaded. A measure with nothing
-        /// behind it shows as having no value rather than as a zero, and the difference is only shown when
-        /// there is something on both sides of it to subtract.
+        /// The difference shown for one measure between the two sessions. A count and a probability are not
+        /// subtracted from one another: the difference in reading counts says nothing about the generator,
+        /// and the two probabilities are answers to separate questions rather than a pair to compare.
+        /// </summary>
+        /// <param name="iRow">IN - The row of the table the measure sits on</param>
+        /// <param name="baseline">IN - Statistics of the baseline session, which may be null</param>
+        /// <param name="result">IN - Statistics of the result session, which may be null</param>
+        /// <returns>The difference to show, or no value when it does not apply</returns>
+        private static string FormatDifference(int iRow, DescriptiveStatistics baseline, DescriptiveStatistics result)
+        {
+            if ((null == baseline) || (null == result))
+            {
+                return m_sNO_VALUE;
+            }
+
+            switch (iRow)
+            {
+                case m_iMEAN_ROW:
+                    return (result.Mean - baseline.Mean).ToString(m_sVALUE_DIFFERENCE_FORMAT);
+                case m_iDEVIATION_ROW:
+                    return (Math.Abs(result.Mean - m_fSTATISTICAL_MEAN) -
+                            Math.Abs(baseline.Mean - m_fSTATISTICAL_MEAN)).ToString(m_sVALUE_DIFFERENCE_FORMAT);
+                case m_iSTD_DEV_ROW:
+                    return (result.StandardDeviation - baseline.StandardDeviation).ToString(m_sVALUE_DIFFERENCE_FORMAT);
+                case m_iSKEWNESS_ROW:
+                    return (result.Skewness - baseline.Skewness).ToString(m_sMOMENT_DIFFERENCE_FORMAT);
+                case m_iKURTOSIS_ROW:
+                    return (result.Kurtosis - baseline.Kurtosis).ToString(m_sMOMENT_DIFFERENCE_FORMAT);
+                default:
+                    return m_sNO_VALUE;
+            }
+        }
+
+        /// <summary>
+        /// A probability written for a reader rather than for a machine. Below a thousandth the digits stop
+        /// meaning anything to the eye, so it is reported as being under that rather than to more decimals.
+        /// </summary>
+        /// <param name="test">IN - The outcome of the test</param>
+        /// <returns>The probability, or no value when the test could not be carried out</returns>
+        private static string FormatProbability(SignificanceResult test)
+        {
+            if (false == test.Valid)
+            {
+                return m_sNO_VALUE;
+            }
+
+            if (m_fSMALLEST_REPORTED_PROBABILITY > test.Probability)
+            {
+                return m_sVERY_SMALL_PROBABILITY;
+            }
+
+            return test.Probability.ToString(m_sPROBABILITY_FORMAT);
+        }
+
+        /// <summary>
+        /// Fills the comparison table from whichever of the two files is loaded, and reports whether the
+        /// difference between them is more than noise. A measure with nothing behind it shows as having no
+        /// value rather than as a zero, and a difference is only shown when there is something on both
+        /// sides of it to subtract.
         /// </summary>
         private void UpdateComparisonTable()
         {
             try
             {
+                List<double> baselineReadings = m_BaselineAnalysis?.LoadedFileData;
+                List<double> resultReadings = m_ResultAnalysis?.LoadedFileData;
                 DescriptiveStatistics baselineStats = m_BaselineAnalysis?.LoadedFileStats;
                 DescriptiveStatistics resultStats = m_ResultAnalysis?.LoadedFileStats;
-                double[] baselineValues = (null == baselineStats) ? null : GetComparisonValues(baselineStats);
-                double[] resultValues = (null == resultStats) ? null : GetComparisonValues(resultStats);
-                bool bBothLoaded = ((null != baselineValues) && (null != resultValues));
 
                 m_ComparisonList.BeginUpdate();
                 for (int iRow = 0; iRow < m_ComparisonList.Items.Count; iRow++)
                 {
-                    // Skewness and kurtosis are unbounded, so they are shown less precisely than the
-                    // measures that sit within a unit range
-                    bool bIsMoment = (iRow >= m_iSKEWNESS_ROW);
-                    string sValueFormat = bIsMoment ? m_sMOMENT_FORMAT : m_sVALUE_FORMAT;
-                    string sDifferenceFormat = bIsMoment ? m_sMOMENT_DIFFERENCE_FORMAT : m_sVALUE_DIFFERENCE_FORMAT;
-
                     ListViewItem measureRow = m_ComparisonList.Items[iRow];
-                    measureRow.SubItems[m_iBASELINE_COLUMN].Text = (null == baselineValues)
-                        ? m_sNO_VALUE : baselineValues[iRow].ToString(sValueFormat);
-                    measureRow.SubItems[m_iRESULT_COLUMN].Text = (null == resultValues)
-                        ? m_sNO_VALUE : resultValues[iRow].ToString(sValueFormat);
-                    measureRow.SubItems[m_iDIFFERENCE_COLUMN].Text = (false == bBothLoaded)
-                        ? m_sNO_VALUE : (resultValues[iRow] - baselineValues[iRow]).ToString(sDifferenceFormat);
+                    measureRow.SubItems[m_iBASELINE_COLUMN].Text = FormatMeasure(iRow, baselineReadings, baselineStats);
+                    measureRow.SubItems[m_iRESULT_COLUMN].Text = FormatMeasure(iRow, resultReadings, resultStats);
+                    measureRow.SubItems[m_iDIFFERENCE_COLUMN].Text = FormatDifference(iRow, baselineStats, resultStats);
                 }
                 m_ComparisonList.EndUpdate();
+
+                UpdateComparisonVerdict(baselineReadings, resultReadings);
             }
             catch (Exception ex)
             {
                 // Handle any errors during comparison update
                 SetStatusBoxError($"Error updating comparison statistics: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Says in words whether the result session shifted away from the baseline by more than the noise in
+        /// the two of them accounts for. This is the question the analysis exists to answer, so it is stated
+        /// rather than left to be read off a table of numbers.
+        /// NOTE: The test is two-tailed, so a shift in either direction counts.
+        /// </summary>
+        /// <param name="baselineReadings">IN - Readings of the baseline session, which may be null</param>
+        /// <param name="resultReadings">IN - Readings of the result session, which may be null</param>
+        private void UpdateComparisonVerdict(List<double> baselineReadings, List<double> resultReadings)
+        {
+            bool bBothLoaded = ((null != baselineReadings) && (null != resultReadings));
+            if (false == bBothLoaded)
+            {
+                SetVerdict(m_sVERDICT_NEEDS_BOTH, false);
+                return;
+            }
+
+            SignificanceResult test = SignificanceTest.CompareMeans(baselineReadings, resultReadings);
+            if (false == test.Valid)
+            {
+                SetVerdict(m_sVERDICT_NOT_ENOUGH_DATA, false);
+                return;
+            }
+
+            double fShift = (Mean(resultReadings) - Mean(baselineReadings));
+            string sDirection = (0 <= fShift) ? m_sDIRECTION_HIGHER : m_sDIRECTION_LOWER;
+            string sProbability = FormatProbability(test);
+
+            if (true == test.Significant)
+            {
+                SetVerdict($"Significant shift: the result sits {sDirection} than the baseline by " +
+                           $"{Math.Abs(fShift).ToString(m_sVALUE_FORMAT)}. A shift this large would arise by " +
+                           $"chance {sProbability} of the time (Welch's t, two-tailed, {test.DegreesOfFreedom.ToString(m_sMOMENT_FORMAT)} df).", true);
+            }
+            else
+            {
+                SetVerdict($"No significant shift. The result sits {sDirection} than the baseline by " +
+                           $"{Math.Abs(fShift).ToString(m_sVALUE_FORMAT)}, but a shift that large would arise by " +
+                           $"chance {sProbability} of the time (Welch's t, two-tailed, {test.DegreesOfFreedom.ToString(m_sMOMENT_FORMAT)} df).", false);
+            }
+        }
+
+        /// <summary>
+        /// Shows the verdict, emphasised only when there is something to notice. Nothing found is the
+        /// ordinary outcome and is not worth shouting about.
+        /// </summary>
+        /// <param name="sVerdict">IN - The wording to show</param>
+        /// <param name="bSignificant">IN - Whether the verdict reports a shift worth noticing</param>
+        private void SetVerdict(string sVerdict, bool bSignificant)
+        {
+            m_VerdictLabel.Text = sVerdict;
+            m_VerdictLabel.Font = bSignificant ? m_VerdictFontBold : m_VerdictFontRegular;
+            m_VerdictLabel.ForeColor = bSignificant ? SystemColors.ControlText : SystemColors.GrayText;
+        }
+
+        /// <summary>
+        /// The mean of a set of readings
+        /// </summary>
+        /// <param name="readings">IN - The readings, which must not be empty</param>
+        /// <returns>The mean</returns>
+        private static double Mean(List<double> readings)
+        {
+            double fTotal = 0.0;
+            foreach (double fReading in readings)
+            {
+                fTotal += fReading;
+            }
+            return (fTotal / readings.Count);
         }
 
         #endregion
@@ -2189,9 +2340,27 @@ namespace RandomNumberGenerator
         private const string m_sSINGLE_READING = "reading";
         private const string m_sMANY_READINGS = "readings";
 
-        // Rows of the comparison table, in the order BuildComparisonTable adds them. Only the first of the
-        // two unbounded measures is named, as the code needs it to tell the two groups of format apart.
-        private const int m_iSKEWNESS_ROW = 3;
+        // Rows of the comparison table, in the order BuildComparisonTable adds them. The order there and
+        // these have to be kept in step.
+        private const int m_iREADINGS_ROW = 0;
+        private const int m_iMEAN_ROW = 1;
+        private const int m_iDEVIATION_ROW = 2;
+        private const int m_iSTD_DEV_ROW = 3;
+        private const int m_iSKEWNESS_ROW = 4;
+        private const int m_iKURTOSIS_ROW = 5;
+        private const int m_iPROBABILITY_ROW = 6;
+
+        // How the counts and probabilities in the table are written
+        private const string m_sCOUNT_FORMAT = "N0";
+        private const string m_sPROBABILITY_FORMAT = "0.000";
+        private const string m_sVERY_SMALL_PROBABILITY = "< 0.001";
+        private const double m_fSMALLEST_REPORTED_PROBABILITY = 0.001;
+
+        // Wording of the verdict on whether the two sessions differ
+        private const string m_sVERDICT_NEEDS_BOTH = "Load a baseline and a result to compare them.";
+        private const string m_sVERDICT_NOT_ENOUGH_DATA = "Not enough readings in these sessions to test whether they differ.";
+        private const string m_sDIRECTION_HIGHER = "higher";
+        private const string m_sDIRECTION_LOWER = "lower";
 
         // Columns of the comparison table. Column zero names the measure and is never rewritten.
         private const int m_iBASELINE_COLUMN = 1;
@@ -2205,6 +2374,10 @@ namespace RandomNumberGenerator
         // the designer and is not disposed here; the bold one is created here and is.
         private Font m_ActionFontRegular = null;
         private Font m_ActionFontBold = null;
+
+        // Fonts for the comparison verdict, which is emphasised only when it reports a shift
+        private Font m_VerdictFontRegular = null;
+        private Font m_VerdictFontBold = null;
 
         // Fill for the button carrying the action to take next. The designer sets the same colour on the
         // start button for the idle state the form opens in, so the two have to be kept in step.

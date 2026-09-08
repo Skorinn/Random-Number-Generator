@@ -84,6 +84,7 @@ namespace RandomNumberGenerator
             this.m_BaselineTextBox = new System.Windows.Forms.TextBox();
             this.m_ComparisonGroupBox = new System.Windows.Forms.GroupBox();
             this.m_ComparisonList = new System.Windows.Forms.ListView();
+            this.m_VerdictLabel = new System.Windows.Forms.Label();
             this.m_MeasureColumn = new System.Windows.Forms.ColumnHeader();
             this.m_BaselineColumn = new System.Windows.Forms.ColumnHeader();
             this.m_ResultColumn = new System.Windows.Forms.ColumnHeader();
@@ -613,7 +614,7 @@ namespace RandomNumberGenerator
             this.m_AnalyzeLayout.Name = "m_AnalyzeLayout";
             this.m_AnalyzeLayout.RowCount = 3;
             this.m_AnalyzeLayout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 92F));
-            this.m_AnalyzeLayout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 168F));
+            this.m_AnalyzeLayout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 244F));
             this.m_AnalyzeLayout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
             this.m_AnalyzeLayout.Size = new System.Drawing.Size(749, 663);
             this.m_AnalyzeLayout.TabIndex = 0;
@@ -720,6 +721,7 @@ namespace RandomNumberGenerator
             // m_ComparisonGroupBox
             //
             this.m_ComparisonGroupBox.Controls.Add(this.m_ComparisonList);
+            this.m_ComparisonGroupBox.Controls.Add(this.m_VerdictLabel);
             this.m_ComparisonGroupBox.Dock = System.Windows.Forms.DockStyle.Fill;
             this.m_ComparisonGroupBox.Location = new System.Drawing.Point(3, 95);
             this.m_ComparisonGroupBox.Name = "m_ComparisonGroupBox";
@@ -750,6 +752,16 @@ namespace RandomNumberGenerator
             this.m_ComparisonList.UseCompatibleStateImageBehavior = false;
             this.m_ComparisonList.View = System.Windows.Forms.View.Details;
             this.m_ComparisonList.SizeChanged += new System.EventHandler(this.ComparisonList_SizeChanged);
+            //
+            // m_VerdictLabel
+            //
+            this.m_VerdictLabel.Dock = System.Windows.Forms.DockStyle.Bottom;
+            this.m_VerdictLabel.Location = new System.Drawing.Point(10, 154);
+            this.m_VerdictLabel.Name = "m_VerdictLabel";
+            this.m_VerdictLabel.Padding = new System.Windows.Forms.Padding(2, 8, 2, 0);
+            this.m_VerdictLabel.Size = new System.Drawing.Size(723, 36);
+            this.m_VerdictLabel.TabIndex = 1;
+            this.m_VerdictLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
             // m_MeasureColumn
             //
@@ -890,6 +902,7 @@ namespace RandomNumberGenerator
         private System.Windows.Forms.Label m_ResultLabel;
         private System.Windows.Forms.GroupBox m_ComparisonGroupBox;
         private System.Windows.Forms.ListView m_ComparisonList;
+        private System.Windows.Forms.Label m_VerdictLabel;
         private System.Windows.Forms.ColumnHeader m_MeasureColumn;
         private System.Windows.Forms.ColumnHeader m_BaselineColumn;
         private System.Windows.Forms.ColumnHeader m_ResultColumn;

@@ -9,6 +9,7 @@
 //====================================================================================================================
 // 2025/01/20 - Mike Pullen - Original implementation.
 // 2026/09/07 - Mike Pullen - Cover the chosen bin count and the axis label precision
+// 2026/09/07 - Mike Pullen - Cover the axis being a share of a session rather than a count of readings
 //*********************************************************************************************************************
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
@@ -89,6 +90,10 @@ namespace RandomNumberGenerator.Test
         private const int m_iMINIMUM_BIN_COUNT = 10;
         private const int m_iMAXIMUM_BIN_COUNT = 60;
         private const int m_iMAXIMUM_LABEL_DECIMALS = 6;
+
+        // The chart plots shares of a session rather than counts of readings, so the axis is a percentage
+        private const double m_fY_AXIS_HEADROOM = 4.0;
+        private const double m_fUNEVEN_SHARE_ALLOWANCE = 3.0;
 
         // Y-axis scaling test constants
         private const double m_fEXPECTED_Y_AXIS_TOLERANCE = 0.01; // Tolerance for Y-axis value comparisons
@@ -639,9 +644,13 @@ namespace RandomNumberGenerator.Test
             Assert.AreEqual(m_fDEFAULT_Y_MINIMUM, fYAxisMinimum, m_fEXPECTED_Y_AXIS_TOLERANCE, 
                            "Y-axis minimum should be set to default value for frequency data");
 
-            // Verify Y-axis maximum is reasonable for low frequency data (should be modest)
-            Assert.IsTrue((fYAxisMaximum > m_fDEFAULT_Y_MINIMUM && fYAxisMaximum <= 10.0), 
-                         $"Y-axis maximum should scale modestly for low frequency data. Actual: {fYAxisMaximum}");
+            // The chart plots each session as a share of its own readings, so with five readings spread so
+            // that no bin holds more than one, the tallest bar is a fifth of the session
+            const double fEXPECTED_TALLEST_SHARE = 20.0;
+            Assert.IsTrue((fYAxisMaximum >= fEXPECTED_TALLEST_SHARE),
+                         $"Y-axis maximum should reach the tallest share. Actual: {fYAxisMaximum}");
+            Assert.IsTrue((fYAxisMaximum <= (fEXPECTED_TALLEST_SHARE + m_fY_AXIS_HEADROOM)),
+                         $"Y-axis maximum should not tower over the tallest share. Actual: {fYAxisMaximum}");
 
             // Verify Y-axis interval is set appropriately
             double fYAxisInterval = chartArea.AxisY.Interval;
@@ -772,10 +781,14 @@ namespace RandomNumberGenerator.Test
             Assert.AreEqual(m_fDEFAULT_Y_MINIMUM, fYAxisMinimum, m_fEXPECTED_Y_AXIS_TOLERANCE, 
                            "Y-axis minimum should be set to default value");
 
-            // Verify Y-axis maximum scales appropriately for large data set
-            // With 1000 data points and 20 bins, expect significant frequency counts
-            Assert.IsTrue((fYAxisMaximum > 20.0), 
-                         $"Y-axis maximum should scale appropriately for large data set. Actual: {fYAxisMaximum}");
+            // A thousand readings spread over twenty bins put roughly a twentieth of the session in each, so
+            // the axis stays around that share however many readings there are. Plotting shares rather than
+            // counts is what lets a long session and a short one be compared on the same chart.
+            const double fEVEN_SHARE = 5.0;
+            Assert.IsTrue((fYAxisMaximum > fEVEN_SHARE),
+                         $"Y-axis maximum should reach past an even share. Actual: {fYAxisMaximum}");
+            Assert.IsTrue((fYAxisMaximum < (fEVEN_SHARE * m_fUNEVEN_SHARE_ALLOWANCE)),
+                         $"Y-axis maximum should stay near the share, not the count. Actual: {fYAxisMaximum}");
 
             // Verify Y-axis interval is reasonable
             double fYAxisInterval = chartArea.AxisY.Interval;
