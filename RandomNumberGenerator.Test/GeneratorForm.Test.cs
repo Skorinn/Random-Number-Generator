@@ -1741,6 +1741,282 @@ namespace RandomNumberGenerator.Test
             Assert.IsFalse(mockSessionData.Object.Simulated, "The recorded state should match the toggle");
         }
 
+        /// <summary>
+        /// Builds a form with a session running on it, the way pressing Start does, so that what happens
+        /// while a session is recording can be tested. The device is reported as already initialized and
+        /// the session as starting successfully, because what is under test here is what the form does
+        /// once a session is running rather than how it gets one started.
+        /// </summary>
+        /// <param name="mockSessionTimer">IN - The session timer the form reads the elapsed time from</param>
+        /// <param name="iSessionLengthMinutes">IN - The length to give the session, zero for no limit</param>
+        /// <param name="mockSessionData">OUT - The session data the form was built with</param>
+        /// <returns>The form, with a session running on it</returns>
+        private GeneratorForm CreateRunningForm(Mock<IRNGSessionTimer> mockSessionTimer, int iSessionLengthMinutes,
+                                                out Mock<IRNGSessionData> mockSessionData)
+        {
+            // Mock the session data, which reports no target so that starting settles the target rather
+            // than putting up the dialog that asks whether a changed one should be kept
+            mockSessionData = new Mock<IRNGSessionData>();
+            mockSessionData.Setup(mock => mock.Timer).Returns(mockSessionTimer.Object);
+            mockSessionData.Setup(mock => mock.TargetValue).Returns(TargetValues.NO_VALUE_SET);
+            mockSessionData.Setup(mock => mock.StartSession()).Returns(true);
+            mockSessionData.Setup(mock => mock.AddDataPoint(It.IsAny<double>())).Returns(true);
+
+            // Mock the device timer as already initialized, so nothing reaches the device
+            Mock<IRNGDeviceTimer> mockDeviceTimer = new Mock<IRNGDeviceTimer>();
+            mockDeviceTimer.Setup(mock => mock.Initialized).Returns(true);
+
+            // Create the form and give the session its length before it starts, which is while the field
+            // is still open to be changed
+            GeneratorForm generatorForm = new GeneratorForm(mockSessionData.Object, mockDeviceTimer.Object);
+            NumericUpDown sessionLength = GetSessionLengthField(generatorForm);
+            sessionLength.Value = iSessionLengthMinutes;
+
+            // Start the session
+            typeof(GeneratorForm).GetMethod("SetRunningState", BindingFlags.NonPublic | BindingFlags.Instance)
+                .Invoke(generatorForm, null);
+
+            return generatorForm;
+        }
+
+        /// <summary>
+        /// Gets the session length field off a form
+        /// </summary>
+        /// <param name="generatorForm">IN - The form to read the field from</param>
+        /// <returns>The control the session length is set in</returns>
+        private NumericUpDown GetSessionLengthField(GeneratorForm generatorForm)
+        {
+            return (NumericUpDown)typeof(GeneratorForm)
+                .GetField("m_SessionLengthUpDown", BindingFlags.NonPublic | BindingFlags.Instance)
+                .GetValue(generatorForm);
+        }
+
+        /// <summary>
+        /// Ends the session on a form, the way pressing Stop does
+        /// </summary>
+        /// <param name="generatorForm">INOUT - The form to end the session on</param>
+        private void EndSessionOn(GeneratorForm generatorForm)
+        {
+            typeof(GeneratorForm).GetMethod("SetIdleState", BindingFlags.NonPublic | BindingFlags.Instance)
+                .Invoke(generatorForm, null);
+        }
+
+        /// <summary>
+        /// Tests a session given a length stops itself once it has recorded for that long
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void RecordReadResult_SessionLengthReached_StopsTheSession()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            const int iSESSION_LENGTH_MINUTES = 1;
+            const int iELAPSED_SECONDS = 60;
+            const string sEXPECTED_TEXT = "Session stopped after 1 minute";
+
+            // Mock a session timer that has been running for as long as the session was given
+            Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
+            mockSessionTimer.SetupAllProperties();
+            mockSessionTimer.Setup(mock => mock.ElapsedSeconds).Returns(iELAPSED_SECONDS);
+
+            // Create the object under test, with a session running on it
+            GeneratorForm generatorForm = CreateRunningForm(mockSessionTimer, iSESSION_LENGTH_MINUTES,
+                                                            out Mock<IRNGSessionData> mockSessionData);
+            Assert.AreEqual(GeneratorForm.RngGuiStates.Running, generatorForm.State, "The session should be running");
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Take a reading, which is when the length is checked
+            const double fVALID_RESULT = 0.5;
+            generatorForm.RecordReadResult(fVALID_RESULT);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the session was ended
+            Assert.AreEqual(GeneratorForm.RngGuiStates.Idle, generatorForm.State);
+            mockSessionData.Verify(mock => mock.EndSession(), Times.AtLeastOnce);
+
+            // Verify the reason is on display, rather than the message the return to idle would leave
+            StringAssert.Contains(generatorForm.StatusBoxText, sEXPECTED_TEXT);
+        }
+
+        /// <summary>
+        /// Tests a session given a length keeps recording until it has been running for that long
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void RecordReadResult_SessionLengthNotReached_KeepsRecording()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            const int iSESSION_LENGTH_MINUTES = 1;
+            const int iELAPSED_SECONDS = 59;
+
+            // Mock a session timer that is one second short of the length the session was given
+            Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
+            mockSessionTimer.SetupAllProperties();
+            mockSessionTimer.Setup(mock => mock.ElapsedSeconds).Returns(iELAPSED_SECONDS);
+
+            // Create the object under test, with a session running on it
+            GeneratorForm generatorForm = CreateRunningForm(mockSessionTimer, iSESSION_LENGTH_MINUTES,
+                                                            out Mock<IRNGSessionData> mockSessionData);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            const double fVALID_RESULT = 0.5;
+            generatorForm.RecordReadResult(fVALID_RESULT);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the session is still running, and the reading was recorded
+            Assert.AreEqual(GeneratorForm.RngGuiStates.Running, generatorForm.State);
+            mockSessionData.Verify(mock => mock.AddDataPoint(fVALID_RESULT), Times.Once);
+        }
+
+        /// <summary>
+        /// Tests a session with no length set records for as long as it is left to, which is what the
+        /// length field starts at
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void RecordReadResult_NoSessionLengthSet_KeepsRecording()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            const int iNO_SESSION_LENGTH = 0;
+            const int iELAPSED_SECONDS = 86400;
+
+            // Mock a session timer that has been recording for a day, with no length set against it
+            Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
+            mockSessionTimer.SetupAllProperties();
+            mockSessionTimer.Setup(mock => mock.ElapsedSeconds).Returns(iELAPSED_SECONDS);
+
+            // Create the object under test, with a session running on it
+            GeneratorForm generatorForm = CreateRunningForm(mockSessionTimer, iNO_SESSION_LENGTH,
+                                                            out Mock<IRNGSessionData> mockSessionData);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            const double fVALID_RESULT = 0.5;
+            generatorForm.RecordReadResult(fVALID_RESULT);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify nothing stopped the session, however long it has been going
+            Assert.AreEqual(GeneratorForm.RngGuiStates.Running, generatorForm.State);
+            mockSessionData.Verify(mock => mock.AddDataPoint(fVALID_RESULT), Times.Once);
+        }
+
+        /// <summary>
+        /// Tests the session length is settled before a session starts and open again once it has ended
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void SetRunningState_SessionStarted_SessionLengthIsLockedUntilItEnds()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            const int iSESSION_LENGTH_MINUTES = 5;
+            const int iELAPSED_SECONDS = 0;
+
+            // Mock a session timer that has only just started
+            Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
+            mockSessionTimer.SetupAllProperties();
+            mockSessionTimer.Setup(mock => mock.ElapsedSeconds).Returns(iELAPSED_SECONDS);
+
+            // Create the object under test, with a session running on it
+            GeneratorForm generatorForm = CreateRunningForm(mockSessionTimer, iSESSION_LENGTH_MINUTES,
+                                                            out Mock<IRNGSessionData> mockSessionData);
+            _ = mockSessionData;
+            NumericUpDown sessionLength = GetSessionLengthField(generatorForm);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            bool bLockedWhileRunning = (false == sessionLength.Enabled);
+            EndSessionOn(generatorForm);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the length could not be changed under a session that was reading it
+            Assert.IsTrue(bLockedWhileRunning);
+
+            // Verify it is open again for the next session
+            Assert.IsTrue(sessionLength.Enabled);
+        }
+
+        /// <summary>
+        /// Tests ending a session keeps the data file, so another session can be recorded into it without
+        /// browsing for the same file again
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void EndSession_SessionEnded_KeepsTheDataFileAndStillOffersStart()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            const string sEXPECTED_FILE = "session.rng";
+            const int iNO_SESSION_LENGTH = 0;
+            const int iELAPSED_SECONDS = 0;
+
+            // Mock a session timer that has only just started
+            Mock<IRNGSessionTimer> mockSessionTimer = new Mock<IRNGSessionTimer>();
+            mockSessionTimer.SetupAllProperties();
+            mockSessionTimer.Setup(mock => mock.ElapsedSeconds).Returns(iELAPSED_SECONDS);
+
+            // Create the object under test, with a session running on it and a file chosen for it
+            GeneratorForm generatorForm = CreateRunningForm(mockSessionTimer, iNO_SESSION_LENGTH,
+                                                            out Mock<IRNGSessionData> mockSessionData);
+            _ = mockSessionData;
+            TextBox fileTextBox = (TextBox)typeof(GeneratorForm)
+                .GetField("m_FileTextBox", BindingFlags.NonPublic | BindingFlags.Instance)
+                .GetValue(generatorForm);
+            Button startButton = (Button)typeof(GeneratorForm)
+                .GetField("m_StartButton", BindingFlags.NonPublic | BindingFlags.Instance)
+                .GetValue(generatorForm);
+            fileTextBox.Text = sEXPECTED_FILE;
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // End the session, the way pressing Stop does
+            EndSessionOn(generatorForm);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the file is still chosen, and that a session can be started into it straight away
+            Assert.AreEqual(sEXPECTED_FILE, fileTextBox.Text);
+            Assert.IsTrue(startButton.Enabled);
+        }
+
         #endregion
     }
 }

@@ -11,6 +11,7 @@
 // 2026/09/01 - Mike Pullen - Corrected the file header, rolled the session time over at 60 rather than 61, and
 //                            replaced the destructor with a dispose
 // 2026/09/08 - Mike Pullen - Report the elapsed time in seconds, so a session can be given a length
+// 2026/09/08 - Mike Pullen - Timed each session from nothing rather than carrying on from the last one
 //*********************************************************************************************************************
 using System;
 using System.Windows.Forms;
@@ -97,10 +98,17 @@ namespace RandomNumberGenerator
         #region Methods
 
         /// <summary>
-        /// Starts the session timer
+        /// Starts the session timer, timing the new session from nothing
         /// </summary>
         public void Start()
         {
+            // Every session is timed from nothing. Stopping deliberately leaves the time it reached on
+            // display, so how long the session ran can still be read after it has ended, which means the
+            // reset belongs here rather than in Stop. Without it the next session carried on from where the
+            // last one finished, and a session given a length was already past it before it recorded
+            // anything.
+            Reset();
+
             m_bInProgress = true;
             m_Timer.Start();
         }

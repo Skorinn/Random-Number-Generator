@@ -481,6 +481,127 @@ namespace RandomNumberGenerator.Test
             Assert.AreEqual(iEXPECTED_SECONDS, timer.ElapsedSeconds);
         }
 
+        /// <summary>
+        /// Tests starting the timer times the new session from nothing, rather than carrying on from where
+        /// the last one finished
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void Start_AfterAPreviousSession_TimesTheNewSessionFromNothing()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            const int iINTERVAL = 1000;
+            const uint iNUM_TICKS = 90;
+            const int iEXPECTED_SECONDS = 0;
+            const string sEXPECTED_TIME = "00:00:00";
+
+            // Run a session and stop it, the way pressing Start and then Stop does
+            IRNGSessionTimer timer = new RNGSessionTimer();
+            timer.Start();
+            SimulateTimer(timer, iINTERVAL, iNUM_TICKS);
+            timer.Stop();
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Start a second session
+            timer.Start();
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the new session is timed from nothing. Carrying on from the last one put a session that
+            // had been given a length past it before it had recorded anything.
+            Assert.AreEqual(iEXPECTED_SECONDS, timer.ElapsedSeconds);
+            Assert.AreEqual(sEXPECTED_TIME, timer.SessionTime);
+        }
+
+        /// <summary>
+        /// Tests stopping the timer leaves the time the session reached on display, so how long it ran can
+        /// still be read once it has ended
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void Stop_SessionHasRun_LeavesTheTimeItReachedOnDisplay()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            const int iINTERVAL = 1000;
+            const uint iNUM_TICKS = 65;
+            const int iEXPECTED_SECONDS = 65;
+            const string sEXPECTED_TIME = "00:01:05";
+
+            // Create the text box the time is shown in, and the timer that writes to it
+            TextBox timerTextBox = new TextBox();
+            IRNGSessionTimer timer = new RNGSessionTimer(timerTextBox);
+            timer.Start();
+            SimulateTimer(timer, iINTERVAL, iNUM_TICKS);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            timer.Stop();
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the time the session reached survives it ending
+            Assert.AreEqual(iEXPECTED_SECONDS, timer.ElapsedSeconds);
+            Assert.AreEqual(sEXPECTED_TIME, timerTextBox.Text);
+        }
+
+        /// <summary>
+        /// Tests a session that ran its length out is followed by one that gets its length over again,
+        /// rather than one that is already past it
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void ElapsedSeconds_SecondSessionAfterALengthWasReached_StartsBelowThatLengthAgain()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // One minute, which is the shortest length a session can be given
+            const int iINTERVAL = 1000;
+            const uint iNUM_TICKS = 60;
+            const int iLENGTH_SECONDS = 60;
+
+            // Run a session until it has been going for the length it was given, then stop it
+            IRNGSessionTimer timer = new RNGSessionTimer();
+            timer.Start();
+            SimulateTimer(timer, iINTERVAL, iNUM_TICKS);
+            bool bFirstReachedIt = (timer.ElapsedSeconds >= iLENGTH_SECONDS);
+            timer.Stop();
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Start a second session with the same length still set
+            timer.Start();
+            bool bSecondReachedIt = (timer.ElapsedSeconds >= iLENGTH_SECONDS);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the first session ran its length out
+            Assert.IsTrue(bFirstReachedIt);
+
+            // Verify the second one has not, so it records rather than stopping on its first reading
+            Assert.IsFalse(bSecondReachedIt);
+        }
+
         #endregion
     }
 }
