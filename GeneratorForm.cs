@@ -1159,9 +1159,13 @@ namespace RandomNumberGenerator
             {
                 // Remembering where the window was is a convenience, and a convenience must never be able to
                 // stop the application closing. This caught only ConfigurationErrorsException before, and the
-                // settings system throws more than that: on the first save for a machine it came out as an
-                // ArgumentException from inside the configuration stack, which went unhandled and put an
-                // error dialog in front of a user who had only asked to close the window.
+                // settings system throws more than that.
+                // NOTE: The report that led here was an ArgumentException out of the configuration stack,
+                // raised because the application's own .config file had gone from beside the executable while
+                // it was running - a rebuild had replaced it under a running instance. Without that file the
+                // settings system cannot find the section group it declares, and saving throws. That is a
+                // development situation rather than one a user would meet, but a missing or damaged
+                // configuration file is not a reason to refuse to close either.
                 SetStatusBoxError($"Unable to save the window position: {saveException.Message}");
 
                 // Record what went wrong where it can be read afterwards, since the window carrying the
