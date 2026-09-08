@@ -223,7 +223,9 @@ non-obvious rules new code is expected to match:
 - Errors bubble up: throw with a user-facing message rather than swallowing and returning `false`; the form
   catches them and renders via `SetStatusBoxError`. Messages start at the first word — the leading space
   that used to be the house style was padding for a status box that had none, and the status bar that
-  replaced it has real padding.
+  replaced it has real padding. A failure that puts the form back to idle must report itself **after**
+  `SetIdleState`, not before: that method ends by resetting the status bar, so a message set on the way in
+  is wiped. Reporting it too early is why clicking Start with no data file used to do nothing whatsoever.
 - Tests: `[ClassName]Tests`, `[Method]_[Scenario]_[ExpectedResult]`, banner-commented Arrange/Act/Assert
   sections, Moq for collaborators, `[TestCategory("Component")]`.
 

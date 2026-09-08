@@ -121,9 +121,9 @@ namespace RandomNumberGenerator
             // was laid out around. The simple style used for the seed asks for a taller control than that.
             m_iFieldHeight = m_PortComboBox.Height;
 
-            // Colour the controls the designer laid out, and emphasise the button that starts a session
+            // Colour the controls the designer laid out, and put the emphasis on the step that comes first
             ApplyTheme();
-            SetPrimaryButton(m_StartButton);
+            UpdateStartAvailability();
 
             // Lay out the comparison table and fill it in, which puts the verdict into the state that says
             // what has to be loaded before there is anything to compare
@@ -541,6 +541,9 @@ namespace RandomNumberGenerator
                         // Update the file display and the window title, which carries the file too
                         m_FileTextBox.Text = Path.GetFileName(sSelectedFile);
                         UpdateWindowTitle();
+
+                        // There is somewhere to record into now, so a session can be started
+                        UpdateStartAvailability();
 
                         // Show success status
                         SetStatusBoxState($"New file selected: {Path.GetFileName(sSelectedFile)}. Ready for new session.", 
@@ -971,7 +974,7 @@ namespace RandomNumberGenerator
         /// NOTE1: Port number data member must be set before calling.
         /// NOTE2: Success can be determined using initialized data member
         /// </summary>
-        private void InitializeInterface()
+        private bool InitializeInterface()
         {
             // Set the wait cursor
             Cursor.Current = Cursors.WaitCursor;
@@ -994,6 +997,12 @@ namespace RandomNumberGenerator
 
             // Restore the cursor
             Cursor.Current = Cursors.Default;
+
+            // Reported back rather than only shown, so a caller cannot carry on as though the device had
+            // started. This returned nothing before, and starting a session went ahead regardless: with the
+            // device unplugged or on the wrong port, the message saying so was immediately overwritten by
+            // one saying the session was running.
+            return bDeviceInitialized;
         }
 
         /// <summary>
@@ -1258,6 +1267,19 @@ namespace RandomNumberGenerator
             m_ClearButton.ForeColor = UiPalette.MutedText;
             m_ClearButton.FlatAppearance.BorderSize = 0;
 
+            // The three browse buttons look the same wherever they are, so promoting the one on the record
+            // tab to the accent is the only thing that ever tells them apart
+            foreach (Button browseButton in new Button[] { m_FileBrowseButton, m_BaselineBrowseButton, m_ResultBrowseButton })
+            {
+                browseButton.FlatStyle = FlatStyle.Flat;
+                browseButton.FlatAppearance.BorderSize = 1;
+                browseButton.FlatAppearance.BorderColor = UiPalette.Line;
+                browseButton.FlatAppearance.MouseOverBackColor = UiPalette.Ground;
+                browseButton.BackColor = UiPalette.Card;
+                browseButton.ForeColor = UiPalette.CardText;
+                browseButton.UseVisualStyleBackColor = false;
+            }
+
             m_ComparisonList.BackColor = UiPalette.Card;
             m_ComparisonList.ForeColor = UiPalette.CardText;
 
@@ -1304,7 +1326,9 @@ namespace RandomNumberGenerator
             // machine having to be run through a transition to say what it was
             m_PrimaryButton = primaryButton;
 
-            Button[] actionButtons = new Button[] { m_StartButton, m_PauseButton, m_StopButton };
+            // The browse button is in here because choosing a file is the step that comes before starting,
+            // so while there is no file it is the one that carries the emphasis
+            Button[] actionButtons = new Button[] { m_StartButton, m_PauseButton, m_StopButton, m_FileBrowseButton };
             foreach (Button actionButton in actionButtons)
             {
                 bool bIsPrimary = ((actionButton == primaryButton) && (true == actionButton.Enabled));
@@ -1363,7 +1387,6 @@ namespace RandomNumberGenerator
             }
 
             // Update the button statuses
-            m_StartButton.Enabled = true;
             m_StopButton.Enabled = false;
             m_PauseButton.Enabled = false;
 
@@ -1379,13 +1402,25 @@ namespace RandomNumberGenerator
             m_SimulateToggle.Enabled = true;
             m_PortComboBox.Enabled = true;
 
-            // Starting a session is the action to take next
-            SetPrimaryButton(m_StartButton);
+            // Whether a session can be started at all depends on there being somewhere to record it
+            UpdateStartAvailability();
 
             UpdateWindowTitle();
 
             // Update the info box
             SetStatusBoxState(IdleMessage, StatusPalette.NormalText, StatusPalette.NormalBackground);
+        }
+
+        /// <summary>
+        /// Offers starting a session only when there is a file to record into, and puts the emphasis on
+        /// whichever step comes next. A session has nowhere to go without a data file, so rather than
+        /// letting the button be pressed and refusing, it is not offered until choosing one has been done.
+        /// </summary>
+        private void UpdateStartAvailability()
+        {
+            bool bFileChosen = (false == string.IsNullOrEmpty(m_FileTextBox.Text));
+            m_StartButton.Enabled = bFileChosen;
+            SetPrimaryButton(bFileChosen ? m_StartButton : m_FileBrowseButton);
         }
 
         /// <summary>
@@ -1442,53 +1477,72 @@ namespace RandomNumberGenerator
         {
             bool bStatus = true;
 
+            // Held rather than shown as it is found, because returning to idle rewrites the status bar and
+            // would wipe the explanation off it. The reason a session did not start is the one thing the
+            // user needs, so it is put up last.
+            string sFailure = string.Empty;
+
             try
             {
                 // If the device has not been initialized
                 if (false == m_Timer.Initialized)
                 {
-                    // Initialize the device interface
-                    InitializeInterface();
+                    // Initialize the device interface. A device that will not start has nothing to record,
+                    // so this stops here rather than carrying on and reporting a session that is running.
+                    bStatus = InitializeInterface();
+                    if (false == bStatus)
+                    {
+                        sFailure = m_sDEVICE_INIT_ERROR;
+                    }
                 }
 
-                // Update the info box after initializing the device, which updates the status box as well
-                SetStatusBoxState(RunningMessage, StatusPalette.NormalText, StatusPalette.NormalBackground);
+                if (true == bStatus)
+                {
+                    // Update the info box after initializing the device, which updates the status box as well
+                    SetStatusBoxState(RunningMessage, StatusPalette.NormalText, StatusPalette.NormalBackground);
 
-                // Start a new data session
-                bStatus = m_Data.StartSession();
+                    // Start a new data session
+                    bStatus = m_Data.StartSession();
 
-                // Start the read timer
-                m_Timer.Start();
+                    // Start the read timer
+                    m_Timer.Start();
+                }
             }
             catch (InvalidOperationException invalidOpEx)
             {
                 // Handle file/operation errors and display in status bar
-                SetStatusBoxError(invalidOpEx.Message);
+                sFailure = invalidOpEx.Message;
                 bStatus = false;
             }
             catch (UnauthorizedAccessException accessEx)
             {
                 // Handle file access errors and display in status bar
-                SetStatusBoxError(accessEx.Message);
+                sFailure = accessEx.Message;
                 bStatus = false;
             }
             catch (System.IO.IOException ioEx)
             {
                 // Handle file I/O errors and display in status bar
-                SetStatusBoxError($"File I/O error: {ioEx.Message}");
+                sFailure = $"File I/O error: {ioEx.Message}";
                 bStatus = false;
             }
             catch (Exception generalEx)
             {
                 // Handle any other errors and display in status bar
-                SetStatusBoxError($"Unexpected error starting session: {generalEx.Message}");
+                sFailure = $"Unexpected error starting session: {generalEx.Message}";
                 bStatus = false;
             }
 
             // If session start failed, ensure we're in idle state
-            if (!bStatus)
+            if (false == bStatus)
             {
                 SetIdleState();
+
+                // Now that the status bar has been reset by the return to idle, say what went wrong
+                if (false == string.IsNullOrEmpty(sFailure))
+                {
+                    SetStatusBoxError(sFailure);
+                }
             }
 
             return bStatus;
@@ -1509,6 +1563,10 @@ namespace RandomNumberGenerator
             // End the current session and clear the selected data file
             m_Data.EndSession();
             m_FileTextBox.Text = string.Empty;
+
+            // With no file there is nowhere to record into, so starting is not offered again until one is
+            // chosen
+            UpdateStartAvailability();
 
             // Enable the target number field for the next session
             m_TargetComboBox.Enabled = true;
@@ -1633,7 +1691,10 @@ namespace RandomNumberGenerator
             {
                 // Update the file display
                 m_FileTextBox.Text = Path.GetFileName(sFilePath);
-                
+
+                // There is somewhere to record into now, so a session can be started
+                UpdateStartAvailability();
+
                 // Update all UI elements with the loaded session data
                 UpdateUIFromLoadedSession();
 

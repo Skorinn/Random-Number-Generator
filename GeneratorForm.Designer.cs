@@ -393,6 +393,7 @@ namespace RandomNumberGenerator
             // m_StartButton
             //
             this.m_StartButton.CausesValidation = false;
+            this.m_StartButton.Enabled = false;
             this.m_StartButton.Location = new System.Drawing.Point(371, 14);
             this.m_StartButton.Margin = new System.Windows.Forms.Padding(0, 0, 8, 0);
             this.m_StartButton.Name = "m_StartButton";
