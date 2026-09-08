@@ -53,7 +53,7 @@ namespace RandomNumberGenerator
 
             // Say what is being plotted. Without this the reader has to know that these are bit averages and
             // that an unbiased generator puts them around a half.
-            Titles.Add(new Title(m_sCHART_TITLE, Docking.Top, m_TitleFont, SystemColors.ControlText));
+            Titles.Add(new Title(m_sCHART_TITLE, Docking.Top, m_TitleFont, UiPalette.CardText));
 
             // Disable the X-Axis. The chart holds a rolling window of the most recent readings, so numbering
             // them would label the axis with a count that means nothing on its own.
@@ -67,16 +67,6 @@ namespace RandomNumberGenerator
             AverageChartYAxis.Minimum = m_fCENTER - m_fYAXIS_INCREMENT;
             AverageChartYAxis.Interval = m_fYAXIS_TICK_INTERVAL;
 
-            // The grid is there to be measured against, not to be looked at, so it is drawn as hairlines
-            // rather than in the black the chart uses by default
-            chartArea.BackColor = Color.Transparent;
-            chartArea.BorderColor = Color.Transparent;
-            AverageChartYAxis.LineColor = UiPalette.Line;
-            AverageChartYAxis.MajorTickMark.LineColor = UiPalette.Line;
-            AverageChartYAxis.MajorGrid.LineColor = UiPalette.Line;
-            AverageChartYAxis.LabelStyle.ForeColor = UiPalette.MutedInk;
-            AverageChartYAxis.TitleForeColor = UiPalette.MutedInk;
-
             // Mark the value an unbiased generator is expected to sit at, so how close the readings are to it
             // can be seen rather than worked out. A strip of no width draws as the single line at its offset.
             StripLine expectedValueLine = new StripLine
@@ -84,11 +74,9 @@ namespace RandomNumberGenerator
                 IntervalOffset = m_fCENTER,
                 Interval = 0,
                 StripWidth = 0,
-                BorderColor = m_ExpectedValueColor,
                 BorderWidth = m_iEXPECTED_VALUE_WIDTH,
                 BorderDashStyle = ChartDashStyle.Dash,
                 Text = m_sEXPECTED_VALUE_TEXT,
-                ForeColor = m_ExpectedValueColor,
                 TextAlignment = System.Drawing.StringAlignment.Far
             };
             AverageChartYAxis.StripLines.Add(expectedValueLine);
@@ -102,18 +90,59 @@ namespace RandomNumberGenerator
             Series DataPointSeries = Series[(int)SeriesIndex.DataPointSeries];
             DataPointSeries.LegendText = m_sDATA_POINT_LEGEND;
             DataPointSeries.ChartType = SeriesChartType.Line;
-            DataPointSeries.Color = UiPalette.Trace;
             DataPointSeries.Points.AddY(m_fCENTER);
 
             // Setup the average series (no need to add initial point as data point series will display the chart)
             Series AverageSeries = Series[(int)SeriesIndex.AverageSeries];
             AverageSeries.LegendText = m_sAVERAGE_LEGEND;
             AverageSeries.ChartType = SeriesChartType.Line;
-            AverageSeries.Color = UiPalette.Average;
+
+            // Colour everything the palette owns
+            ApplyPalette();
         }
 
         #endregion
         #region Methods
+
+        /// <summary>
+        /// Takes the chart's colours from the palette. The grid is there to be measured against rather than
+        /// looked at, so it is drawn as hairlines rather than in the black the chart uses by default.
+        /// NOTE: This is called again whenever the system colour scheme changes, so it must set every colour
+        /// it owns rather than assuming what was set when the chart was built.
+        /// </summary>
+        public void ApplyPalette()
+        {
+            ChartArea resultsArea = ChartAreas[0];
+            resultsArea.BackColor = Color.Transparent;
+            resultsArea.BorderColor = Color.Transparent;
+
+            Axis resultsYAxis = resultsArea.AxisY;
+            resultsYAxis.LineColor = UiPalette.Line;
+            resultsYAxis.MajorTickMark.LineColor = UiPalette.Line;
+            resultsYAxis.MajorGrid.LineColor = UiPalette.Line;
+            resultsYAxis.LabelStyle.ForeColor = UiPalette.MutedText;
+            resultsYAxis.TitleForeColor = UiPalette.MutedText;
+
+            foreach (StripLine expectedValueLine in resultsYAxis.StripLines)
+            {
+                expectedValueLine.BorderColor = UiPalette.Expected;
+                expectedValueLine.ForeColor = UiPalette.Expected;
+            }
+
+            foreach (Title chartTitle in Titles)
+            {
+                chartTitle.ForeColor = UiPalette.CardText;
+            }
+
+            foreach (Legend chartLegend in Legends)
+            {
+                chartLegend.BackColor = Color.Transparent;
+                chartLegend.ForeColor = UiPalette.CardText;
+            }
+
+            Series[(int)SeriesIndex.DataPointSeries].Color = UiPalette.Trace;
+            Series[(int)SeriesIndex.AverageSeries].Color = UiPalette.Average;
+        }
 
         /// <summary>
         /// Adds a data point to the chart
@@ -314,9 +343,6 @@ namespace RandomNumberGenerator
 
         #endregion
         #region Data Members
-
-        // Drawing of the expected value marker and the title
-        private static readonly Color m_ExpectedValueColor = UiPalette.Expected;
         private static readonly Font m_TitleFont = new Font("Segoe UI", 9F, FontStyle.Bold);
 
         private enum SeriesIndex { DataPointSeries, AverageSeries, };

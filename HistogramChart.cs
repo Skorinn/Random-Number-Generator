@@ -44,19 +44,6 @@ namespace RandomNumberGenerator
                 AxisY = { Title = m_sY_AXIS_TITLE }
             };
 
-            // The grid is there to be measured against, not to be looked at, so it is drawn as hairlines
-            // rather than in the black the chart uses by default
-            mainChartArea.BackColor = Color.Transparent;
-            mainChartArea.BorderColor = Color.Transparent;
-            foreach (Axis axis in new Axis[] { mainChartArea.AxisX, mainChartArea.AxisY })
-            {
-                axis.LineColor = UiPalette.Line;
-                axis.MajorTickMark.LineColor = UiPalette.Line;
-                axis.MajorGrid.LineColor = UiPalette.Line;
-                axis.LabelStyle.ForeColor = UiPalette.MutedInk;
-                axis.TitleForeColor = UiPalette.MutedInk;
-            }
-
             this.ChartAreas.Add(mainChartArea);
 
             // Add the legend, above the plot rather than beside it so the distribution keeps the full width
@@ -66,10 +53,42 @@ namespace RandomNumberGenerator
             legendHistogram.Alignment = StringAlignment.Far;
             legendHistogram.IsDockedInsideChartArea = false;
             Legends.Add(legendHistogram);
+
+            // Colour everything the palette owns
+            ApplyPalette();
         }
 
         #endregion
         #region Methods
+
+        /// <summary>
+        /// Takes the chart's colours from the palette. The grid is there to be measured against rather than
+        /// looked at, so it is drawn as hairlines rather than in the black the chart uses by default.
+        /// NOTE: This is called again whenever the system colour scheme changes, so it must set every colour
+        /// it owns rather than assuming what was set when the chart was built. The two distributions are
+        /// coloured when they are plotted, as they only exist then.
+        /// </summary>
+        public void ApplyPalette()
+        {
+            ChartArea mainChartArea = this.ChartAreas[0];
+            mainChartArea.BackColor = Color.Transparent;
+            mainChartArea.BorderColor = Color.Transparent;
+
+            foreach (Axis axis in new Axis[] { mainChartArea.AxisX, mainChartArea.AxisY })
+            {
+                axis.LineColor = UiPalette.Line;
+                axis.MajorTickMark.LineColor = UiPalette.Line;
+                axis.MajorGrid.LineColor = UiPalette.Line;
+                axis.LabelStyle.ForeColor = UiPalette.MutedText;
+                axis.TitleForeColor = UiPalette.MutedText;
+            }
+
+            foreach (Legend chartLegend in Legends)
+            {
+                chartLegend.BackColor = Color.Transparent;
+                chartLegend.ForeColor = UiPalette.CardText;
+            }
+        }
 
         /// <summary>
         /// Plots histogram data for two data sets, choosing how many bins to divide them into from how much

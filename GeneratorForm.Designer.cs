@@ -50,6 +50,7 @@ namespace RandomNumberGenerator
             this.m_SetupLayout = new System.Windows.Forms.TableLayoutPanel();
             this.m_SimulateToggleLabel = new System.Windows.Forms.Label();
             this.m_SimulateToggle = new CommonControls.ToggleButton();
+            this.m_SourceModeLabel = new System.Windows.Forms.Label();
             this.m_PortLabel = new System.Windows.Forms.Label();
             this.m_PortComboBox = new System.Windows.Forms.ComboBox();
             this.m_FileLlabel = new System.Windows.Forms.Label();
@@ -209,21 +210,24 @@ namespace RandomNumberGenerator
             // m_SetupLayout
             //
             this.m_SetupLayout.BackColor = System.Drawing.Color.Transparent;
-            this.m_SetupLayout.ColumnCount = 5;
-            this.m_SetupLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 128F));
+            this.m_SetupLayout.ColumnCount = 6;
+            this.m_SetupLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 76F));
+            this.m_SetupLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 84F));
             this.m_SetupLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 96F));
             this.m_SetupLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
             this.m_SetupLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 116F));
             this.m_SetupLayout.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 124F));
             this.m_SetupLayout.Controls.Add(this.m_SimulateToggleLabel, 0, 0);
+            this.m_SetupLayout.SetColumnSpan(this.m_SimulateToggleLabel, 2);
+            this.m_SetupLayout.Controls.Add(this.m_SourceModeLabel, 1, 1);
             this.m_SetupLayout.Controls.Add(this.m_SimulateToggle, 0, 1);
-            this.m_SetupLayout.Controls.Add(this.m_PortLabel, 1, 0);
-            this.m_SetupLayout.Controls.Add(this.m_PortComboBox, 1, 1);
-            this.m_SetupLayout.Controls.Add(this.m_FileLlabel, 2, 0);
-            this.m_SetupLayout.Controls.Add(this.m_FileTextBox, 2, 1);
-            this.m_SetupLayout.Controls.Add(this.m_FileBrowseButton, 3, 1);
-            this.m_SetupLayout.Controls.Add(this.m_TargetLabel, 4, 0);
-            this.m_SetupLayout.Controls.Add(this.m_TargetComboBox, 4, 1);
+            this.m_SetupLayout.Controls.Add(this.m_PortLabel, 2, 0);
+            this.m_SetupLayout.Controls.Add(this.m_PortComboBox, 2, 1);
+            this.m_SetupLayout.Controls.Add(this.m_FileLlabel, 3, 0);
+            this.m_SetupLayout.Controls.Add(this.m_FileTextBox, 3, 1);
+            this.m_SetupLayout.Controls.Add(this.m_FileBrowseButton, 4, 1);
+            this.m_SetupLayout.Controls.Add(this.m_TargetLabel, 5, 0);
+            this.m_SetupLayout.Controls.Add(this.m_TargetComboBox, 5, 1);
             this.m_SetupLayout.Controls.Add(this.m_ActionPanel, 0, 2);
             this.m_SetupLayout.Dock = System.Windows.Forms.DockStyle.Fill;
             this.m_SetupLayout.Location = new System.Drawing.Point(14, 12);
@@ -264,6 +268,18 @@ namespace RandomNumberGenerator
             this.m_SimulateToggle.TabIndex = 2;
             this.m_SimulateToggle.UseVisualStyleBackColor = true;
             this.m_SimulateToggle.CheckedChanged += new System.EventHandler(this.SimulateToggle_CheckedChanged);
+            //
+            // m_SourceModeLabel
+            //
+            this.m_SourceModeLabel.AutoSize = true;
+            this.m_SourceModeLabel.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.m_SourceModeLabel.Location = new System.Drawing.Point(76, 18);
+            this.m_SourceModeLabel.Margin = new System.Windows.Forms.Padding(6, 0, 12, 0);
+            this.m_SourceModeLabel.Name = "m_SourceModeLabel";
+            this.m_SourceModeLabel.Size = new System.Drawing.Size(66, 28);
+            this.m_SourceModeLabel.TabIndex = 0;
+            this.m_SourceModeLabel.Text = "Device";
+            this.m_SourceModeLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //
             // m_PortLabel
             //
@@ -348,7 +364,7 @@ namespace RandomNumberGenerator
             //
             // m_ActionPanel
             //
-            this.m_SetupLayout.SetColumnSpan(this.m_ActionPanel, 5);
+            this.m_SetupLayout.SetColumnSpan(this.m_ActionPanel, 6);
             this.m_ActionPanel.BackColor = System.Drawing.Color.Transparent;
             this.m_ActionPanel.Controls.Add(this.m_StopButton);
             this.m_ActionPanel.Controls.Add(this.m_PauseButton);
@@ -951,6 +967,7 @@ namespace RandomNumberGenerator
         private System.Windows.Forms.ComboBox m_PortComboBox;
         private System.Windows.Forms.Label m_SimulateToggleLabel;
         private CommonControls.ToggleButton m_SimulateToggle;
+        private System.Windows.Forms.Label m_SourceModeLabel;
         private System.Windows.Forms.Label m_FileLlabel;
         private System.Windows.Forms.TextBox m_FileTextBox;
         private System.Windows.Forms.Button m_FileBrowseButton;

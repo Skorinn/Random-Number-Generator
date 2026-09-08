@@ -126,8 +126,20 @@ a fixed-size dialog are gone. The window is sizable with a `MinimumSize`, and `R
 `SaveWindowPlacement` remember its geometry in `Properties.Settings` — a saved position for a screen that
 is no longer attached is ignored rather than opening the window off-screen.
 
-Status messages go to a `StatusStrip` docked to the form, not to the tab, so errors raised while analysing
-are visible on the tab that raised them. `SetStatusBoxState` takes its colours from `StatusPalette`, which
+Status messages go to a `StatusStrip` docked to the form, not to the tab.
+
+Colour comes from two palettes, both of them properties rather than fields so that they report the scheme
+in force now: `UiPalette` for the chrome, every value of it taken from `SystemColors`, and `StatusPalette`
+for severity. Take text from the same pair as the surface behind it — `Card`/`CardText`, `Ground`/
+`GroundText` — because a high contrast scheme can render a mismatched pair as one colour on itself.
+`GeneratorForm.ApplyTheme` colours everything the designer laid out and is called again from
+`OnSystemColorsChanged`, so anything added to the window belongs there rather than in the designer. The
+only fixed colours are `Trace` and `Average`, which are data rather than chrome: they tell two series
+apart, so they have to differ from each other rather than agree with the window. Severity has no system
+colour to take, so under a high contrast scheme `StatusPalette` stands aside and the wording carries it.
+
+Errors raised while analysing are visible on the tab that raised them. `SetStatusBoxState` takes its
+colours from `StatusPalette`, which
 is where the severity scheme lives for both the form and `DeviceUpdateThread`. Messages start at the first
 word: the leading space that used to pad them was for a text box with no padding of its own.
 

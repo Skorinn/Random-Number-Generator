@@ -253,6 +253,10 @@ namespace RandomNumberGenerator
             // Record the device interface requires initialization
             m_Timer.Initialized = false;
 
+            // Say which source the toggle is on. A switch with nothing beside it says only that there are
+            // two of something, not which one is in use.
+            m_SourceModeLabel.Text = m_Data.Simulated ? m_sSIMULATOR_SOURCE : m_sDEVICE_SOURCE;
+
             // If simulating
             if (m_Data.Simulated)
             {
@@ -1183,7 +1187,7 @@ namespace RandomNumberGenerator
                                                     m_BaselineLabel, m_ResultLabel })
             {
                 eyebrow.Font = m_EyebrowFont;
-                eyebrow.ForeColor = UiPalette.MutedInk;
+                eyebrow.ForeColor = UiPalette.MutedText;
             }
 
             // The readouts are the values the window exists to show, so they are the largest thing on it
@@ -1192,17 +1196,60 @@ namespace RandomNumberGenerator
                                                         m_StandardDeviationTextBox })
             {
                 readout.Font = m_ReadoutFont;
-                readout.ForeColor = UiPalette.Ink;
+                readout.ForeColor = UiPalette.CardText;
                 readout.BackColor = UiPalette.Card;
             }
 
+            // The source toggle carries a setting rather than a severity, so it reads as the accent when it
+            // is on and as a plain track when it is off. Its own defaults were black on black, which was
+            // the one thing on the window that belonged to no scheme at all.
+            m_SimulateToggle.OnBackground = UiPalette.Accent;
+            m_SimulateToggle.OnToggle = UiPalette.AccentText;
+            m_SimulateToggle.OffBackground = UiPalette.Line;
+            m_SimulateToggle.OffToggle = UiPalette.Card;
+            m_SimulateToggle.DisabledBackground = UiPalette.Ground;
+            m_SimulateToggle.DisabledToggle = UiPalette.Line;
+
+            // The switch is drawn on the card, so the corners its rounded shape does not reach take the card
+            m_SimulateToggle.BackColor = UiPalette.Card;
+
+            m_SourceModeLabel.ForeColor = UiPalette.CardText;
+
             // Clearing is the one action here that destroys something, so it is the quietest thing on the card
             m_ClearButton.BackColor = UiPalette.Card;
-            m_ClearButton.ForeColor = UiPalette.MutedInk;
+            m_ClearButton.ForeColor = UiPalette.MutedText;
             m_ClearButton.FlatAppearance.BorderSize = 0;
 
             m_ComparisonList.BackColor = UiPalette.Card;
-            m_ComparisonList.ForeColor = UiPalette.Ink;
+            m_ComparisonList.ForeColor = UiPalette.CardText;
+
+            // The charts sit on cards, so their own furniture is taken from the same pair
+            m_ResultChart.ApplyPalette();
+            m_ResultHistogramChart.ApplyPalette();
+        }
+
+        /// <summary>
+        /// Event handler for the system colour scheme being changed while the application is running
+        /// </summary>
+        /// <param name="e">IN - The event arguments (not used)</param>
+        protected override void OnSystemColorsChanged(EventArgs e)
+        {
+            base.OnSystemColorsChanged(e);
+
+            // The palette reports whatever scheme is in force now, so the controls are recoloured from it.
+            // Without this the window keeps the scheme it opened under until it is restarted.
+            ApplyTheme();
+            RefreshPrimaryButton();
+            SetStatusBoxState(StatusBoxText, StatusPalette.NormalText, StatusPalette.NormalBackground);
+        }
+
+        /// <summary>
+        /// Draws the button emphasis again from the palette as it stands now, without changing which button
+        /// carries it
+        /// </summary>
+        private void RefreshPrimaryButton()
+        {
+            SetPrimaryButton(m_PrimaryButton);
         }
 
         /// <summary>
@@ -1215,6 +1262,10 @@ namespace RandomNumberGenerator
         /// <param name="primaryButton">IN - The button to emphasise, which is left plain if it is disabled</param>
         private void SetPrimaryButton(Button primaryButton)
         {
+            // Remembered so the emphasis can be drawn again from a changed colour scheme without the state
+            // machine having to be run through a transition to say what it was
+            m_PrimaryButton = primaryButton;
+
             Button[] actionButtons = new Button[] { m_StartButton, m_PauseButton, m_StopButton };
             foreach (Button actionButton in actionButtons)
             {
@@ -1229,7 +1280,7 @@ namespace RandomNumberGenerator
                     actionButton.FlatAppearance.BorderSize = 1;
                     actionButton.FlatAppearance.BorderColor = UiPalette.Line;
                     actionButton.BackColor = UiPalette.Ground;
-                    actionButton.ForeColor = UiPalette.Line;
+                    actionButton.ForeColor = UiPalette.MutedText;
                     actionButton.Font = m_ActionFontRegular;
                 }
                 else if (true == bIsPrimary)
@@ -1238,7 +1289,7 @@ namespace RandomNumberGenerator
                     actionButton.FlatAppearance.MouseOverBackColor = UiPalette.AccentHover;
                     actionButton.FlatAppearance.MouseDownBackColor = UiPalette.AccentPressed;
                     actionButton.BackColor = UiPalette.Accent;
-                    actionButton.ForeColor = Color.White;
+                    actionButton.ForeColor = UiPalette.AccentText;
                     actionButton.Font = m_ActionFontBold;
                 }
                 else
@@ -1250,7 +1301,7 @@ namespace RandomNumberGenerator
                     actionButton.FlatAppearance.MouseOverBackColor = UiPalette.Ground;
                     actionButton.FlatAppearance.MouseDownBackColor = UiPalette.Line;
                     actionButton.BackColor = UiPalette.Card;
-                    actionButton.ForeColor = UiPalette.Ink;
+                    actionButton.ForeColor = UiPalette.CardText;
                     actionButton.Font = m_ActionFontRegular;
                 }
             }
@@ -2223,7 +2274,7 @@ namespace RandomNumberGenerator
         {
             m_VerdictLabel.Text = sVerdict;
             m_VerdictLabel.Font = bSignificant ? m_VerdictFontBold : m_VerdictFontRegular;
-            m_VerdictLabel.ForeColor = bSignificant ? SystemColors.ControlText : SystemColors.GrayText;
+            m_VerdictLabel.ForeColor = bSignificant ? UiPalette.CardText : UiPalette.MutedText;
         }
 
         /// <summary>
@@ -2450,6 +2501,9 @@ namespace RandomNumberGenerator
         private Font m_ActionFontRegular = null;
         private Font m_ActionFontBold = null;
 
+        // The button currently carrying the action to take next, so its emphasis can be redrawn
+        private Button m_PrimaryButton = null;
+
         // Fonts for the comparison verdict, which is emphasised only when it reports a shift
         private Font m_VerdictFontRegular = null;
         private Font m_VerdictFontBold = null;
@@ -2458,6 +2512,10 @@ namespace RandomNumberGenerator
         // created here and disposed with the form.
         private static readonly Font m_EyebrowFont = new Font("Segoe UI", 8F, FontStyle.Regular);
         private static readonly Font m_ReadoutFont = new Font("Consolas", 15F, FontStyle.Regular);
+
+        // The two sources the toggle switches between, named beside it
+        private const string m_sDEVICE_SOURCE = "Device";
+        private const string m_sSIMULATOR_SOURCE = "Simulator";
 
         // The two things the same field means, depending on where the readings come from
         private const string m_sPORT_LABEL = "PORT";

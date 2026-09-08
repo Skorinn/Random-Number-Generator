@@ -8,78 +8,100 @@
 // Revision History:
 //====================================================================================================================
 // 2026/09/07 - Mike Pullen - Original implementation.
+// 2026/09/08 - Mike Pullen - Take the colours from the system scheme rather than fixing them
 //*********************************************************************************************************************
 
 using System.Drawing;
+using System.Windows.Forms;
 
 namespace RandomNumberGenerator
 {
     /// <summary>
     /// The colours the window is built from: the ground it sits on, the cards laid on that ground, the
-    /// hairlines between them, and the two weights of text used on them.
-    /// NOTE: These are fixed rather than taken from SystemColors. The interface is a set of white cards on a
-    /// light ground, and a system colour scheme that inverted one without the other would leave the two
-    /// disagreeing. The cost is that a high contrast Windows theme is not followed; a machine that needs one
-    /// is the reason to reach for SystemColors here instead.
+    /// hairlines between them, and the text used on each.
+    /// NOTE: These are properties rather than fields on purpose. SystemColors reports whatever scheme is in
+    /// force now, and a scheme can be changed while the application is running; a field would hold whatever
+    /// was in force when the class was first touched. GeneratorForm re-applies these when the system tells
+    /// it the scheme has changed.
+    /// NOTE: Text has to be taken from the same pair as the surface behind it. Card and CardText go
+    /// together, Ground and GroundText go together, and mixing them gives a pair that a high contrast
+    /// scheme can render as one colour on itself.
     /// </summary>
     public static class UiPalette
     {
-        #region Constants
+        #region Properties
 
         /// <summary>
-        /// The ground the cards are laid on, and the colour of the tab pages behind them
+        /// The ground the cards are laid on, and the colour of the tab pages behind them (read-only)
         /// </summary>
-        public static readonly Color Ground = Color.FromArgb(240, 240, 240);
+        public static Color Ground { get => SystemColors.Control; }
+
+        /// <summary>
+        /// Text on the ground (read-only)
+        /// </summary>
+        public static Color GroundText { get => SystemColors.ControlText; }
 
         /// <summary>
         /// The face of a card: the settings, the readouts, the comparison and the charts each sit on one
+        /// (read-only)
         /// </summary>
-        public static readonly Color Card = Color.FromArgb(255, 255, 255);
+        public static Color Card { get => SystemColors.Window; }
 
         /// <summary>
-        /// The hairline around a card and between the readouts
+        /// Text on a card, carrying a value the user reads (read-only)
         /// </summary>
-        public static readonly Color Line = Color.FromArgb(200, 205, 211);
+        public static Color CardText { get => SystemColors.WindowText; }
 
         /// <summary>
-        /// Text carrying a value the user reads
+        /// The hairline around a card and between the readouts (read-only)
         /// </summary>
-        public static readonly Color Ink = Color.FromArgb(27, 31, 36);
+        public static Color Line { get => SystemColors.ControlDark; }
 
         /// <summary>
-        /// Text naming a value rather than carrying one, which should recede behind it
+        /// Text naming a value rather than carrying one, which should recede behind it (read-only)
         /// </summary>
-        public static readonly Color MutedInk = Color.FromArgb(90, 101, 112);
+        public static Color MutedText { get => SystemColors.GrayText; }
 
         /// <summary>
-        /// The fill behind the one button carrying the action to take next
+        /// The fill behind the one button carrying the action to take next (read-only)
         /// </summary>
-        public static readonly Color Accent = Color.FromArgb(31, 92, 153);
+        public static Color Accent { get => SystemColors.Highlight; }
 
         /// <summary>
-        /// The accent under the pointer
+        /// Text on the accent (read-only)
         /// </summary>
-        public static readonly Color AccentHover = Color.FromArgb(42, 112, 181);
+        public static Color AccentText { get => SystemColors.HighlightText; }
 
         /// <summary>
-        /// The accent while the button is held down
+        /// The accent under the pointer. There is no system colour for this, so it is taken from the accent
+        /// itself and stays in step with whatever scheme that came from. (read-only)
         /// </summary>
-        public static readonly Color AccentPressed = Color.FromArgb(23, 72, 121);
+        public static Color AccentHover { get => ControlPaint.Light(SystemColors.Highlight); }
+
+        /// <summary>
+        /// The accent while the button is held down (read-only)
+        /// </summary>
+        public static Color AccentPressed { get => ControlPaint.Dark(SystemColors.Highlight); }
+
+        /// <summary>
+        /// The marker on the value an unbiased generator is expected to give (read-only)
+        /// </summary>
+        public static Color Expected { get => SystemColors.GrayText; }
 
         /// <summary>
         /// The line drawn through the individual readings, and the first of the two compared distributions
+        /// (read-only).
+        /// NOTE: This and Average are the only fixed colours here, and they are fixed because they are data
+        /// rather than chrome: they tell two series apart, so they have to differ from one another rather
+        /// than agree with the window. Both are chosen to read on a light ground and on a dark one.
         /// </summary>
-        public static readonly Color Trace = Color.FromArgb(43, 108, 176);
+        public static Color Trace { get => Color.FromArgb(43, 108, 176); }
 
         /// <summary>
         /// The line drawn through the running mean, and the second of the two compared distributions
+        /// (read-only)
         /// </summary>
-        public static readonly Color Average = Color.FromArgb(192, 57, 43);
-
-        /// <summary>
-        /// The marker on the value an unbiased generator is expected to give
-        /// </summary>
-        public static readonly Color Expected = Color.FromArgb(130, 138, 146);
+        public static Color Average { get => Color.FromArgb(192, 57, 43); }
 
         #endregion
     }
