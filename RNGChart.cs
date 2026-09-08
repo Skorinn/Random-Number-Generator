@@ -51,10 +51,6 @@ namespace RandomNumberGenerator
             Series.Add(dataPointSeries);
             Series.Add(averagesSeries);
 
-            // Say what is being plotted. Without this the reader has to know that these are bit averages and
-            // that an unbiased generator puts them around a half.
-            Titles.Add(new Title(m_sCHART_TITLE, Docking.Top, m_TitleFont, UiPalette.CardText));
-
             // Disable the X-Axis. The chart holds a rolling window of the most recent readings, so numbering
             // them would label the axis with a count that means nothing on its own.
             Axis AverageChartXAxis = ChartAreas[0].AxisX;
@@ -124,11 +120,6 @@ namespace RandomNumberGenerator
             foreach (StripLine expectedValueLine in resultsYAxis.StripLines)
             {
                 expectedValueLine.BorderColor = UiPalette.Expected;
-            }
-
-            foreach (Title chartTitle in Titles)
-            {
-                chartTitle.ForeColor = UiPalette.CardText;
             }
 
             foreach (Legend chartLegend in Legends)
@@ -331,7 +322,6 @@ namespace RandomNumberGenerator
         private const double m_fCENTER = 0.5; // Statistical mean of the data, which the chart is centered on
 
         // Labelling, so the chart says what it is showing rather than relying on the reader knowing
-        private const string m_sCHART_TITLE = "Bit average per reading";
         private const string m_sYAXIS_TITLE = "Bit average";
         private const string m_sDATA_POINT_LEGEND = "Reading";
         private const string m_sAVERAGE_LEGEND = "Running mean";
@@ -339,7 +329,6 @@ namespace RandomNumberGenerator
 
         #endregion
         #region Data Members
-        private static readonly Font m_TitleFont = new Font("Segoe UI", 9F, FontStyle.Bold);
 
         private enum SeriesIndex { DataPointSeries, AverageSeries, };
 

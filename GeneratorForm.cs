@@ -117,6 +117,10 @@ namespace RandomNumberGenerator
             m_VerdictFontRegular = m_VerdictLabel.Font;
             m_VerdictFontBold = new Font(m_VerdictFontRegular, FontStyle.Bold);
 
+            // The height a combo box picks for itself in the dropped down style, which is what the setup row
+            // was laid out around. The simple style used for the seed asks for a taller control than that.
+            m_iFieldHeight = m_PortComboBox.Height;
+
             // Colour the controls the designer laid out, and emphasise the button that starts a session
             ApplyTheme();
             SetPrimaryButton(m_StartButton);
@@ -270,6 +274,12 @@ namespace RandomNumberGenerator
                 this.m_PortComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
                 this.m_PortComboBox.RightToLeft = System.Windows.Forms.RightToLeft.Inherit;
             }
+
+            // A combo box in the simple style is a text box with a list under it, and it takes a height to
+            // fit both. Left at that it is taller than the row it sits in, so its bottom border falls outside
+            // and the field looks unfinished. Put it back to the height the dropped down style chooses for
+            // itself, which is the height the row was laid out for.
+            this.m_PortComboBox.Height = m_iFieldHeight;
         }
 
         /// <summary>
@@ -1145,11 +1155,40 @@ namespace RandomNumberGenerator
                 Properties.Settings.Default.WindowSize = bounds.Size;
                 Properties.Settings.Default.Save();
             }
-            catch (System.Configuration.ConfigurationErrorsException configEx)
+            catch (Exception saveException)
             {
-                // Failing to remember where the window was is not worth stopping the close for, but it is
-                // worth saying so rather than closing as though nothing happened
-                SetStatusBoxError($"Unable to save the window position: {configEx.Message}");
+                // Remembering where the window was is a convenience, and a convenience must never be able to
+                // stop the application closing. This caught only ConfigurationErrorsException before, and the
+                // settings system throws more than that: on the first save for a machine it came out as an
+                // ArgumentException from inside the configuration stack, which went unhandled and put an
+                // error dialog in front of a user who had only asked to close the window.
+                SetStatusBoxError($"Unable to save the window position: {saveException.Message}");
+
+                // Record what went wrong where it can be read afterwards, since the window carrying the
+                // status bar is on its way out and nobody will see the message above
+                ReportPlacementFailure(saveException);
+            }
+        }
+
+        /// <summary>
+        /// Writes a failure to save the window position to a log beside the session files, so a failure that
+        /// happens as the application closes leaves something behind to look at
+        /// </summary>
+        /// <param name="saveException">IN - The failure to record</param>
+        private static void ReportPlacementFailure(Exception saveException)
+        {
+            try
+            {
+                string sLogPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    m_sLOG_FOLDER, m_sPLACEMENT_LOG);
+                Directory.CreateDirectory(Path.GetDirectoryName(sLogPath));
+                File.AppendAllText(sLogPath,
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  {saveException}{Environment.NewLine}{Environment.NewLine}");
+            }
+            catch (Exception)
+            {
+                // Failing to write a note about a failure is not worth reporting a failure about
             }
         }
 
@@ -2495,6 +2534,13 @@ namespace RandomNumberGenerator
         // the designer and is not disposed here; the bold one is created here and is.
         private Font m_ActionFontRegular = null;
         private Font m_ActionFontBold = null;
+
+        // Where a failure to remember the window position is recorded
+        private const string m_sLOG_FOLDER = "RandomNumberGenerator";
+        private const string m_sPLACEMENT_LOG = "window-placement-errors.log";
+
+        // Height of a field in the setup row, taken from the control that reports it correctly
+        private int m_iFieldHeight = 0;
 
         // The button currently carrying the action to take next, so its emphasis can be redrawn
         private Button m_PrimaryButton = null;
