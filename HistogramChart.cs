@@ -44,6 +44,19 @@ namespace RandomNumberGenerator
                 AxisY = { Title = m_sY_AXIS_TITLE }
             };
 
+            // The grid is there to be measured against, not to be looked at, so it is drawn as hairlines
+            // rather than in the black the chart uses by default
+            mainChartArea.BackColor = Color.Transparent;
+            mainChartArea.BorderColor = Color.Transparent;
+            foreach (Axis axis in new Axis[] { mainChartArea.AxisX, mainChartArea.AxisY })
+            {
+                axis.LineColor = UiPalette.Line;
+                axis.MajorTickMark.LineColor = UiPalette.Line;
+                axis.MajorGrid.LineColor = UiPalette.Line;
+                axis.LabelStyle.ForeColor = UiPalette.MutedInk;
+                axis.TitleForeColor = UiPalette.MutedInk;
+            }
+
             this.ChartAreas.Add(mainChartArea);
 
             // Add the legend, above the plot rather than beside it so the distribution keeps the full width
@@ -151,10 +164,10 @@ namespace RandomNumberGenerator
             UpdateChartAxisRange(fMinValue, fMaxValue, fMinYValue, fMaxYValue);
 
             // Create series for first data set
-            Series firstSeries = CreateHistogramSeries(label1, m_iSERIES1_ALPHA, Color.Blue);
+            Series firstSeries = CreateHistogramSeries(label1, m_iSERIES1_ALPHA, UiPalette.Trace);
 
             // Create series for second data set
-            Series secondSeries = CreateHistogramSeries(label2, m_iSERIES2_ALPHA, Color.Red);
+            Series secondSeries = CreateHistogramSeries(label2, m_iSERIES2_ALPHA, UiPalette.Average);
 
             // Add data points to both series
             for (int iBinIndex = 0; iBinIndex < binCount; iBinIndex++)

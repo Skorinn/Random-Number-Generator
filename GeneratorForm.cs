@@ -117,6 +117,10 @@ namespace RandomNumberGenerator
             m_VerdictFontRegular = m_VerdictLabel.Font;
             m_VerdictFontBold = new Font(m_VerdictFontRegular, FontStyle.Bold);
 
+            // Colour the controls the designer laid out, and emphasise the button that starts a session
+            ApplyTheme();
+            SetPrimaryButton(m_StartButton);
+
             // Lay out the comparison table and fill it in, which puts the verdict into the state that says
             // what has to be loaded before there is anything to compare
             BuildComparisonTable();
@@ -129,6 +133,7 @@ namespace RandomNumberGenerator
             m_StatusLabel.Text = IdleMessage;
             m_StatusLabel.ForeColor = StatusPalette.NormalText;
             m_StatusLabel.BackColor = StatusPalette.NormalBackground;
+            m_StatusIndicator.ForeColor = StatusPalette.NormalText;
 
             // Start the device update thread and trigger an update
             DeviceUpdateThread.Parent = this;
@@ -252,7 +257,7 @@ namespace RandomNumberGenerator
             if (m_Data.Simulated)
             {
                 // Change the Port field to Seed
-                this.m_PortLabel.Text = "Seed";
+                this.m_PortLabel.Text = m_sSEED_LABEL;
                 this.m_PortComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.Simple;
                 this.m_PortComboBox.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
                 this.m_PortComboBox.Text = "0";
@@ -261,7 +266,7 @@ namespace RandomNumberGenerator
             else
             {
                 // Change the Seed field to Port
-                this.m_PortLabel.Text = "Port";
+                this.m_PortLabel.Text = m_sPORT_LABEL;
                 this.m_PortComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
                 this.m_PortComboBox.RightToLeft = System.Windows.Forms.RightToLeft.Inherit;
             }
@@ -668,6 +673,7 @@ namespace RandomNumberGenerator
             // Reset the info box to the message state
             m_StatusLabel.ForeColor = StatusPalette.NormalText;
             m_StatusLabel.BackColor = StatusPalette.NormalBackground;
+            m_StatusIndicator.ForeColor = StatusPalette.NormalText;
 
             // Make sure any session is closed out. The session is ended directly rather than through the
             // idle transition, which only ends a session while the state is running or paused and so would
@@ -1148,6 +1154,58 @@ namespace RandomNumberGenerator
         }
 
         /// <summary>
+        /// Applies the palette to the controls the designer laid out. The colours and the two label fonts
+        /// are set here rather than repeated on forty controls in the designer, so that changing the
+        /// interface's palette is one edit rather than forty.
+        /// </summary>
+        private void ApplyTheme()
+        {
+            // The window and the tab pages are the ground the cards are laid on
+            BackColor = UiPalette.Ground;
+            ExecuteTabPage.BackColor = UiPalette.Ground;
+            AnalyzeTabPage.BackColor = UiPalette.Ground;
+            MainTabControl.BackColor = UiPalette.Ground;
+            m_StatusStrip.BackColor = UiPalette.Ground;
+
+            // The hairlines between the readout tiles are the layout showing through the gaps its cells
+            // leave, so the layout is the colour of the line and the tiles are the colour of the card
+            m_StatisticsLayout.BackColor = UiPalette.Line;
+            foreach (Panel tile in new Panel[] { m_SessionTimerTile, m_DataPointsTile, m_CurrentAverageTile,
+                                                 m_MeanDeviationTile, m_StandardDeviationTile })
+            {
+                tile.BackColor = UiPalette.Card;
+            }
+
+            // Labels name a value rather than carrying one, so they recede behind it
+            foreach (Label eyebrow in new Label[] { m_SimulateToggleLabel, m_PortLabel, m_FileLlabel, m_TargetLabel,
+                                                    m_SessionTimerLabel, m_DataPointsLabel, m_CurrentAverageLabel,
+                                                    m_MeanDeviationLabel, m_StandardDeviationLabel,
+                                                    m_BaselineLabel, m_ResultLabel })
+            {
+                eyebrow.Font = m_EyebrowFont;
+                eyebrow.ForeColor = UiPalette.MutedInk;
+            }
+
+            // The readouts are the values the window exists to show, so they are the largest thing on it
+            foreach (TextBox readout in new TextBox[] { m_SessionTimerTextBox, m_DataPointsTextBox,
+                                                        m_CurrentAverageTextBox, m_MeanDeviationTextBox,
+                                                        m_StandardDeviationTextBox })
+            {
+                readout.Font = m_ReadoutFont;
+                readout.ForeColor = UiPalette.Ink;
+                readout.BackColor = UiPalette.Card;
+            }
+
+            // Clearing is the one action here that destroys something, so it is the quietest thing on the card
+            m_ClearButton.BackColor = UiPalette.Card;
+            m_ClearButton.ForeColor = UiPalette.MutedInk;
+            m_ClearButton.FlatAppearance.BorderSize = 0;
+
+            m_ComparisonList.BackColor = UiPalette.Card;
+            m_ComparisonList.ForeColor = UiPalette.Ink;
+        }
+
+        /// <summary>
         /// Emphasises the one button that carries the action to take next, leaving the others in the system
         /// style. Which button that is changes with the state - starting a session while idle, ending it
         /// while one is running - so it is set as part of each state transition rather than fixed once.
@@ -1161,23 +1219,38 @@ namespace RandomNumberGenerator
             foreach (Button actionButton in actionButtons)
             {
                 bool bIsPrimary = ((actionButton == primaryButton) && (true == actionButton.Enabled));
-                if (true == bIsPrimary)
+                actionButton.FlatStyle = FlatStyle.Flat;
+                actionButton.UseVisualStyleBackColor = false;
+
+                if (false == actionButton.Enabled)
                 {
-                    actionButton.FlatStyle = FlatStyle.Flat;
+                    // A flat button given a colour of its own keeps it when it is disabled, so an action
+                    // that cannot be taken has to be greyed here or it reads as being available
+                    actionButton.FlatAppearance.BorderSize = 1;
+                    actionButton.FlatAppearance.BorderColor = UiPalette.Line;
+                    actionButton.BackColor = UiPalette.Ground;
+                    actionButton.ForeColor = UiPalette.Line;
+                    actionButton.Font = m_ActionFontRegular;
+                }
+                else if (true == bIsPrimary)
+                {
                     actionButton.FlatAppearance.BorderSize = 0;
-                    actionButton.FlatAppearance.MouseOverBackColor = m_PRIMARY_HOVER_COLOR;
-                    actionButton.FlatAppearance.MouseDownBackColor = m_PRIMARY_PRESSED_COLOR;
-                    actionButton.BackColor = m_PRIMARY_COLOR;
+                    actionButton.FlatAppearance.MouseOverBackColor = UiPalette.AccentHover;
+                    actionButton.FlatAppearance.MouseDownBackColor = UiPalette.AccentPressed;
+                    actionButton.BackColor = UiPalette.Accent;
                     actionButton.ForeColor = Color.White;
-                    actionButton.UseVisualStyleBackColor = false;
                     actionButton.Font = m_ActionFontBold;
                 }
                 else
                 {
-                    actionButton.FlatStyle = FlatStyle.Standard;
-                    actionButton.UseVisualStyleBackColor = true;
-                    actionButton.BackColor = SystemColors.Control;
-                    actionButton.ForeColor = SystemColors.ControlText;
+                    // A card-coloured face inside a hairline, so a secondary action reads as available
+                    // without competing with the one that carries the next step
+                    actionButton.FlatAppearance.BorderSize = 1;
+                    actionButton.FlatAppearance.BorderColor = UiPalette.Line;
+                    actionButton.FlatAppearance.MouseOverBackColor = UiPalette.Ground;
+                    actionButton.FlatAppearance.MouseDownBackColor = UiPalette.Line;
+                    actionButton.BackColor = UiPalette.Card;
+                    actionButton.ForeColor = UiPalette.Ink;
                     actionButton.Font = m_ActionFontRegular;
                 }
             }
@@ -1575,6 +1648,7 @@ namespace RandomNumberGenerator
                     m_StatusLabel.Text = sText;
                     m_StatusLabel.ForeColor = textColor;
                     m_StatusLabel.BackColor = backColor;
+                    m_StatusIndicator.ForeColor = textColor;
                 }));
             }
             else
@@ -1582,6 +1656,7 @@ namespace RandomNumberGenerator
                 m_StatusLabel.Text = sText;
                 m_StatusLabel.ForeColor = textColor;
                 m_StatusLabel.BackColor = backColor;
+                m_StatusIndicator.ForeColor = textColor;
             }
         }
 
@@ -2379,11 +2454,14 @@ namespace RandomNumberGenerator
         private Font m_VerdictFontRegular = null;
         private Font m_VerdictFontBold = null;
 
-        // Fill for the button carrying the action to take next. The designer sets the same colour on the
-        // start button for the idle state the form opens in, so the two have to be kept in step.
-        private static readonly Color m_PRIMARY_COLOR = Color.FromArgb(31, 92, 153);
-        private static readonly Color m_PRIMARY_HOVER_COLOR = Color.FromArgb(42, 112, 181);
-        private static readonly Color m_PRIMARY_PRESSED_COLOR = Color.FromArgb(23, 72, 121);
+        // The small capitals that name a value, and the face the values themselves are set in. Both are
+        // created here and disposed with the form.
+        private static readonly Font m_EyebrowFont = new Font("Segoe UI", 8F, FontStyle.Regular);
+        private static readonly Font m_ReadoutFont = new Font("Consolas", 15F, FontStyle.Regular);
+
+        // The two things the same field means, depending on where the readings come from
+        private const string m_sPORT_LABEL = "PORT";
+        private const string m_sSEED_LABEL = "SEED";
 
         // Window title
         private const string m_sAPPLICATION_NAME = "Random Number Generator";

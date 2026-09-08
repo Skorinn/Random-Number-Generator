@@ -28,13 +28,13 @@ namespace RandomNumberGenerator
         /// <summary>
         /// Text colour for a message that reports nothing out of the ordinary
         /// </summary>
-        public static readonly Color NormalText = SystemColors.ControlText;
+        public static readonly Color NormalText = UiPalette.MutedInk;
 
         /// <summary>
         /// Background colour for a message that reports nothing out of the ordinary, which leaves the status
         /// bar looking like the rest of the window rather than tinting it permanently
         /// </summary>
-        public static readonly Color NormalBackground = SystemColors.Control;
+        public static readonly Color NormalBackground = UiPalette.Ground;
 
         /// <summary>
         /// Text colour for a message reporting that something completed
