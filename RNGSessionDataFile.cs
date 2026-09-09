@@ -11,6 +11,8 @@
 // 2026/08/31 - Mike Pullen - Report anything that needs raising about a loaded file through LastError
 // 2026/09/08 - Mike Pullen - Appended to a file that already holds readings rather than writing over it, so
 //                            recording a second session into the same file keeps the first
+// 2026/09/09 - Mike Pullen - Said what the check on the file actually asks, which is whether anything has
+//                            been written to it rather than whether it holds readings
 //*********************************************************************************************************************
 using System;
 using System.IO;
@@ -149,16 +151,16 @@ namespace RandomNumberGenerator
                 bool bValid = IsValid();
                 if (bValid)
                 {
-                    // A file that already holds readings is continued rather than started over. Starting a
-                    // session opens the file for writing from the beginning, so doing that to a file with a
-                    // session already in it would throw those readings away without asking. That could not
+                    // A file that has anything in it already is continued rather than started over. Starting
+                    // a session opens the file for writing from the beginning, so doing that to a file with a
+                    // session already in it would throw what it holds away without asking. That could not
                     // happen while ending a session also cleared the chosen file, because the only way back
                     // to a file was to load it, and loading prepares it for appending; now that the file
                     // stays chosen, pressing Start again has to be safe on its own.
-                    bool bHasReadings = FileHoldsData(FilePath);
-                    if (true == bHasReadings)
+                    bool bHasContent = FileHasContent(FilePath);
+                    if (true == bHasContent)
                     {
-                        // Reopens the file after the end of the readings already in it
+                        // Reopens the file after whatever is already in it
                         PrepareWriterForAppend(FilePath);
                         bStatus = true;
                     }
@@ -310,12 +312,19 @@ namespace RandomNumberGenerator
         }
 
         /// <summary>
-        /// Whether a file is already holding readings, which decides whether starting a session continues it
-        /// or begins it. A file that does not exist yet, or that exists with nothing in it, is begun.
+        /// Whether anything has been written to a file already, which decides whether starting a session
+        /// continues it or begins it. A file that does not exist yet, or that exists with nothing in it, is
+        /// begun.
+        /// NOTE: This asks whether the file has anything in it, not whether any readings were recorded. A
+        /// session that was started and stopped without recording anything leaves a session element and no
+        /// data, and that file has to be continued rather than written over: the session element is already
+        /// there, and PrepareForAppend reopens it. Reading far enough to count the readings would mean
+        /// opening a file that grows by roughly 2MB an hour to answer a question whose answer does not
+        /// change what happens.
         /// </summary>
         /// <param name="sFilePath">IN - Path to the session file</param>
         /// <returns>true if the file exists and has something in it; otherwise, false</returns>
-        private static bool FileHoldsData(string sFilePath)
+        private static bool FileHasContent(string sFilePath)
         {
             if (string.IsNullOrEmpty(sFilePath))
             {

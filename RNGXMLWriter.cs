@@ -122,15 +122,16 @@ namespace RandomNumberGenerator
                         m_Writer.WriteAttributeString(XMLConstants.TARGET_ATTRIBUTE, iRecordedTarget.ToString());
                         m_Writer.Flush();
                     }
-                    catch (InvalidOperationException)
+                    catch (InvalidOperationException invalidOpEx)
                     {
-                        // Writer is in an invalid state
-                        throw new InvalidOperationException("XML writer error: Unable to start session. The file may be corrupted or in use.");
+                        // Writer is in an invalid state. The failure that caused it comes along, so a report
+                        // says where it went wrong as well as what the user should do about it.
+                        throw new InvalidOperationException("XML writer error: Unable to start session. The file may be corrupted or in use.", invalidOpEx);
                     }
-                    catch (System.UnauthorizedAccessException)
+                    catch (System.UnauthorizedAccessException accessEx)
                     {
                         // File access denied
-                        throw new UnauthorizedAccessException("File access denied. Please check file permissions and ensure the file is not open in another application.");
+                        throw new UnauthorizedAccessException("File access denied. Please check file permissions and ensure the file is not open in another application.", accessEx);
                     }
                     catch (System.IO.IOException ioEx)
                     {
@@ -190,10 +191,13 @@ namespace RandomNumberGenerator
                     }
                     return bStatus;
                 }
-                catch (InvalidOperationException)
+                catch (InvalidOperationException invalidOpEx)
                 {
-                    // Re-throw with context
-                    throw new InvalidOperationException("Error writing data point: XML writer is in an invalid state.");
+                    // Re-throw with context, keeping what actually went wrong. The throw above for a data
+                    // point that reported failure lands here too, and this used to replace its message with
+                    // this one, which reported the writer as being in a bad state when the data point had
+                    // simply refused to write. What went wrong is now said rather than guessed at.
+                    throw new InvalidOperationException($"Error writing data point: {invalidOpEx.Message}", invalidOpEx);
                 }
                 catch (System.IO.IOException ioEx)
                 {
@@ -270,10 +274,10 @@ namespace RandomNumberGenerator
                         m_bAppendMode = false; // Reset append mode flag
                         bStatus = true;
                     }
-                    catch (InvalidOperationException)
+                    catch (InvalidOperationException invalidOpEx)
                     {
-                        // Writer is in an invalid state
-                        throw new InvalidOperationException("Error ending session: XML writer is in an invalid state.");
+                        // Writer is in an invalid state, with what put it there kept rather than replaced
+                        throw new InvalidOperationException($"Error ending session: {invalidOpEx.Message}", invalidOpEx);
                     }
                     catch (System.IO.IOException ioEx)
                     {

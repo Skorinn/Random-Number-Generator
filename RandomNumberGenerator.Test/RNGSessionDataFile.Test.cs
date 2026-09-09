@@ -757,6 +757,101 @@ namespace RandomNumberGenerator.Test
             File.Delete(m_sAPPEND_FILE_PATH);
         }
 
+        /// <summary>
+        /// Tests a file that exists but has nothing in it is started rather than continued. An empty file is
+        /// what a session that never got as far as writing anything leaves behind, and there is no session
+        /// element in it to append to.
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void StartSession_FileExistsButIsEmpty_StartsTheSessionRatherThanAppending()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            const bool bWRITTEN = true;
+
+            // A file that is there with nothing in it
+            File.WriteAllText(m_sAPPEND_FILE_PATH, string.Empty);
+
+            // Mock a writer that reports the session start was written
+            var xmlWriterMock = new Mock<IRNGSessionFileWriter>();
+            xmlWriterMock.Setup(mock => mock.FilePath).Returns(m_sAPPEND_FILE_PATH);
+            xmlWriterMock.Setup(mock => mock.WriteSessionStart(It.IsAny<bool>(), It.IsAny<int>())).Returns(bWRITTEN);
+
+            var sessionDataMock = new Mock<IRNGSessionData>();
+
+            // Create the object under test
+            RNGSessionDataFile sessionDataFile = new RNGSessionDataFile(xmlWriterMock.Object);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            bool bStatus = sessionDataFile.StartSession(sessionDataMock.Object);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the session was begun rather than continued. There is nothing in the file to continue,
+            // and preparing an empty one for appending would leave it with data and no session around it.
+            Assert.IsTrue(bStatus);
+            xmlWriterMock.Verify(mock => mock.WriteSessionStart(It.IsAny<bool>(), It.IsAny<int>()), Times.Once);
+            xmlWriterMock.Verify(mock => mock.PrepareForAppend(It.IsAny<string>()), Times.Never);
+
+            // Clean up the file this test owns
+            File.Delete(m_sAPPEND_FILE_PATH);
+        }
+
+        /// <summary>
+        /// Tests a file holding a session that recorded nothing is still continued rather than written over.
+        /// The check is whether the file has anything in it, not whether it has readings, and a session that
+        /// was started and stopped without recording leaves an element that has to be appended to.
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void StartSession_FileHoldsASessionWithNoReadings_ContinuesItRatherThanWritingOverIt()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            const bool bPREPARED = true;
+
+            // A session that closed itself without recording anything
+            File.WriteAllText(m_sAPPEND_FILE_PATH,
+                              "<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n<Session Simulated=\"true\" Target=\"-1\" />");
+
+            var xmlWriterMock = new Mock<IRNGSessionFileWriter>();
+            xmlWriterMock.Setup(mock => mock.FilePath).Returns(m_sAPPEND_FILE_PATH);
+            xmlWriterMock.Setup(mock => mock.PrepareForAppend(It.IsAny<string>())).Returns(bPREPARED);
+
+            var sessionDataMock = new Mock<IRNGSessionData>();
+
+            // Create the object under test
+            RNGSessionDataFile sessionDataFile = new RNGSessionDataFile(xmlWriterMock.Object);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            bool bStatus = sessionDataFile.StartSession(sessionDataMock.Object);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the session element already in the file is reopened rather than a second one written
+            Assert.IsTrue(bStatus);
+            xmlWriterMock.Verify(mock => mock.PrepareForAppend(m_sAPPEND_FILE_PATH), Times.Once);
+            xmlWriterMock.Verify(mock => mock.WriteSessionStart(It.IsAny<bool>(), It.IsAny<int>()), Times.Never);
+
+            // Clean up the file this test owns
+            File.Delete(m_sAPPEND_FILE_PATH);
+        }
+
         #endregion
     }
 }

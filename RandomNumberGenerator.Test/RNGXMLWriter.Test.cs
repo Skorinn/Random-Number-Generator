@@ -778,6 +778,57 @@ namespace RandomNumberGenerator.Test
             Assert.AreEqual(sEXPECTED_INNER_MESSAGE, thrown.InnerException.Message);
         }
 
+        /// <summary>
+        /// Tests a data point that refuses to write is reported as such, rather than as the writer having
+        /// gone bad. The throw for a refused data point is caught by the same handler that reports an
+        /// invalid writer, and that handler used to replace the message with its own.
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void WriteDataPoint_DataPointRefuses_SaysTheDataPointRefusedRatherThanBlamingTheWriter()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            const string sEXPECTED_CAUSE = "Failed to write data point";
+
+            // A data point that reports failure rather than throwing, which is the case the writer turns
+            // into an exception itself
+            Mock<IXMLDataPoint> refusingDataPoint = new Mock<IXMLDataPoint>();
+            refusingDataPoint.Setup(mock => mock.WriteDataPoint(It.IsAny<XmlWriter>())).Returns(false);
+
+            RNGXMLWriter xmlWriter = new RNGXMLWriter(m_sTEST_FILE_PATH, m_writerSettings);
+            xmlWriter.WriteSessionStart(m_bSIMULATED_FLAG, m_iTARGET_VALUE);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            Exception thrown = null;
+            try
+            {
+                xmlWriter.WriteDataPoint(refusingDataPoint.Object);
+            }
+            catch (Exception writeFailure)
+            {
+                thrown = writeFailure;
+            }
+
+            // Let go of the file, as the session was never ended
+            xmlWriter.Dispose();
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify what actually went wrong survives, in the message or on the failure attached to it
+            Assert.IsNotNull(thrown, "A data point that refuses to write should be reported");
+            string sReported = thrown.Message + " " + (thrown.InnerException?.Message ?? string.Empty);
+            StringAssert.Contains(sReported, sEXPECTED_CAUSE,
+                                  $"The reported failure was '{thrown.Message}', which does not say what happened");
+        }
+
         #endregion
     }
 }
