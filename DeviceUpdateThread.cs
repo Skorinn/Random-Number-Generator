@@ -12,6 +12,8 @@
 // 2026/08/31 - Mike Pullen - Only restore the info box when the reading devices message is still displayed
 // 2026/09/01 - Mike Pullen - Release the searches run for each controller when they are finished with
 // 2026/09/07 - Mike Pullen - Report device status through the shared status palette
+// 2026/09/09 - Mike Pullen - Read the severity colours where they are shown rather than holding them, so a
+//                            scheme changed while running is followed
 //*********************************************************************************************************************
 using System;
 using System.ComponentModel;
@@ -37,7 +39,7 @@ namespace RandomNumberGenerator
             {
                 // Backup the info box and display the "reading devices" message
                 BackupInfoBox();
-                UpdateInfoBox(m_sREADING_DEVICES_MESSAGE, m_READING_DEVICES_TEXTCOLOR, m_READING_DEVICES_BACKCOLOR);
+                UpdateInfoBox(m_sREADING_DEVICES_MESSAGE, StatusPalette.BusyText, StatusPalette.BusyBackground);
 
                 try
                 {
@@ -227,7 +229,7 @@ namespace RandomNumberGenerator
             if ((null != m_Parent) && (false == Terminating))
             {
                 string sMessage = $"{m_sREADING_DEVICES_ERROR} {deviceException.Message}";
-                m_Parent.SetStatusBoxState(sMessage, m_DEVICE_ERROR_TEXTCOLOR, m_DEVICE_ERROR_BACKCOLOR);
+                m_Parent.SetStatusBoxState(sMessage, StatusPalette.ErrorText, StatusPalette.ErrorBackground);
             }
         }
 
@@ -261,9 +263,5 @@ namespace RandomNumberGenerator
         // Message to display in the info box when reading devices
         private static readonly string m_sREADING_DEVICES_MESSAGE = "Checking attached devices and updating port list...";
         private static readonly string m_sREADING_DEVICES_ERROR = "Unable to check the attached devices. The port list has been left as it was.";
-        private static readonly Color m_DEVICE_ERROR_TEXTCOLOR = StatusPalette.ErrorText;
-        private static readonly Color m_DEVICE_ERROR_BACKCOLOR = StatusPalette.ErrorBackground;
-        private static readonly Color m_READING_DEVICES_TEXTCOLOR = StatusPalette.BusyText;
-        private static readonly Color m_READING_DEVICES_BACKCOLOR = StatusPalette.BusyBackground;
     }
 }

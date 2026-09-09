@@ -37,6 +37,12 @@ public class W32 {
     [DllImport("kernel32.dll")] public static extern bool CloseHandle(IntPtr h);
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
     [DllImport("user32.dll")] public static extern bool MoveWindow(IntPtr h, int x, int y, int w, int hgt, bool repaint);
+    // Memory in the other process is reserved and committed in one call. Committing alone is not enough
+    // when the address is left to Windows to choose: the region has to be reserved as well, or the
+    // allocation can fail and the read comes back empty from a window that was perfectly fine.
+    const uint MEM_RESERVE_COMMIT = 0x1000 | 0x2000;
+    const uint PAGE_READWRITE = 0x04;
+
     [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L, T, R, B; }
 
     public static System.Collections.Generic.List<IntPtr> Children(IntPtr parent) {
@@ -60,7 +66,7 @@ public class W32 {
         if (proc == IntPtr.Zero) return null;
         int len = (int)SendMessage(h, 0x000E, IntPtr.Zero, IntPtr.Zero);   // WM_GETTEXTLENGTH
         int bytes = (len + 1) * 2;
-        IntPtr mem = VirtualAllocEx(proc, IntPtr.Zero, (uint)bytes, 0x1000, 0x04);
+        IntPtr mem = VirtualAllocEx(proc, IntPtr.Zero, (uint)bytes, MEM_RESERVE_COMMIT, PAGE_READWRITE);
         if (mem == IntPtr.Zero) { CloseHandle(proc); return null; }
         SendMessage(h, 0x000D, (IntPtr)(len + 1), mem);                    // WM_GETTEXT
         byte[] buf = new byte[bytes]; UIntPtr read;
@@ -87,7 +93,7 @@ public class W32 {
         const int ITEM_SIZE = 88;          // sizeof(LVITEMW) on x64
         const int TEXT_CHARS = 512;
         int total = ITEM_SIZE + (TEXT_CHARS * 2);
-        IntPtr mem = VirtualAllocEx(proc, IntPtr.Zero, (uint)total, 0x1000, 0x04);
+        IntPtr mem = VirtualAllocEx(proc, IntPtr.Zero, (uint)total, MEM_RESERVE_COMMIT, PAGE_READWRITE);
         if (mem == IntPtr.Zero) { CloseHandle(proc); return new string[0][]; }
 
         var result = new string[rows][];
@@ -119,7 +125,7 @@ public class W32 {
         uint pid; GetWindowThreadProcessId(tab, out pid);
         IntPtr proc = OpenProcess(0x0008 | 0x0010 | 0x0020, false, pid);   // VM_OPERATION | VM_READ | VM_WRITE
         if (proc == IntPtr.Zero) return null;
-        IntPtr mem = VirtualAllocEx(proc, IntPtr.Zero, 16, 0x1000, 0x04);  // COMMIT, READWRITE
+        IntPtr mem = VirtualAllocEx(proc, IntPtr.Zero, 16, MEM_RESERVE_COMMIT, PAGE_READWRITE);
         if (mem == IntPtr.Zero) { CloseHandle(proc); return null; }
         SendMessage(tab, 0x130A, (IntPtr)index, mem);                       // TCM_GETITEMRECT
         byte[] buf = new byte[16]; UIntPtr read;

@@ -15,6 +15,8 @@ using Moq;
 using System;
 using System.ComponentModel;
 using System.Drawing;
+using System.Linq;
+using System.Reflection;
 using System.Threading;
 
 namespace RandomNumberGenerator.Test
@@ -612,6 +614,85 @@ namespace RandomNumberGenerator.Test
         /// <param name="textColor">OUT - Status box text color</param>
         /// <param name="backColor">OUT - Status box background color</param>
         private delegate void GetStatusBoxStateCallback(out string text, out Color textColor, out Color backColor);
+
+        /// <summary>
+        /// Tests the device status colours are taken from the palette when they are used rather than held
+        /// from when the class was first touched. The palette reports the scheme in force now, so anything
+        /// that keeps a copy of it stops following the scheme the moment it is changed.
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void DeviceUpdateThread_StatusColours_AreNotHeldInFields()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Everything the class keeps for itself, of the type the severity colours are
+            FieldInfo[] colourFields = typeof(DeviceUpdateThread)
+                .GetFields(BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Public)
+                .Where(field => (typeof(Color) == field.FieldType) && field.IsInitOnly)
+                .ToArray();
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify none of them is a colour settled once and kept. A read-only colour field can only have
+            // been filled when the class was first touched, which is before the user can have changed the
+            // scheme and long before the colour is shown.
+            string sHeld = string.Join(", ", colourFields.Select(field => field.Name));
+            Assert.AreEqual(0, colourFields.Length,
+                            $"These colours are held rather than read when they are used: {sHeld}");
+        }
+
+        /// <summary>
+        /// Tests the severity colours follow the scheme rather than being fixed, which is what lets the
+        /// status bar stand aside under a high contrast scheme
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void StatusPalette_SeverityColours_AreReadEachTimeRatherThanFixed()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // The palette exposes its colours as properties so each read reports the scheme in force now
+            PropertyInfo[] colourProperties = typeof(StatusPalette)
+                .GetProperties(BindingFlags.Public | BindingFlags.Static)
+                .Where(property => (typeof(Color) == property.PropertyType))
+                .ToArray();
+
+            FieldInfo[] colourFields = typeof(StatusPalette)
+                .GetFields(BindingFlags.Public | BindingFlags.Static)
+                .Where(field => (typeof(Color) == field.FieldType))
+                .ToArray();
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the palette is read rather than held, and that it offers something to read
+            Assert.IsTrue(colourProperties.Length > 0, "The palette should expose its colours as properties");
+            Assert.AreEqual(0, colourFields.Length,
+                            "The palette should not expose a colour as a field, which would fix it at start-up");
+
+            // Verify a read actually produces a colour rather than an unset one
+            foreach (PropertyInfo property in colourProperties)
+            {
+                Color severityColour = (Color)property.GetValue(null);
+                Assert.AreNotEqual(Color.Empty, severityColour, $"{property.Name} came back unset");
+            }
+        }
 
         #endregion
     }
