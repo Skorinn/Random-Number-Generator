@@ -229,7 +229,8 @@ namespace RandomNumberGenerator
         }
 
         /// <summary>
-        /// Event handler for the comparison table being resized, which happens whenever the window is
+        /// Event handler for the comparison table being resized, which happens whenever the window is,
+        /// because the table fills the width of the card it sits on
         /// </summary>
         /// <param name="sender">IN - Sender of the event (not used)</param>
         /// <param name="e">IN - The event arguments (not used)</param>

@@ -236,7 +236,17 @@ namespace RandomNumberGenerator
 
             int iDecimals = (int)Math.Ceiling(-Math.Log10(fInterval));
             iDecimals = Math.Min(Math.Max(iDecimals, 0), m_iMAXIMUM_LABEL_DECIMALS);
-            return "0." + new string('0', iDecimals);
+
+            // An interval of one or more needs no decimals at all, and the whole number format is returned
+            // rather than one with an empty run of zeroes after the point. Both produce the same labels,
+            // because a format ending in a decimal point with nothing after it drops the point, but only
+            // one of them says so.
+            if (m_iNO_DECIMALS == iDecimals)
+            {
+                return m_sWHOLE_NUMBER_LABEL_FORMAT;
+            }
+
+            return m_sDECIMAL_LABEL_PREFIX + new string(m_cLABEL_DECIMAL_PLACE, iDecimals);
         }
 
         /// <summary>
@@ -565,6 +575,12 @@ namespace RandomNumberGenerator
         private const string m_sDEFAULT_LABEL_FORMAT = "0.000";
         private const string m_sFREQUENCY_LABEL_FORMAT = "0";
         private const int m_iMAXIMUM_LABEL_DECIMALS = 6;
+
+        // Building the format for a given number of decimals
+        private const string m_sWHOLE_NUMBER_LABEL_FORMAT = "0";
+        private const string m_sDECIMAL_LABEL_PREFIX = "0.";
+        private const char m_cLABEL_DECIMAL_PLACE = '0';
+        private const int m_iNO_DECIMALS = 0;
 
         // How much of the space a bin is given the bar fills
         private const string m_sPOINT_WIDTH = "0.9";

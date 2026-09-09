@@ -10,10 +10,13 @@
 // 2025/01/20 - Mike Pullen - Original implementation.
 // 2026/09/07 - Mike Pullen - Cover the chosen bin count and the axis label precision
 // 2026/09/07 - Mike Pullen - Cover the axis being a share of a session rather than a count of readings
+// 2026/09/09 - Mike Pullen - Pin the axis label format to the precision the interval needs
 //*********************************************************************************************************************
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Reflection;
 
 namespace RandomNumberGenerator.Test
 {
@@ -1082,6 +1085,87 @@ namespace RandomNumberGenerator.Test
                 data.Add(iIndex / (double)iCount);
             }
             return data;
+        }
+
+        /// <summary>
+        /// Tests the axis labels are printed to the precision the tick interval needs, and no further
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void GetAxisLabelFormat_VaryingIntervals_PrintsToThePrecisionTheIntervalNeeds()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // An interval and the label a value should carry under the format chosen for it. A whole number
+            // interval needs no decimals; the finer the interval, the more places it takes to tell two ticks
+            // apart. The interval is capped so a very fine one cannot ask for a label of any length.
+            var cases = new[]
+            {
+                new { Interval = 10.0,     Value = 5.0,        Expected = "5"        },
+                new { Interval = 1.0,      Value = 5.0,        Expected = "5"        },
+                new { Interval = 0.5,      Value = 0.25,       Expected = "0.3"      },
+                new { Interval = 0.1,      Value = 0.25,       Expected = "0.3"      },
+                new { Interval = 0.01,     Value = 0.256,      Expected = "0.26"     },
+                new { Interval = 0.001,    Value = 0.2564,     Expected = "0.256"    },
+                new { Interval = 0.0000001, Value = 0.12345678, Expected = "0.123457" },
+            };
+
+            // Reach the format chooser, which is private because nothing outside the chart picks a format
+            MethodInfo formatMethod = typeof(HistogramChart).GetMethod("GetAxisLabelFormat",
+                                          BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.IsNotNull(formatMethod, "GetAxisLabelFormat should be there to test");
+
+            //**************************************************************//
+            // Act & Assert
+            //**************************************************************//
+
+            foreach (var testCase in cases)
+            {
+                string sFormat = (string)formatMethod.Invoke(null, new object[] { testCase.Interval });
+                string sLabel = testCase.Value.ToString(sFormat, CultureInfo.InvariantCulture);
+
+                // Verify the label reads as a number rather than one left ending at the decimal point
+                Assert.IsFalse(sLabel.EndsWith("."),
+                               $"An interval of {testCase.Interval} produced '{sLabel}', which ends at the point");
+                Assert.AreEqual(testCase.Expected, sLabel,
+                                $"An interval of {testCase.Interval} labelled {testCase.Value} wrongly");
+            }
+        }
+
+        /// <summary>
+        /// Tests an interval of nothing falls back to a format rather than dividing by it
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void GetAxisLabelFormat_NoInterval_FallsBackToADefault()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            const double fNO_INTERVAL = 0.0;
+            const double fNEGATIVE_INTERVAL = -1.0;
+
+            MethodInfo formatMethod = typeof(HistogramChart).GetMethod("GetAxisLabelFormat",
+                                          BindingFlags.NonPublic | BindingFlags.Static);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            string sNoInterval = (string)formatMethod.Invoke(null, new object[] { fNO_INTERVAL });
+            string sNegative = (string)formatMethod.Invoke(null, new object[] { fNEGATIVE_INTERVAL });
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify neither produces something that is not a format at all
+            Assert.IsFalse(string.IsNullOrEmpty(sNoInterval));
+            Assert.IsFalse(string.IsNullOrEmpty(sNegative));
+            Assert.AreEqual(sNoInterval, sNegative, "Both should fall back the same way");
         }
 
         #endregion
