@@ -20,6 +20,17 @@ if ([string]::IsNullOrEmpty($env:RNG_BIN)) { $env:RNG_BIN = (Resolve-Path (Join-
 # else initializes the native layer, so a read failure here is the application's rather than the harness's.
 $ErrorActionPreference = "Continue"
 Add-Type -AssemblyName System.Windows.Forms
+
+# The window has to be set up the way Program.cs sets it up, before any of it is built. Without this the
+# form is drawn without visual styles, and controls that ask the theme how to draw themselves fall back to
+# something that looks nothing like the shipped application - the spin buttons on the session length come
+# out almost black. A window that does not look like the real one is no good for judging how it looks.
+try {
+    [System.Windows.Forms.Application]::EnableVisualStyles()
+    [System.Windows.Forms.Application]::SetCompatibleTextRenderingDefault($false)
+} catch {
+    # Already set for this process, which is fine
+}
 $binDir = $env:RNG_BIN
 [System.Reflection.Assembly]::LoadFrom((Join-Path $binDir "Random Number Generator.exe")) | Out-Null
 [Environment]::CurrentDirectory = $binDir
