@@ -46,6 +46,13 @@ namespace RandomNumberGenerator
     {
         BindingList<IRNGDevice> DeviceList { set; }
         bool FileBrowseActive { get; set; }
+
+        // Whether the window exists yet. Background work has to ask before reporting into the form, because
+        // InvokeRequired cannot answer for a form that has never been shown: with no window handle there is
+        // no thread to compare against, so it says false, which reads as "already on the right thread" and
+        // is how a pool thread ends up writing controls directly. Form supplies this from Control.
+        bool IsHandleCreated { get; }
+
         bool Running { get; }
         Color StatusBoxBackColor { get; set; }
         string StatusBoxText { get; set; }
@@ -143,22 +150,11 @@ namespace RandomNumberGenerator
             m_StatusLabel.BackColor = StatusPalette.NormalBackground;
             m_StatusIndicator.ForeColor = StatusPalette.NormalText;
 
-            // Start the device update thread and trigger an update
-            DeviceUpdateThread.Parent = this;
-            ThreadPool.QueueUserWorkItem(state =>
-            {
-                m_DeviceUpdateComplete.Reset(); // Clear the device update complete flag
-                try
-                {
-                    DeviceUpdateThread.ThreadProc(state);
-                }
-                finally
-                {
-                    // Signal that the device update has finished however it ended, so a failure does not
-                    // leave the close waiting for an update that will never report itself complete
-                    m_DeviceUpdateComplete.Set();
-                }
-            });
+            // The device search is not started here. It reports what it finds by calling this form, and the
+            // form cannot be called until its window exists, so it is started from OnHandleCreated instead.
+            // Starting it here raced the window into being: a search that finished first had nowhere to
+            // report to and its results were dropped, leaving the port list empty until a device was
+            // plugged or unplugged.
 
             // Create the source from the list of device ports
             m_DeviceBindingSource = new BindingSource();
@@ -971,6 +967,30 @@ namespace RandomNumberGenerator
         }
 
         /// <summary>
+        /// Points the device search at this form and runs one, on the thread pool so the window is not held
+        /// while WMI is asked what is attached. Called once the window exists, because that is what the
+        /// search needs in order to report back.
+        /// </summary>
+        private void StartDeviceSearch()
+        {
+            DeviceUpdateThread.Parent = this;
+            ThreadPool.QueueUserWorkItem(state =>
+            {
+                m_DeviceUpdateComplete.Reset(); // Clear the device update complete flag
+                try
+                {
+                    DeviceUpdateThread.ThreadProc(state);
+                }
+                finally
+                {
+                    // Signal that the device update has finished however it ended, so a failure does not
+                    // leave the close waiting for an update that will never report itself complete
+                    m_DeviceUpdateComplete.Set();
+                }
+            });
+        }
+
+        /// <summary>
         /// Initializes the thread pool
         /// </summary>
         private void InitializeThreadPool()
@@ -1323,6 +1343,20 @@ namespace RandomNumberGenerator
             // The charts sit on cards, so their own furniture is taken from the same pair
             m_ResultChart.ApplyPalette();
             m_ResultHistogramChart.ApplyPalette();
+        }
+
+        /// <summary>
+        /// Event handler for the window being created, which is when the device search can first be run
+        /// </summary>
+        /// <param name="e">IN - The event arguments (not used)</param>
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+
+            // The search runs on a pool thread and reports what it finds by calling this form, so it cannot
+            // start until there is a window for it to call. Started from the constructor it raced the window
+            // into being, and a search that got there first had its results dropped.
+            StartDeviceSearch();
         }
 
         /// <summary>

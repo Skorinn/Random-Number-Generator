@@ -132,6 +132,11 @@ namespace RandomNumberGenerator.Test
             // Create mock parent form
             var mockParent = new Mock<IGeneratorForm>();
 
+            // Stand in for a form that has been shown. The search only reports into a form whose window
+            // exists, because it decides how to marshal by asking the form, and a form with no window
+            // cannot answer that question.
+            mockParent.Setup(mock => mock.IsHandleCreated).Returns(true);
+
             //**************************************************************//
             // Act
             //**************************************************************//
@@ -163,6 +168,11 @@ namespace RandomNumberGenerator.Test
 
             // Create mock parent form with non-terminating state
             var mockParent = new Mock<IGeneratorForm>();
+
+            // Stand in for a form that has been shown. The search only reports into a form whose window
+            // exists, because it decides how to marshal by asking the form, and a form with no window
+            // cannot answer that question.
+            mockParent.Setup(mock => mock.IsHandleCreated).Returns(true);
             mockParent.Setup(mock => mock.State).Returns(GeneratorForm.RngGuiStates.Idle);
 
             // Set the parent
@@ -196,6 +206,11 @@ namespace RandomNumberGenerator.Test
 
             // Create mock parent form with terminating state
             var mockParent = new Mock<IGeneratorForm>();
+
+            // Stand in for a form that has been shown. The search only reports into a form whose window
+            // exists, because it decides how to marshal by asking the form, and a form with no window
+            // cannot answer that question.
+            mockParent.Setup(mock => mock.IsHandleCreated).Returns(true);
             mockParent.Setup(mock => mock.State).Returns(GeneratorForm.RngGuiStates.Terminating);
 
             // Set the parent
@@ -258,6 +273,11 @@ namespace RandomNumberGenerator.Test
 
             // Create mock parent form
             var mockParent = new Mock<IGeneratorForm>();
+
+            // Stand in for a form that has been shown. The search only reports into a form whose window
+            // exists, because it decides how to marshal by asking the form, and a form with no window
+            // cannot answer that question.
+            mockParent.Setup(mock => mock.IsHandleCreated).Returns(true);
             mockParent.Setup(mock => mock.State).Returns(GeneratorForm.RngGuiStates.Idle);
             mockParent.Setup(mock => mock.InvokeRequired).Returns(true);
             mockParent.Setup(mock => mock.Invoke(It.IsAny<Action>())).Callback<Action>(action => action());
@@ -346,6 +366,11 @@ namespace RandomNumberGenerator.Test
 
             // Create mock parent form that doesn't require invoke
             var mockParent = new Mock<IGeneratorForm>();
+
+            // Stand in for a form that has been shown. The search only reports into a form whose window
+            // exists, because it decides how to marshal by asking the form, and a form with no window
+            // cannot answer that question.
+            mockParent.Setup(mock => mock.IsHandleCreated).Returns(true);
             mockParent.Setup(mock => mock.State).Returns(GeneratorForm.RngGuiStates.Idle);
             mockParent.Setup(mock => mock.InvokeRequired).Returns(false);
             
@@ -398,6 +423,11 @@ namespace RandomNumberGenerator.Test
 
             // Create mock parent form
             var mockParent = new Mock<IGeneratorForm>();
+
+            // Stand in for a form that has been shown. The search only reports into a form whose window
+            // exists, because it decides how to marshal by asking the form, and a form with no window
+            // cannot answer that question.
+            mockParent.Setup(mock => mock.IsHandleCreated).Returns(true);
             mockParent.Setup(mock => mock.State).Returns(GeneratorForm.RngGuiStates.Idle);
             mockParent.Setup(mock => mock.InvokeRequired).Returns(false);
             
@@ -491,6 +521,11 @@ namespace RandomNumberGenerator.Test
 
             // Create mock parent form
             var mockParent = new Mock<IGeneratorForm>();
+
+            // Stand in for a form that has been shown. The search only reports into a form whose window
+            // exists, because it decides how to marshal by asking the form, and a form with no window
+            // cannot answer that question.
+            mockParent.Setup(mock => mock.IsHandleCreated).Returns(true);
             mockParent.Setup(mock => mock.State).Returns(GeneratorForm.RngGuiStates.Idle);
             mockParent.Setup(mock => mock.InvokeRequired).Returns(false);
 
@@ -550,6 +585,11 @@ namespace RandomNumberGenerator.Test
 
             // Create mock parent form
             var mockParent = new Mock<IGeneratorForm>();
+
+            // Stand in for a form that has been shown. The search only reports into a form whose window
+            // exists, because it decides how to marshal by asking the form, and a form with no window
+            // cannot answer that question.
+            mockParent.Setup(mock => mock.IsHandleCreated).Returns(true);
             mockParent.Setup(mock => mock.State).Returns(GeneratorForm.RngGuiStates.Idle);
             mockParent.Setup(mock => mock.InvokeRequired).Returns(false);
 
