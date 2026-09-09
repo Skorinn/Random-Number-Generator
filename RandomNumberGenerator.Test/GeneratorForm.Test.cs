@@ -100,6 +100,16 @@ namespace RandomNumberGenerator.Test
         [TestCleanup]
         public void Cleanup()
         {
+            // Let go of the form this test built, the way DeviceUpdateThreadTests does and for the same
+            // reason. Building a form points the device search at it and queues a search on the thread pool,
+            // and that search reports back by assigning the device list to whichever form is the parent when
+            // it finishes - which is a later test's form, or one that is being written to at that moment.
+            // The search guards that assignment with InvokeRequired, but a form that was never shown has no
+            // window handle, and InvokeRequired on a handleless control is false rather than true, so the
+            // report is made from the pool thread instead of being marshalled. Leaving the parent set is
+            // what let a search outlive the test that started it.
+            DeviceUpdateThread.Parent = null;
+
             // Delete test files if they exist to ensure clean state for next test
             string[] testFiles = {
                 m_sBASELINE_TEST_FILE,
