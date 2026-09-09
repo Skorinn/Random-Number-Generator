@@ -514,22 +514,22 @@ namespace RandomNumberGenerator
         /// <returns>Tuple containing minimum and maximum frequency values</returns>
         private (double fMinYValue, double fMaxYValue) CalculateFrequencyRange(double[] fBins1, double[] fBins2)
         {
-            double iMaxFrequency = 0;
+            double fMaxFrequency = 0;
 
             // Find the maximum frequency from both bin arrays
-            foreach (double iFrequency in fBins1)
+            foreach (double fFrequency in fBins1)
             {
-                if (iFrequency > iMaxFrequency)
+                if (fFrequency > fMaxFrequency)
                 {
-                    iMaxFrequency = iFrequency;
+                    fMaxFrequency = fFrequency;
                 }
             }
 
-            foreach (double iFrequency in fBins2)
+            foreach (double fFrequency in fBins2)
             {
-                if (iFrequency > iMaxFrequency)
+                if (fFrequency > fMaxFrequency)
                 {
-                    iMaxFrequency = iFrequency;
+                    fMaxFrequency = fFrequency;
                 }
             }
 
@@ -537,7 +537,7 @@ namespace RandomNumberGenerator
             double fMinYValue = m_fDEFAULT_Y_AXIS_MINIMUM;
             double fMaxYValue;
 
-            if (m_fMINIMUM_SHARE >= iMaxFrequency)
+            if (m_fMINIMUM_SHARE >= fMaxFrequency)
             {
                 // No data points - use default range
                 fMaxYValue = m_fDEFAULT_Y_AXIS_MAXIMUM;
@@ -545,13 +545,13 @@ namespace RandomNumberGenerator
             else
             {
                 // Add padding to the maximum frequency for better visualization
-                double fPadding = iMaxFrequency * m_fY_RANGE_PADDING_FACTOR;
-                fMaxYValue = iMaxFrequency + fPadding;
+                double fPadding = fMaxFrequency * m_fY_RANGE_PADDING_FACTOR;
+                fMaxYValue = fMaxFrequency + fPadding;
                 
                 // Ensure minimum padding
-                if (fMaxYValue < (iMaxFrequency + m_fMINIMUM_Y_PADDING))
+                if (fMaxYValue < (fMaxFrequency + m_fMINIMUM_Y_PADDING))
                 {
-                    fMaxYValue = iMaxFrequency + m_fMINIMUM_Y_PADDING;
+                    fMaxYValue = fMaxFrequency + m_fMINIMUM_Y_PADDING;
                 }
             }
 

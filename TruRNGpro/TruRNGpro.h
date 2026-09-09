@@ -11,6 +11,8 @@
 //* 10/30/2022 - Mike Pullen - Recreated under VS2022 and added ARM64 support.
 //* 09/08/2026 - Mike Pullen - Opened the device again after a failed read rather than giving up on it, so a
 //*                            momentary fault no longer ends the session
+//* 09/09/2026 - Mike Pullen - Only reopened a device that had been opened once, so an instance that was
+//*                            never initialized reports a failed read rather than trying to open COM0
 //*********************************************************************************************************************
 #pragma once
 #include "rng.h"
@@ -115,6 +117,14 @@ namespace RNGInterfaces
     {
         rfResult = 0.0;
 
+        // Whether there is an interface that could have gone bad. Reopening only makes sense for a device
+        // that was opened once and stopped answering; with no interface at all there is nothing to reopen,
+        // and the port that would be tried is whatever the member happens to hold - zero, on an instance
+        // that was never initialized, which sends the third party code off to open COM0. The class says
+        // Initialize must be called first, and an instance that has not been gets a failed read and no
+        // attempt at the port it was never given.
+        bool bHadInterface = (nullptr != m_pTruRNGProInterface);
+
         // Try to read from the device as it stands
         bool bStatus = ReadBuffer();
 
@@ -123,7 +133,7 @@ namespace RNGInterfaces
         // stopped until the user pressed Start again. The device itself is fine - opening it again and
         // carrying on works - so that is what is done here rather than giving up on it. Only if it will
         // not open again is the read reported as having failed, which is what an unplugged device does.
-        if (false == bStatus)
+        if ((false == bStatus) && (true == bHadInterface))
         {
             // Build the interface again on the port it was opened on, and read once more
             bool bReopened = Initialize(m_iPortNum);
