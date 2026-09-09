@@ -23,6 +23,11 @@ screen it was last closed at.
 Every reading is written to the session file as it is taken, so a session survives the application being
 closed or stopped unexpectedly.
 
+### Session length
+
+A session can be given a length in minutes, and stops itself once it has recorded for that long. The
+default of zero records until *Stop* is pressed. Time spent paused does not count towards it.
+
 ### Analysis
 
 A recorded session can be loaded as a **baseline** and another as a **result**, and the two are compared
@@ -69,13 +74,16 @@ The application is built to `bin\Debug\Random Number Generator.exe` and copied t
 Start the application. It opens on the **Record** tab, and the status bar at the foot of the window says
 what to do next at each step.
 
-1. **Choose a file.** *Browse* selects the session file. An existing file is loaded and displayed, and the
-   session continues in it. A new file is created.
+1. **Choose a file.** *Browse* selects the session file. An existing file is loaded and displayed, and
+   the session continues in it. A new file is created. The file stays selected when a session ends, so
+   pressing *Start* again records another session into the same file, after the readings already in it.
 2. **Choose a source.** The toggle switches between the device and the simulator. With the device, pick the
    COM port it is on; the port list updates by itself as devices are connected and removed. With the
    simulator, the port becomes a seed.
 3. **Choose a target**, if the session has one.
-4. **Start.** *Pause* suspends recording without ending the session; *Stop* ends it. Whichever button
+4. **Set a length**, if the session should stop on its own. *Stop after (min)* is how long to record
+   for; zero records until *Stop* is pressed.
+5. **Start.** *Pause* suspends recording without ending the session; *Stop* ends it. Whichever button
    carries the action to take next is the emphasised one. *Clear* discards the readings on screen and asks
    before it does.
 

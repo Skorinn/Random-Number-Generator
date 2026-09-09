@@ -107,6 +107,17 @@ edits the file **textually** so writing can resume, handling three shapes:
 Only the ends of the file are read rather than the whole of it, because these files grow by roughly 2MB an
 hour. Changes to the session element shape must keep that text surgery in sync.
 
+Starting a session goes down the same road. `RNGSessionDataFile.StartSession` asks whether the file already
+holds readings and, if it does, prepares it for appending rather than calling `WriteSessionStart`, which
+opens the file from the beginning and would throw them away. That could not happen while ending a session
+also gave up the chosen file, because the only way back to a file was to load it; the file now stays chosen
+after a session ends, so pressing Start again has to be safe on its own. `RNGXMLWriter.WriteSessionEnd`
+keeps `FilePath` for the same reason — what ends there is the session, not the choice of file.
+
+A second session appended this way joins the session element already in the file rather than opening one of
+its own, so the recorded `Simulated` and `Target` stay the first session's. `CheckTargetChanged` is what
+keeps that honest: it asks before recording against a target the file disagrees with.
+
 A file of the third shape is what an interrupted session leaves, and it is recovered rather than rejected:
 the reader keeps every complete data point, refuses a partially written one, and reports the recovery
 through `LastError`, which the form shows to the user. A file that closes its session and still fails to
@@ -127,6 +138,18 @@ a fixed-size dialog are gone. The window is sizable with a `MinimumSize`, and `R
 is no longer attached is ignored rather than opening the window off-screen.
 
 Status messages go to a `StatusStrip` docked to the form, not to the tab.
+
+A session can be given a length in minutes, zero meaning it records until Stop is pressed.
+`CheckSessionLength` is called from `RecordReadResult` as each reading arrives, so the stop happens on the
+thread that owns the form and needs no marshalling, and it measures `IRNGSessionTimer.ElapsedSeconds` rather
+than counting readings: the device delivers about nine readings a second against the ten the timer asks for,
+so readings are not a clock. The session timer does not run while a session is paused, so a pause does not
+spend the length.
+
+The chart and the statistics beside it are drawn from the same readings, so they are cleared together and at
+the same moment — when a file is chosen, in `FileBrowseButton_Click`. Starting a session leaves both alone,
+which is what lets a second session into the same file carry on from the first. Clearing one without the
+other, which is what starting a session used to do, leaves an empty chart beside a count of several hundred.
 
 Colour comes from two palettes, both of them properties rather than fields so that they report the scheme
 in force now: `UiPalette` for the chrome, every value of it taken from `SystemColors`, and `StatusPalette`
@@ -189,6 +212,9 @@ collide.
   thread, so anything touching controls goes through `InvokeRequired`/`Invoke`.
 - Background work (device enumeration, file loading) marshals UI updates the same way; the `On*Completed`
   callbacks are the established pattern.
+- `RNGSessionTimer.Start` times each session from nothing; `Stop` deliberately leaves the time it reached on
+  display, so how long a session ran can still be read once it has ended. Resuming a paused session goes
+  through `Enabled` rather than `Start`, so a pause does not reset the clock.
 
 ### Native layer
 `TruRNGproMain.cpp` exports `Initialize(int iPort, bool bSimulate)` and `GetRandomBitAverage(double&)`.
@@ -196,6 +222,19 @@ collide.
 twister — the seed comes from the "Seed" box that replaces "Port" in simulate mode) behind the
 `RNGInterface` base class. Note the two `DllImport`s in `RNGDeviceTimer.cs` declare different calling
 conventions (`Winapi` vs `Cdecl`).
+
+Both exports return a C++ `bool`, which is one byte, so both `DllImport`s marshal the return — and the
+`bSimulate` argument — as `UnmanagedType.I1`. Left to itself the marshaller expects the four byte Windows
+`BOOL` and reads three bytes of whatever the call left behind along with the answer, which made a native
+false come back as true: initializing against a port with nothing on it reported success, and the failure
+only surfaced as a read error a moment later.
+
+`TruRNGpro::GetBitAverage` reopens the device and reads once more before reporting failure. A failed read
+leaves the third-party interface flagged `bad` and it never clears, so one momentary fault on the USB port
+ended the session and every read after it failed too. The device itself is fine afterwards — opening it
+again and carrying on works — so that is what happens, and only a device that will not open again is
+reported as a failure, which is what an unplugged one does. Every reading is still an average of the same
+number of bits whether it took one attempt or two.
 
 `Externals/CommonControls.dll` and `Externals/DeviceInterfaces.dll` are checked-in binaries with no source
 here (`DeviceInterfaces` supplies the `USBDeviceNotification` constants used in `WndProc`).
@@ -248,3 +287,14 @@ that touch `GeneratorForm`. The interface rework turned up four more the same wa
 in a format that had been replaced, a button row clipped by a band an inch too short, comparison columns
 that did not fill their table, and a Pause button that was clickable before any session existed. All four
 passed a clean unit run.
+
+There are now unit tests that build a `GeneratorForm` over mocked collaborators and drive `SetRunningState`
+and `SetIdleState` through reflection, which covers the session lifecycle the earlier suite never reached.
+They still do not run a message loop, so the designer's event wiring is exercised only by running the
+application.
+
+The device path cannot be reached by the simulator at all, and three faults were found there that a full
+green run did not show: the bool marshalling, the read that never recovered, and readings from a previous
+file left in the statistics. Changes touching `RNGDeviceTimer`, `TruRNGpro.h` or the P/Invoke boundary are
+worth running against real hardware — with the device attached, with it absent, and with it pulled part way
+through a session.
