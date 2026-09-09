@@ -722,6 +722,62 @@ namespace RandomNumberGenerator.Test
             StringAssert.Contains(sFileContent, "0.111");
         }
 
+        /// <summary>
+        /// Tests a failure met while writing is reported with the failure that caused it still attached.
+        /// Wrapping an exception in a message and letting the original go leaves the report saying what went
+        /// wrong but not where, which is the half that is needed to find it.
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void WriteDataPoint_WriteFails_KeepsTheFailureThatCausedIt()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            const string sEXPECTED_INNER_MESSAGE = "the underlying failure";
+
+            // A data point that fails the way the framework would, part way through being written
+            Mock<IXMLDataPoint> failingDataPoint = new Mock<IXMLDataPoint>();
+            failingDataPoint.Setup(mock => mock.WriteDataPoint(It.IsAny<XmlWriter>()))
+                            .Throws(new InvalidTimeZoneException(sEXPECTED_INNER_MESSAGE));
+
+            // Create the object under test, against a real file so the writer reaches the data point
+            RNGXMLWriter xmlWriter = new RNGXMLWriter(m_sTEST_FILE_PATH, m_writerSettings);
+            xmlWriter.WriteSessionStart(m_bSIMULATED_FLAG, m_iTARGET_VALUE);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            Exception thrown = null;
+            try
+            {
+                xmlWriter.WriteDataPoint(failingDataPoint.Object);
+            }
+            catch (Exception writeFailure)
+            {
+                thrown = writeFailure;
+            }
+
+            // Let go of the file. The write failed part way through, so the session was never ended and the
+            // writer is still holding it open, which stops the cleanup removing it.
+            xmlWriter.Dispose();
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the failure was reported at all
+            Assert.IsNotNull(thrown, "A failure while writing should be reported");
+
+            // Verify the failure that caused it came along, rather than only its message being copied into
+            // the text of a new one
+            Assert.IsNotNull(thrown.InnerException,
+                             "The failure that caused it should be kept as the inner exception");
+            Assert.AreEqual(sEXPECTED_INNER_MESSAGE, thrown.InnerException.Message);
+        }
+
         #endregion
     }
 }

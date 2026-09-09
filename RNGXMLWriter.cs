@@ -12,6 +12,8 @@
 //                            and continue a session that was left open by the application stopping
 // 2026/09/08 - Mike Pullen - Kept the file the writer is pointed at when a session ends, so a second session
 //                            can be recorded into the same file without choosing it again
+// 2026/09/09 - Mike Pullen - Kept the failure that caused a write error attached to the one reported, so a
+//                            report says where it went wrong as well as what went wrong
 //*********************************************************************************************************************
 using System;
 using System.Xml;
@@ -133,12 +135,12 @@ namespace RandomNumberGenerator
                     catch (System.IO.IOException ioEx)
                     {
                         // File I/O error
-                        throw new System.IO.IOException($"File I/O error: {ioEx.Message}");
+                        throw new System.IO.IOException($"File I/O error: {ioEx.Message}", ioEx);
                     }
                     catch (Exception ex)
                     {
                         // Any other writing error
-                        throw new Exception($"Unexpected error starting session: {ex.Message}");
+                        throw new Exception($"Unexpected error starting session: {ex.Message}", ex);
                     }
                 }
                 else
@@ -196,12 +198,12 @@ namespace RandomNumberGenerator
                 catch (System.IO.IOException ioEx)
                 {
                     // File I/O error
-                    throw new System.IO.IOException($"File I/O error writing data point: {ioEx.Message}");
+                    throw new System.IO.IOException($"File I/O error writing data point: {ioEx.Message}", ioEx);
                 }
                 catch (Exception ex)
                 {
                     // Any other writing error
-                    throw new Exception($"Unexpected error writing data point: {ex.Message}");
+                    throw new Exception($"Unexpected error writing data point: {ex.Message}", ex);
                 }
             }
         }
@@ -276,12 +278,12 @@ namespace RandomNumberGenerator
                     catch (System.IO.IOException ioEx)
                     {
                         // File I/O error
-                        throw new System.IO.IOException($"File I/O error ending session: {ioEx.Message}");
+                        throw new System.IO.IOException($"File I/O error ending session: {ioEx.Message}", ioEx);
                     }
                     catch (Exception ex)
                     {
                         // Any other writing error
-                        throw new Exception($"Unexpected error ending session: {ex.Message}");
+                        throw new Exception($"Unexpected error ending session: {ex.Message}", ex);
                     }
                 }
                 else
