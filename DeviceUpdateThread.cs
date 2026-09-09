@@ -14,6 +14,8 @@
 // 2026/09/07 - Mike Pullen - Report device status through the shared status palette
 // 2026/09/09 - Mike Pullen - Read the severity colours where they are shown rather than holding them, so a
 //                            scheme changed while running is followed
+// 2026/09/09 - Mike Pullen - Reported the search into the form only once its window exists, as InvokeRequired
+//                            cannot say which thread owns a form that was never shown
 //*********************************************************************************************************************
 using System;
 using System.ComponentModel;
@@ -144,7 +146,7 @@ namespace RandomNumberGenerator
         private static void UpdateDeviceList()
         {
             // Check if the parent has been set and not terminating early
-            if ((null != m_Parent) && (false == Terminating))
+            if (ParentIsReady)
             {
                 // Check if invoke is required (should be)
                 if (m_Parent.InvokeRequired)
@@ -165,8 +167,8 @@ namespace RandomNumberGenerator
         /// </summary>
         private static void BackupInfoBox()
         {
-            // Make sure the parent is valid and not terminating early
-            if ((null != m_Parent) && (false == Terminating))
+            // Make sure there is a window to report into
+            if (ParentIsReady)
             {
                 // Get the current status box state through the parent's interface
                 m_Parent.GetStatusBoxState(out m_sStatusBoxText, out m_StatusBoxTextColor, out m_StatusBoxBackColor);
@@ -181,8 +183,8 @@ namespace RandomNumberGenerator
         /// <param name="backColor">IN - Background color to set for the info box</param>
         private static void UpdateInfoBox(string sText, Color textColor, Color backColor)
         {
-            // Make sure the parent is valid and not terminating early
-            if ((null != m_Parent) && (false == Terminating))
+            // Make sure there is a window to report into
+            if (ParentIsReady)
             {
                 // Use parent's method which already handles invoke requirements
                 m_Parent.SetStatusBoxState(sText, textColor, backColor);
@@ -197,8 +199,8 @@ namespace RandomNumberGenerator
         /// </summary>
         private static void RestoreInfoBox()
         {
-            // Make sure the parent is valid and not terminating early
-            if ((null != m_Parent) && (false == Terminating))
+            // Make sure there is a window to report into
+            if (ParentIsReady)
             {
                 // Get the message currently displayed in the info box
                 string sCurrentText;
@@ -225,8 +227,8 @@ namespace RandomNumberGenerator
         /// <param name="deviceException">IN - The failure that stopped the search</param>
         private static void ReportDeviceUpdateFailure(Exception deviceException)
         {
-            // Make sure the parent is valid and not terminating early
-            if ((null != m_Parent) && (false == Terminating))
+            // Make sure there is a window to report into
+            if (ParentIsReady)
             {
                 string sMessage = $"{m_sREADING_DEVICES_ERROR} {deviceException.Message}";
                 m_Parent.SetStatusBoxState(sMessage, StatusPalette.ErrorText, StatusPalette.ErrorBackground);
@@ -247,6 +249,20 @@ namespace RandomNumberGenerator
         /// Indicates if the thread is terminating early (read-only)
         /// </summary>
         public static bool Terminating { get => (null != m_Parent) && (GeneratorForm.RngGuiStates.Terminating == m_Parent.State); }
+
+        /// <summary>
+        /// Whether there is a window to report the search into. A parent has to be set, it has to not be
+        /// closing, and its window has to exist: the search runs on a pool thread and reports by calling the
+        /// form, and every one of those calls decides how to marshal itself by asking InvokeRequired.
+        /// A form that has never been shown has no handle, and InvokeRequired on a handleless control
+        /// answers false, which reads as "already on the right thread" - so the search writes the controls
+        /// from the pool thread and races whoever else is using them. Nothing is displaying a form that has
+        /// no window, so there is nothing to report to and the result is dropped rather than forced in.
+        /// </summary>
+        private static bool ParentIsReady
+        {
+            get => ((null != m_Parent) && (false == Terminating) && m_Parent.IsHandleCreated);
+        }
 
         // Synchronizaion objects
         private static object m_Lock = new object();
