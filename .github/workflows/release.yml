@@ -64,7 +64,7 @@ jobs:
           }
 
       - name: Check out master
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -86,10 +86,10 @@ jobs:
           }
 
       - name: Set up MSBuild
-        uses: microsoft/setup-msbuild@v2
+        uses: microsoft/setup-msbuild@v3
 
       - name: Set up NuGet
-        uses: NuGet/setup-nuget@v2
+        uses: NuGet/setup-nuget@v4
 
       - name: Restore packages
         shell: pwsh
@@ -191,7 +191,7 @@ jobs:
           }
 
       - name: Keep the package with the run
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: RandomNumberGenerator-${{ inputs.version }}
           path: RandomNumberGenerator-${{ inputs.version }}.zip
