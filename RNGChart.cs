@@ -10,6 +10,8 @@
 // 2024/02/05 - Mike Pullen - Original implementation.
 // 2026/08/31 - Mike Pullen - Track the displayed extremes as points are added instead of rescanning the series on
 //                            every point, and corrected the limit tightening logic.
+// 2026/09/07 - Mike Pullen - Say what is being plotted: a title, an axis title, a key, and a marker on the
+//                            value an unbiased generator is expected to sit at
 //*********************************************************************************************************************
 using System;
 using System.Drawing;
@@ -49,32 +51,86 @@ namespace RandomNumberGenerator
             Series.Add(dataPointSeries);
             Series.Add(averagesSeries);
 
-            // Disable the X-Axis
+            // Disable the X-Axis. The chart holds a rolling window of the most recent readings, so numbering
+            // them would label the axis with a count that means nothing on its own.
             Axis AverageChartXAxis = ChartAreas[0].AxisX;
             AverageChartXAxis.Enabled = AxisEnabled.False;
 
             // Setup the Y-Axis
             Axis AverageChartYAxis = ChartAreas[0].AxisY;
+            AverageChartYAxis.Title = m_sYAXIS_TITLE;
             AverageChartYAxis.Maximum = m_fCENTER + m_fYAXIS_INCREMENT;
             AverageChartYAxis.Minimum = m_fCENTER - m_fYAXIS_INCREMENT;
             AverageChartYAxis.Interval = m_fYAXIS_TICK_INTERVAL;
 
+            // Mark the value an unbiased generator is expected to sit at, so how close the readings are to it
+            // can be seen rather than worked out. A strip of no width draws as the single line at its offset.
+            StripLine expectedValueLine = new StripLine
+            {
+                IntervalOffset = m_fCENTER,
+                Interval = 0,
+                StripWidth = 0,
+                BorderWidth = m_iEXPECTED_VALUE_WIDTH,
+                BorderDashStyle = ChartDashStyle.Dash
+            };
+            AverageChartYAxis.StripLines.Add(expectedValueLine);
+
+            // Put the key above the plot rather than beside it, so the plot keeps the full width
+            chartLegend.Docking = Docking.Top;
+            chartLegend.Alignment = System.Drawing.StringAlignment.Far;
+            chartLegend.IsDockedInsideChartArea = false;
+
             // Setup the data point series and add a single point to force display
             Series DataPointSeries = Series[(int)SeriesIndex.DataPointSeries];
-            DataPointSeries.IsVisibleInLegend = false;
+            DataPointSeries.LegendText = m_sDATA_POINT_LEGEND;
             DataPointSeries.ChartType = SeriesChartType.Line;
-            DataPointSeries.Color = Color.Blue;
             DataPointSeries.Points.AddY(m_fCENTER);
 
             // Setup the average series (no need to add initial point as data point series will display the chart)
             Series AverageSeries = Series[(int)SeriesIndex.AverageSeries];
-            AverageSeries.IsVisibleInLegend = false;
+            AverageSeries.LegendText = m_sAVERAGE_LEGEND;
             AverageSeries.ChartType = SeriesChartType.Line;
-            AverageSeries.Color = Color.Red;
+
+            // Colour everything the palette owns
+            ApplyPalette();
         }
 
         #endregion
         #region Methods
+
+        /// <summary>
+        /// Takes the chart's colours from the palette. The grid is there to be measured against rather than
+        /// looked at, so it is drawn as hairlines rather than in the black the chart uses by default.
+        /// NOTE: This is called again whenever the system colour scheme changes, so it must set every colour
+        /// it owns rather than assuming what was set when the chart was built.
+        /// </summary>
+        public void ApplyPalette()
+        {
+            ChartArea resultsArea = ChartAreas[0];
+            resultsArea.BackColor = Color.Transparent;
+            resultsArea.BorderColor = Color.Transparent;
+
+            Axis resultsYAxis = resultsArea.AxisY;
+            resultsYAxis.LineColor = UiPalette.Line;
+            resultsYAxis.MajorTickMark.LineColor = UiPalette.Line;
+            resultsYAxis.MajorGrid.LineColor = UiPalette.Line;
+            resultsYAxis.LabelStyle.ForeColor = UiPalette.MutedText;
+            resultsYAxis.TitleForeColor = UiPalette.MutedText;
+
+            foreach (StripLine expectedValueLine in resultsYAxis.StripLines)
+            {
+                expectedValueLine.BorderColor = UiPalette.Expected;
+            }
+
+            foreach (Legend chartLegend in Legends)
+            {
+                chartLegend.BackColor = Color.Transparent;
+                chartLegend.ForeColor = UiPalette.CardText;
+            }
+
+            Series[(int)SeriesIndex.DataPointSeries].Color = UiPalette.Trace;
+            Series[(int)SeriesIndex.AverageSeries].Color = UiPalette.Average;
+        }
 
         /// <summary>
         /// Adds a data point to the chart
@@ -264,6 +320,12 @@ namespace RandomNumberGenerator
         private const double m_fYAXIS_INCREMENT = 0.01;
         private const double m_fYAXIS_TICK_INTERVAL = 0.005;
         private const double m_fCENTER = 0.5; // Statistical mean of the data, which the chart is centered on
+
+        // Labelling, so the chart says what it is showing rather than relying on the reader knowing
+        private const string m_sYAXIS_TITLE = "Bit average";
+        private const string m_sDATA_POINT_LEGEND = "Reading";
+        private const string m_sAVERAGE_LEGEND = "Running mean";
+        private const int m_iEXPECTED_VALUE_WIDTH = 1;
 
         #endregion
         #region Data Members

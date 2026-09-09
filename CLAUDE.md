@@ -107,6 +107,17 @@ edits the file **textually** so writing can resume, handling three shapes:
 Only the ends of the file are read rather than the whole of it, because these files grow by roughly 2MB an
 hour. Changes to the session element shape must keep that text surgery in sync.
 
+Starting a session goes down the same road. `RNGSessionDataFile.StartSession` asks whether the file already
+holds readings and, if it does, prepares it for appending rather than calling `WriteSessionStart`, which
+opens the file from the beginning and would throw them away. That could not happen while ending a session
+also gave up the chosen file, because the only way back to a file was to load it; the file now stays chosen
+after a session ends, so pressing Start again has to be safe on its own. `RNGXMLWriter.WriteSessionEnd`
+keeps `FilePath` for the same reason — what ends there is the session, not the choice of file.
+
+A second session appended this way joins the session element already in the file rather than opening one of
+its own, so the recorded `Simulated` and `Target` stay the first session's. `CheckTargetChanged` is what
+keeps that honest: it asks before recording against a target the file disagrees with.
+
 A file of the third shape is what an interrupted session leaves, and it is recovered rather than rejected:
 the reader keeps every complete data point, refuses a partially written one, and reports the recovery
 through `LastError`, which the form shows to the user. A file that closes its session and still fails to
@@ -115,8 +126,51 @@ the file, not by the parse error.
 
 ### GUI
 `GeneratorForm` is a state machine over `RngGuiStates` (Idle / Running / Paused / Terminating); the
-`Set*State()` methods own all control enable/disable and are the right place to hook new UI state.
+`Set*State()` methods own all control enable/disable, which button `SetPrimaryButton` emphasises, and the
+window title, and are the right place to hook new UI state.
 `GeneratorForm.Designer.cs` is designer-generated — prefer editing it through the VS designer.
+
+Each tab is a `TableLayoutPanel` of bands: fixed-height rows for the settings and the readouts, and a
+percent row underneath that the chart fills, so the chart takes whatever space is left and grows with the
+window. Nothing is positioned absolutely at the tab level any more, and the anchors that used to be set on
+a fixed-size dialog are gone. The window is sizable with a `MinimumSize`, and `RestoreWindowPlacement` /
+`SaveWindowPlacement` remember its geometry in `Properties.Settings` — a saved position for a screen that
+is no longer attached is ignored rather than opening the window off-screen.
+
+Status messages go to a `StatusStrip` docked to the form, not to the tab.
+
+A session can be given a length in minutes, zero meaning it records until Stop is pressed.
+`CheckSessionLength` is called from `RecordReadResult` as each reading arrives, so the stop happens on the
+thread that owns the form and needs no marshalling, and it measures `IRNGSessionTimer.ElapsedSeconds` rather
+than counting readings: the device delivers about nine readings a second against the ten the timer asks for,
+so readings are not a clock. The session timer does not run while a session is paused, so a pause does not
+spend the length.
+
+The chart and the statistics beside it are drawn from the same readings, so they are cleared together and at
+the same moment — when a file is chosen, in `FileBrowseButton_Click`. Starting a session leaves both alone,
+which is what lets a second session into the same file carry on from the first. Clearing one without the
+other, which is what starting a session used to do, leaves an empty chart beside a count of several hundred.
+
+Colour comes from two palettes, both of them properties rather than fields so that they report the scheme
+in force now: `UiPalette` for the chrome, every value of it taken from `SystemColors`, and `StatusPalette`
+for severity. Take text from the same pair as the surface behind it — `Card`/`CardText`, `Ground`/
+`GroundText` — because a high contrast scheme can render a mismatched pair as one colour on itself.
+`GeneratorForm.ApplyTheme` colours everything the designer laid out and is called again from
+`OnSystemColorsChanged`, so anything added to the window belongs there rather than in the designer. The
+only fixed colours are `Trace` and `Average`, which are data rather than chrome: they tell two series
+apart, so they have to differ from each other rather than agree with the window. Severity has no system
+colour to take, so under a high contrast scheme `StatusPalette` stands aside and the wording carries it.
+
+Errors raised while analysing are visible on the tab that raised them. `SetStatusBoxState` takes its
+colours from `StatusPalette`, which
+is where the severity scheme lives for both the form and `DeviceUpdateThread`. Messages start at the first
+word: the leading space that used to pad them was for a text box with no padding of its own.
+
+Statistics are shown in borderless read-only `TextBox` readouts rather than sunken fields — read-only so
+they read as output, but still text boxes so a value can be selected and copied. A measure that nothing has
+been measured for shows `m_sNO_VALUE` rather than a zero. Number formats are named per kind:
+`m_sVALUE_FORMAT` for anything in a unit range, `m_sMOMENT_FORMAT` for the unbounded moments, and the two
+`…DIFFERENCE_FORMAT` variants, which carry an explicit sign.
 
 Device discovery is separate: `DeviceUpdateThread` (a static class queued on the thread pool) enumerates
 `Win32_USBControllerDevice`/`Win32_PnPEntity` via WMI, regex-matches `USB…Serial…COM<n>`, and pushes a
@@ -127,12 +181,40 @@ The analysis UI (baseline vs. result comparison) uses `StatisticalAnalysis` (Mat
 `DescriptiveStatistics`) and `HistogramChart`; both charts derive from
 `System.Windows.Forms.DataVisualization.Charting.Chart`.
 
+The analysis tab exists to answer one question: **did the result session shift by more than noise?**
+`SignificanceTest` answers it — `CompareMeans` is Welch's t-test between the two sessions (unequal sizes and
+spreads, because a baseline is usually recorded for far longer than the run compared against it), and
+`CompareWithExpected` tests one session against the 0.5 an unbiased generator gives. Both are two-tailed: a
+one-tailed test would find a shift toward a target more easily, but only holds when the direction was
+predicted before the readings were taken, which the application cannot know. Every path that cannot produce
+a number — fewer than two readings, or readings with no spread — returns `Valid = false` rather than a
+probability, and `Significant` is false whenever the test did not run.
+
+The verdict is stated in words under the table rather than left to be read off the numbers, and is
+emphasised only when there is a shift to notice. `HistogramChart` plots each session as a percentage of its
+own readings, not as counts: on counts the longer session stands taller in every bin and hides the shift the
+comparison exists to show.
+
+The comparison is a single `ListView` — measure, baseline, result, difference — rather than the two
+mirrored sets of fields it used to be. `BuildComparisonTable` makes the rows once and `UpdateComparisonTable`
+rewrites their values; the row order there and the `m_iSKEWNESS_ROW` constant that tells the bounded
+measures from the unbounded ones have to be kept in step. The list does not come back through UI Automation,
+so anything driving it from outside has to read it with `LVM_GETITEMTEXT`.
+
+`HistogramChart.Plot` chooses its own bin count from the sample size unless one is passed; a fixed hundred
+bins turned a short session into a row of one-pixel spikes rather than a distribution. Axis labels are
+printed to the precision the tick interval needs, because the default prints the full double and the labels
+collide.
+
 ### Threading rules
 - `RNGDeviceTimer` uses `System.Windows.Forms.Timer` → its tick is already on the UI thread.
 - `RNGSessionTimer` uses `System.Timers.Timer` (deliberately, for reliable ticks) → it fires on a pool
   thread, so anything touching controls goes through `InvokeRequired`/`Invoke`.
 - Background work (device enumeration, file loading) marshals UI updates the same way; the `On*Completed`
   callbacks are the established pattern.
+- `RNGSessionTimer.Start` times each session from nothing; `Stop` deliberately leaves the time it reached on
+  display, so how long a session ran can still be read once it has ended. Resuming a paused session goes
+  through `Enabled` rather than `Start`, so a pause does not reset the clock.
 
 ### Native layer
 `TruRNGproMain.cpp` exports `Initialize(int iPort, bool bSimulate)` and `GetRandomBitAverage(double&)`.
@@ -140,6 +222,19 @@ The analysis UI (baseline vs. result comparison) uses `StatisticalAnalysis` (Mat
 twister — the seed comes from the "Seed" box that replaces "Port" in simulate mode) behind the
 `RNGInterface` base class. Note the two `DllImport`s in `RNGDeviceTimer.cs` declare different calling
 conventions (`Winapi` vs `Cdecl`).
+
+Both exports return a C++ `bool`, which is one byte, so both `DllImport`s marshal the return — and the
+`bSimulate` argument — as `UnmanagedType.I1`. Left to itself the marshaller expects the four byte Windows
+`BOOL` and reads three bytes of whatever the call left behind along with the answer, which made a native
+false come back as true: initializing against a port with nothing on it reported success, and the failure
+only surfaced as a read error a moment later.
+
+`TruRNGpro::GetBitAverage` reopens the device and reads once more before reporting failure. A failed read
+leaves the third-party interface flagged `bad` and it never clears, so one momentary fault on the USB port
+ended the session and every read after it failed too. The device itself is fine afterwards — opening it
+again and carrying on works — so that is what happens, and only a device that will not open again is
+reported as a failure, which is what an unplugged one does. Every reading is still an average of the same
+number of bits whether it took one attempt or two.
 
 `Externals/CommonControls.dll` and `Externals/DeviceInterfaces.dll` are checked-in binaries with no source
 here (`DeviceInterfaces` supplies the `USBDeviceNotification` constants used in `WndProc`).
@@ -164,8 +259,12 @@ non-obvious rules new code is expected to match:
   (`if (null == x)`, `if (false == bStatus)`). Explicit parentheses in compound/boolean expressions.
 - `string.Empty` over `""`; string interpolation over concatenation; named `const` locals instead of bare
   `true`/`false`/magic numbers at call sites; `_ = sender;` to discard unused event parameters.
-- Errors bubble up: throw with a user-facing message (leading space is the house style) rather than
-  swallowing and returning `false`; the form catches them and renders via `SetStatusBoxError`.
+- Errors bubble up: throw with a user-facing message rather than swallowing and returning `false`; the form
+  catches them and renders via `SetStatusBoxError`. Messages start at the first word — the leading space
+  that used to be the house style was padding for a status box that had none, and the status bar that
+  replaced it has real padding. A failure that puts the form back to idle must report itself **after**
+  `SetIdleState`, not before: that method ends by resetting the status bar, so a message set on the way in
+  is wiped. Reporting it too early is why clicking Start with no data file used to do nothing whatsoever.
 - Tests: `[ClassName]Tests`, `[Method]_[Scenario]_[ExpectedResult]`, banner-commented Arrange/Act/Assert
   sections, Moq for collaborators, `[TestCategory("Component")]`.
 
@@ -184,4 +283,18 @@ pressing publish.
 
 The unit tests do not build the form's event wiring, so a fault in it passes them: the crash that made
 loading a session file impossible was only found by driving the built application. Worth doing for changes
-that touch `GeneratorForm`.
+that touch `GeneratorForm`. The interface rework turned up four more the same way — start-up values still
+in a format that had been replaced, a button row clipped by a band an inch too short, comparison columns
+that did not fill their table, and a Pause button that was clickable before any session existed. All four
+passed a clean unit run.
+
+There are now unit tests that build a `GeneratorForm` over mocked collaborators and drive `SetRunningState`
+and `SetIdleState` through reflection, which covers the session lifecycle the earlier suite never reached.
+They still do not run a message loop, so the designer's event wiring is exercised only by running the
+application.
+
+The device path cannot be reached by the simulator at all, and three faults were found there that a full
+green run did not show: the bool marshalling, the read that never recovered, and readings from a previous
+file left in the statistics. Changes touching `RNGDeviceTimer`, `TruRNGpro.h` or the P/Invoke boundary are
+worth running against real hardware — with the device attached, with it absent, and with it pulled part way
+through a session.

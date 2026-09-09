@@ -9,6 +9,10 @@
 //====================================================================================================================
 // 2023/12/04 - Mike Pullen - Original implementation.
 // 2026/08/31 - Mike Pullen - Report anything that needs raising about a loaded file through LastError
+// 2026/09/08 - Mike Pullen - Appended to a file that already holds readings rather than writing over it, so
+//                            recording a second session into the same file keeps the first
+// 2026/09/09 - Mike Pullen - Said what the check on the file actually asks, which is whether anything has
+//                            been written to it rather than whether it holds readings
 //*********************************************************************************************************************
 using System;
 using System.IO;
@@ -72,7 +76,7 @@ namespace RandomNumberGenerator
             // Writer object provided cannot be null
             if (null == writer)
             {
-                throw new ArgumentNullException("Specified writer object cannot be null");
+                throw new ArgumentNullException(nameof(writer), "Specified writer object cannot be null");
             }
 
             m_Writer = writer;
@@ -88,7 +92,7 @@ namespace RandomNumberGenerator
             // Writer object provided cannot be null
             if (null == writer)
             {
-                throw new ArgumentNullException("Specified writer object cannot be null");
+                throw new ArgumentNullException(nameof(writer), "Specified writer object cannot be null");
             }
 
             m_Writer = writer;
@@ -135,7 +139,7 @@ namespace RandomNumberGenerator
             // Session data object provided cannot be null
             if (null == sessionData)
             {
-                throw new ArgumentNullException("Specified data object cannot be null");
+                throw new ArgumentNullException(nameof(sessionData), "Specified data object cannot be null");
             }
 
             // Default the status to failure
@@ -147,15 +151,31 @@ namespace RandomNumberGenerator
                 bool bValid = IsValid();
                 if (bValid)
                 {
-                    // Write the session start, recording the session as in progress only once it is, so a
-                    // write that reports failure does not leave the file looking like it holds a session
-                    bStatus = m_Writer.WriteSessionStart(sessionData.Simulated, sessionData.TargetValue);
-                    m_bSessionInProgress = bStatus;
+                    // A file that has anything in it already is continued rather than started over. Starting
+                    // a session opens the file for writing from the beginning, so doing that to a file with a
+                    // session already in it would throw what it holds away without asking. That could not
+                    // happen while ending a session also cleared the chosen file, because the only way back
+                    // to a file was to load it, and loading prepares it for appending; now that the file
+                    // stays chosen, pressing Start again has to be safe on its own.
+                    bool bHasContent = FileHasContent(FilePath);
+                    if (true == bHasContent)
+                    {
+                        // Reopens the file after whatever is already in it
+                        PrepareWriterForAppend(FilePath);
+                        bStatus = true;
+                    }
+                    else
+                    {
+                        // Write the session start, recording the session as in progress only once it is, so a
+                        // write that reports failure does not leave the file looking like it holds a session
+                        bStatus = m_Writer.WriteSessionStart(sessionData.Simulated, sessionData.TargetValue);
+                        m_bSessionInProgress = bStatus;
+                    }
                 }
                 else
                 {
                     // Invalid writer - likely no file path set
-                    throw new InvalidOperationException(" No data file selected. Please select a file before starting a session.");
+                    throw new InvalidOperationException("No data file selected. Please select a file before starting a session.");
                 }
             }
             catch (InvalidOperationException)
@@ -196,7 +216,7 @@ namespace RandomNumberGenerator
             // Data point object provided cannot be null
             if (null == dataPoint)
             {
-                throw new ArgumentNullException("Specified data point object cannot be null");
+                throw new ArgumentNullException(nameof(dataPoint), "Specified data point object cannot be null");
             }
 
             // Default the status to failure
@@ -224,12 +244,12 @@ namespace RandomNumberGenerator
             // Validate parameters
             if (null == sessionData)
             {
-                throw new ArgumentNullException("Specified session data object cannot be null");
+                throw new ArgumentNullException(nameof(sessionData), "Specified session data object cannot be null");
             }
 
             if (string.IsNullOrEmpty(sFilePath))
             {
-                throw new ArgumentNullException("Specified file path cannot be null or empty");
+                throw new ArgumentNullException(nameof(sFilePath), "Specified file path cannot be null or empty");
             }
 
             bool bStatus = false;
@@ -249,7 +269,7 @@ namespace RandomNumberGenerator
                         string sErrorMessage = m_Reader.LastError;
                         if (string.IsNullOrEmpty(sErrorMessage))
                         {
-                            sErrorMessage = $" Unknown error loading file '{Path.GetFileName(sFilePath)}'.";
+                            sErrorMessage = $"Unknown error loading file '{Path.GetFileName(sFilePath)}'.";
                         }
                         throw new InvalidDataException(sErrorMessage);
                     }
@@ -263,7 +283,7 @@ namespace RandomNumberGenerator
                 catch (IOException ioException)
                 {
                     // Re-throw IO exceptions to be handled by calling code
-                    throw new IOException($" File I/O error accessing '{Path.GetFileName(sFilePath)}': {ioException.Message}", ioException);
+                    throw new IOException($"File I/O error accessing '{Path.GetFileName(sFilePath)}': {ioException.Message}", ioException);
                 }
                 catch (InvalidDataException)
                 {
@@ -279,16 +299,40 @@ namespace RandomNumberGenerator
                 catch (Exception generalException)
                 {
                     // Wrap other exceptions with file context
-                    throw new Exception($" Unexpected error loading file '{Path.GetFileName(sFilePath)}': {generalException.Message}", generalException);
+                    throw new Exception($"Unexpected error loading file '{Path.GetFileName(sFilePath)}': {generalException.Message}", generalException);
                 }
             }
             else
             {
                 // No reader available - cannot load sessions
-                throw new InvalidOperationException(" No XML reader available for loading session data. Use constructor with reader parameter.");
+                throw new InvalidOperationException("No XML reader available for loading session data. Use constructor with reader parameter.");
             }
 
             return bStatus;
+        }
+
+        /// <summary>
+        /// Whether anything has been written to a file already, which decides whether starting a session
+        /// continues it or begins it. A file that does not exist yet, or that exists with nothing in it, is
+        /// begun.
+        /// NOTE: This asks whether the file has anything in it, not whether any readings were recorded. A
+        /// session that was started and stopped without recording anything leaves a session element and no
+        /// data, and that file has to be continued rather than written over: the session element is already
+        /// there, and PrepareForAppend reopens it. Reading far enough to count the readings would mean
+        /// opening a file that grows by roughly 2MB an hour to answer a question whose answer does not
+        /// change what happens.
+        /// </summary>
+        /// <param name="sFilePath">IN - Path to the session file</param>
+        /// <returns>true if the file exists and has something in it; otherwise, false</returns>
+        private static bool FileHasContent(string sFilePath)
+        {
+            if (string.IsNullOrEmpty(sFilePath))
+            {
+                return false;
+            }
+
+            FileInfo sessionFile = new FileInfo(sFilePath);
+            return (sessionFile.Exists && (0 < sessionFile.Length));
         }
 
         /// <summary>
@@ -310,7 +354,7 @@ namespace RandomNumberGenerator
             // overwrite the file that has just been loaded.
             if (false == bPrepared)
             {
-                throw new InvalidOperationException($" Unable to prepare '{Path.GetFileName(sFilePath)}' for" +
+                throw new InvalidOperationException($"Unable to prepare '{Path.GetFileName(sFilePath)}' for" +
                                                     $" appending, so the session cannot be continued.");
             }
 

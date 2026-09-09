@@ -12,13 +12,21 @@ so the application can be run and developed without one attached.
 Each sample reads a block of bits from the device and records the **average of those bits**, which for an
 unbiased generator sits around 0.5. Readings are taken ten times a second. The application shows, live:
 
-- the running average, the number of data points, the deviation from the statistical mean, and the standard
-  deviation
-- a chart of the individual readings against the running average, with the axis scaling itself to the data
-- the elapsed session time
+- the elapsed session time, the number of readings, the running average, how far that average sits from
+  0.5, and the standard deviation
+- a chart of the individual readings against the running average, marked with the 0.5 an unbiased
+  generator is expected to give, and with the axis scaling itself to the data
+
+The window resizes, and the chart takes whatever space is left over. It reopens at the size and on the
+screen it was last closed at.
 
 Every reading is written to the session file as it is taken, so a session survives the application being
 closed or stopped unexpectedly.
+
+### Session length
+
+A session can be given a length in minutes, and stops itself once it has recorded for that long. The
+default of zero records until *Stop* is pressed. Time spent paused does not count towards it.
 
 ### Analysis
 
@@ -63,16 +71,37 @@ The application is built to `bin\Debug\Random Number Generator.exe` and copied t
 
 ## Running
 
-Start the application, then:
+Start the application. It opens on the **Record** tab, and the status bar at the foot of the window says
+what to do next at each step.
 
-1. **Choose a source.** Leave *Simulate* unchecked and pick the COM port the device is on, or check it and
-   enter a seed for the simulator. The port list updates by itself as devices are connected and removed.
-2. **Choose a file.** *Browse* selects the session file. An existing file is loaded and displayed, and the
-   session continues in it. A new file is created.
+1. **Choose a file.** *Browse* selects the session file. An existing file is loaded and displayed, and
+   the session continues in it. A new file is created. The file stays selected when a session ends, so
+   pressing *Start* again records another session into the same file, after the readings already in it.
+2. **Choose a source.** The toggle switches between the device and the simulator. With the device, pick the
+   COM port it is on; the port list updates by itself as devices are connected and removed. With the
+   simulator, the port becomes a seed.
 3. **Choose a target**, if the session has one.
-4. **Start.** *Pause* suspends recording without ending the session; *Stop* ends it.
+4. **Set a length**, if the session should stop on its own. *Stop after (min)* is how long to record
+   for; zero records until *Stop* is pressed.
+5. **Start.** *Pause* suspends recording without ending the session; *Stop* ends it. Whichever button
+   carries the action to take next is the emphasised one. *Clear* discards the readings on screen and asks
+   before it does.
 
-To analyse previous sessions, browse for a baseline file and a result file in the comparison section.
+To compare previous sessions, go to the **Analyse** tab and browse for a baseline file and a result file.
+The two are set against each other in one table, measure by measure, with the difference between them, and
+the question the tab exists to answer is stated underneath in words: whether the result shifted away from
+the baseline by more than the noise in the two of them accounts for.
+
+That verdict is [Welch's t-test](https://en.wikipedia.org/wiki/Welch%27s_t-test) between the two sessions,
+which does not assume they are the same length or equally spread — a baseline is usually recorded for far
+longer than the run being compared against it. It is two-tailed, so a shift in either direction counts; a
+one-tailed test would find a shift toward a target more easily, but only holds when the direction was
+predicted before the readings were taken. A shift is reported as significant when it would arise by chance
+less than one time in twenty. Each session is also tested on its own against the 0.5 an unbiased generator
+would give.
+
+The histogram plots each session as a percentage of its own readings rather than as a count of them, so a
+long session and a short one can be compared on the same chart.
 
 ### Recovering a session
 

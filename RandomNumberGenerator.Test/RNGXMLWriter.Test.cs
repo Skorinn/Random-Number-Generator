@@ -492,8 +492,8 @@ namespace RandomNumberGenerator.Test
             // Verify the write was successful
             Assert.IsTrue(bStatus);
 
-            // Verify the session file was cleared
-            Assert.IsTrue(string.IsNullOrEmpty(xmlWriter.FilePath));
+            // Verify the file the writer is pointed at is kept, so another session can be recorded into it
+            Assert.AreEqual(m_sTEST_FILE_PATH, xmlWriter.FilePath);
 
             // Verify the file was created
             Assert.IsTrue(File.Exists(m_sTEST_FILE_PATH));
@@ -720,6 +720,113 @@ namespace RandomNumberGenerator.Test
 
             // Verify the data recorded so far was readable while the session was in progress
             StringAssert.Contains(sFileContent, "0.111");
+        }
+
+        /// <summary>
+        /// Tests a failure met while writing is reported with the failure that caused it still attached.
+        /// Wrapping an exception in a message and letting the original go leaves the report saying what went
+        /// wrong but not where, which is the half that is needed to find it.
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void WriteDataPoint_WriteFails_KeepsTheFailureThatCausedIt()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            const string sEXPECTED_INNER_MESSAGE = "the underlying failure";
+
+            // A data point that fails the way the framework would, part way through being written
+            Mock<IXMLDataPoint> failingDataPoint = new Mock<IXMLDataPoint>();
+            failingDataPoint.Setup(mock => mock.WriteDataPoint(It.IsAny<XmlWriter>()))
+                            .Throws(new InvalidTimeZoneException(sEXPECTED_INNER_MESSAGE));
+
+            // Create the object under test, against a real file so the writer reaches the data point
+            RNGXMLWriter xmlWriter = new RNGXMLWriter(m_sTEST_FILE_PATH, m_writerSettings);
+            xmlWriter.WriteSessionStart(m_bSIMULATED_FLAG, m_iTARGET_VALUE);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            Exception thrown = null;
+            try
+            {
+                xmlWriter.WriteDataPoint(failingDataPoint.Object);
+            }
+            catch (Exception writeFailure)
+            {
+                thrown = writeFailure;
+            }
+
+            // Let go of the file. The write failed part way through, so the session was never ended and the
+            // writer is still holding it open, which stops the cleanup removing it.
+            xmlWriter.Dispose();
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the failure was reported at all
+            Assert.IsNotNull(thrown, "A failure while writing should be reported");
+
+            // Verify the failure that caused it came along, rather than only its message being copied into
+            // the text of a new one
+            Assert.IsNotNull(thrown.InnerException,
+                             "The failure that caused it should be kept as the inner exception");
+            Assert.AreEqual(sEXPECTED_INNER_MESSAGE, thrown.InnerException.Message);
+        }
+
+        /// <summary>
+        /// Tests a data point that refuses to write is reported as such, rather than as the writer having
+        /// gone bad. The throw for a refused data point is caught by the same handler that reports an
+        /// invalid writer, and that handler used to replace the message with its own.
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void WriteDataPoint_DataPointRefuses_SaysTheDataPointRefusedRatherThanBlamingTheWriter()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            const string sEXPECTED_CAUSE = "Failed to write data point";
+
+            // A data point that reports failure rather than throwing, which is the case the writer turns
+            // into an exception itself
+            Mock<IXMLDataPoint> refusingDataPoint = new Mock<IXMLDataPoint>();
+            refusingDataPoint.Setup(mock => mock.WriteDataPoint(It.IsAny<XmlWriter>())).Returns(false);
+
+            RNGXMLWriter xmlWriter = new RNGXMLWriter(m_sTEST_FILE_PATH, m_writerSettings);
+            xmlWriter.WriteSessionStart(m_bSIMULATED_FLAG, m_iTARGET_VALUE);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            Exception thrown = null;
+            try
+            {
+                xmlWriter.WriteDataPoint(refusingDataPoint.Object);
+            }
+            catch (Exception writeFailure)
+            {
+                thrown = writeFailure;
+            }
+
+            // Let go of the file, as the session was never ended
+            xmlWriter.Dispose();
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify what actually went wrong survives, in the message or on the failure attached to it
+            Assert.IsNotNull(thrown, "A data point that refuses to write should be reported");
+            string sReported = thrown.Message + " " + (thrown.InnerException?.Message ?? string.Empty);
+            StringAssert.Contains(sReported, sEXPECTED_CAUSE,
+                                  $"The reported failure was '{thrown.Message}', which does not say what happened");
         }
 
         #endregion

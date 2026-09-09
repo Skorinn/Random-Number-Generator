@@ -10,6 +10,8 @@
 // 2024/02/03 - Mike Pullen - Original implementation.
 // 2026/09/01 - Mike Pullen - Corrected the file header, rolled the session time over at 60 rather than 61, and
 //                            replaced the destructor with a dispose
+// 2026/09/08 - Mike Pullen - Report the elapsed time in seconds, so a session can be given a length
+// 2026/09/08 - Mike Pullen - Timed each session from nothing rather than carrying on from the last one
 //*********************************************************************************************************************
 using System;
 using System.Windows.Forms;
@@ -20,6 +22,7 @@ namespace RandomNumberGenerator
     {
         bool Enabled { get; set; }
         bool InProgress { get; }
+        int ElapsedSeconds { get; }
         int Interval { get; set; }
         string SessionTime { get; }
         TextBox TimerTextBox { set; }
@@ -95,10 +98,17 @@ namespace RandomNumberGenerator
         #region Methods
 
         /// <summary>
-        /// Starts the session timer
+        /// Starts the session timer, timing the new session from nothing
         /// </summary>
         public void Start()
         {
+            // Every session is timed from nothing. Stopping deliberately leaves the time it reached on
+            // display, so how long the session ran can still be read after it has ended, which means the
+            // reset belongs here rather than in Stop. Without it the next session carried on from where the
+            // last one finished, and a session given a length was already past it before it recorded
+            // anything.
+            Reset();
+
             m_bInProgress = true;
             m_Timer.Start();
         }
@@ -208,6 +218,21 @@ namespace RandomNumberGenerator
         public bool InProgress { get => m_bInProgress; }
 
         /// <summary>
+        /// How long the session has been recording, in seconds, not counting time spent paused (read-only)
+        /// </summary>
+        public int ElapsedSeconds
+        {
+            get
+            {
+                lock (m_TimerLock)
+                {
+                    return ((m_iSessionHours * m_iSECONDS_PER_HOUR) + (m_iSessionMinutes * m_iSECONDS_PER_MINUTE) +
+                            m_iSessionSeconds);
+                }
+            }
+        }
+
+        /// <summary>
         /// Timer interval in milliseconds. Valid values are 1-1000.
         /// </summary>
         public int Interval
@@ -266,6 +291,10 @@ namespace RandomNumberGenerator
 
         // Text box for displaying the timer
         private TextBox m_TimerTextBox = null;
+
+        // Seconds in the larger units the elapsed time is kept in
+        private const int m_iSECONDS_PER_MINUTE = 60;
+        private const int m_iSECONDS_PER_HOUR = 3600;
 
         // Session timer counters
         private object m_TimerLock = new object();

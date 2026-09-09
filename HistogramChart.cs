@@ -8,6 +8,12 @@
 // Revision History: 
 //====================================================================================================================
 // 2025/08/13 - Mike Pullen - Initial version
+// 2026/09/07 - Mike Pullen - Choose the bin count from the sample size, label the axes to tick precision,
+//                            and put the key above the plot
+// 2026/09/07 - Mike Pullen - Plot each session as a share of its own readings, so two sessions of
+//                            different lengths can be compared
+// 2026/09/09 - Mike Pullen - Let the share axis interval follow the data rather than holding it at whole
+//                            numbers, which it was doing from when the axis counted readings
 //*********************************************************************************************************************
 using System;
 using System.Collections.Generic;
@@ -41,15 +47,76 @@ namespace RandomNumberGenerator
             };
 
             this.ChartAreas.Add(mainChartArea);
-            
-            // Add the legend
+
+            // Add the legend, above the plot rather than beside it so the distribution keeps the full width
             Legend legendHistogram = new Legend();
             legendHistogram.Name = "legendHistogram";
+            legendHistogram.Docking = Docking.Top;
+            legendHistogram.Alignment = StringAlignment.Far;
+            legendHistogram.IsDockedInsideChartArea = false;
             Legends.Add(legendHistogram);
+
+            // Colour everything the palette owns
+            ApplyPalette();
         }
 
         #endregion
         #region Methods
+
+        /// <summary>
+        /// Takes the chart's colours from the palette. The grid is there to be measured against rather than
+        /// looked at, so it is drawn as hairlines rather than in the black the chart uses by default.
+        /// NOTE: This is called again whenever the system colour scheme changes, so it must set every colour
+        /// it owns rather than assuming what was set when the chart was built. The two distributions are
+        /// coloured when they are plotted, as they only exist then.
+        /// </summary>
+        public void ApplyPalette()
+        {
+            ChartArea mainChartArea = this.ChartAreas[0];
+            mainChartArea.BackColor = Color.Transparent;
+            mainChartArea.BorderColor = Color.Transparent;
+
+            foreach (Axis axis in new Axis[] { mainChartArea.AxisX, mainChartArea.AxisY })
+            {
+                axis.LineColor = UiPalette.Line;
+                axis.MajorTickMark.LineColor = UiPalette.Line;
+                axis.MajorGrid.LineColor = UiPalette.Line;
+                axis.LabelStyle.ForeColor = UiPalette.MutedText;
+                axis.TitleForeColor = UiPalette.MutedText;
+            }
+
+            foreach (Legend chartLegend in Legends)
+            {
+                chartLegend.BackColor = Color.Transparent;
+                chartLegend.ForeColor = UiPalette.CardText;
+            }
+        }
+
+        /// <summary>
+        /// Plots histogram data for two data sets, choosing how many bins to divide them into from how much
+        /// data there is. Too many bins for the sample leaves single readings standing alone as spikes,
+        /// which reads as a scatter of lines rather than as a distribution with a shape.
+        /// </summary>
+        /// <param name="data1">IN - First data set to plot</param>
+        /// <param name="label1">IN - Label for the first data set</param>
+        /// <param name="data2">IN - Second data set to plot</param>
+        /// <param name="label2">IN - Label for the second data set</param>
+        /// <exception cref="ArgumentNullException">Thrown when data1 or data2 is null</exception>
+        public void Plot(List<double> data1, string label1, List<double> data2, string label2)
+        {
+            // Validate before counting, so a null set is reported rather than dereferenced
+            if (null == data1)
+            {
+                throw new ArgumentNullException(nameof(data1), "First data set cannot be null");
+            }
+
+            if (null == data2)
+            {
+                throw new ArgumentNullException(nameof(data2), "Second data set cannot be null");
+            }
+
+            Plot(data1, label1, data2, label2, ChooseBinCount(data1.Count + data2.Count));
+        }
 
         /// <summary>
         /// Plots histogram data for two data sets with specified labels and bin count
@@ -58,10 +125,10 @@ namespace RandomNumberGenerator
         /// <param name="label1">IN - Label for the first data set</param>
         /// <param name="data2">IN - Second data set to plot</param>
         /// <param name="label2">IN - Label for the second data set</param>
-        /// <param name="binCount">IN - Number of bins for the histogram (default 100)</param>
+        /// <param name="binCount">IN - Number of bins for the histogram</param>
         /// <exception cref="ArgumentNullException">Thrown when data1 or data2 is null</exception>
         /// <exception cref="ArgumentException">Thrown when binCount is less than or equal to zero</exception>
-        public void Plot(List<double> data1, string label1, List<double> data2, string label2, int binCount = m_iDEFAULT_BIN_COUNT)
+        public void Plot(List<double> data1, string label1, List<double> data2, string label2, int binCount)
         {
             // Validate input parameters
             if (null == data1)
@@ -105,29 +172,83 @@ namespace RandomNumberGenerator
                 iBins2[iBinIndex]++;
             }
 
-            // Calculate dynamic y-axis range based on bin frequencies
-            (double fMinYValue, double fMaxYValue) = CalculateFrequencyRange(iBins1, iBins2);
+            // Show each set as a share of its own readings rather than as a count of them. Two sessions are
+            // rarely the same length, and on raw counts the longer one stands taller in every bin, which
+            // hides the thing the comparison exists to show: whether the shape has shifted.
+            double[] fShare1 = CalculateShares(iBins1, data1.Count);
+            double[] fShare2 = CalculateShares(iBins2, data2.Count);
+
+            // Calculate dynamic y-axis range based on the bin shares
+            (double fMinYValue, double fMaxYValue) = CalculateFrequencyRange(fShare1, fShare2);
 
             // Update the chart area with dynamic x-axis and y-axis ranges
             UpdateChartAxisRange(fMinValue, fMaxValue, fMinYValue, fMaxYValue);
 
             // Create series for first data set
-            Series firstSeries = CreateHistogramSeries(label1, m_iSERIES1_ALPHA, Color.Blue);
+            Series firstSeries = CreateHistogramSeries(label1, m_iSERIES1_ALPHA, UiPalette.Trace);
 
             // Create series for second data set
-            Series secondSeries = CreateHistogramSeries(label2, m_iSERIES2_ALPHA, Color.Red);
+            Series secondSeries = CreateHistogramSeries(label2, m_iSERIES2_ALPHA, UiPalette.Average);
 
             // Add data points to both series
             for (int iBinIndex = 0; iBinIndex < binCount; iBinIndex++)
             {
                 double fBinCenter = fMinValue + (iBinIndex + m_fBIN_CENTER_OFFSET) * fBinWidth;
-                firstSeries.Points.AddXY(fBinCenter, iBins1[iBinIndex]);
-                secondSeries.Points.AddXY(fBinCenter, iBins2[iBinIndex]);
+                firstSeries.Points.AddXY(fBinCenter, fShare1[iBinIndex]);
+                secondSeries.Points.AddXY(fBinCenter, fShare2[iBinIndex]);
             }
 
             // Add series to chart
             this.Series.Add(firstSeries);
             this.Series.Add(secondSeries);
+        }
+
+        /// <summary>
+        /// Chooses how many bins to divide the data into. The count follows the cube root of the sample
+        /// size, which is the usual rule for keeping the bars wide enough to show a shape without smoothing
+        /// the distribution away, and is held between a floor and a ceiling so that a handful of readings
+        /// still produces a readable chart and a long session does not produce a comb.
+        /// </summary>
+        /// <param name="iSampleCount">IN - How many readings there are across both data sets</param>
+        /// <returns>The number of bins to use</returns>
+        private static int ChooseBinCount(int iSampleCount)
+        {
+            if (m_iMINIMUM_BIN_COUNT >= iSampleCount)
+            {
+                return m_iMINIMUM_BIN_COUNT;
+            }
+
+            int iChosen = (int)Math.Ceiling(m_fBIN_COUNT_FACTOR * Math.Pow(iSampleCount, m_fBIN_COUNT_EXPONENT));
+            return Math.Min(Math.Max(iChosen, m_iMINIMUM_BIN_COUNT), m_iMAXIMUM_BIN_COUNT);
+        }
+
+        /// <summary>
+        /// The number of decimal places an axis label needs to tell one tick from the next. Printing a
+        /// double at full precision fills the axis with digits that carry no information and collide with
+        /// the label beside them.
+        /// </summary>
+        /// <param name="fInterval">IN - The interval between ticks</param>
+        /// <returns>A numeric format string for the axis labels</returns>
+        private static string GetAxisLabelFormat(double fInterval)
+        {
+            if (0 >= fInterval)
+            {
+                return m_sDEFAULT_LABEL_FORMAT;
+            }
+
+            int iDecimals = (int)Math.Ceiling(-Math.Log10(fInterval));
+            iDecimals = Math.Min(Math.Max(iDecimals, 0), m_iMAXIMUM_LABEL_DECIMALS);
+
+            // An interval of one or more needs no decimals at all, and the whole number format is returned
+            // rather than one with an empty run of zeroes after the point. Both produce the same labels,
+            // because a format ending in a decimal point with nothing after it drops the point, but only
+            // one of them says so.
+            if (m_iNO_DECIMALS == iDecimals)
+            {
+                return m_sWHOLE_NUMBER_LABEL_FORMAT;
+            }
+
+            return m_sDECIMAL_LABEL_PREFIX + new string(m_cLABEL_DECIMAL_PLACE, iDecimals);
         }
 
         /// <summary>
@@ -211,6 +332,10 @@ namespace RandomNumberGenerator
                 double fXInterval = CalculateOptimalInterval(fXRange);
                 mainChartArea.AxisX.Interval = fXInterval;
 
+                // Label the ticks to the precision that tells them apart, and no further. Left to itself the
+                // chart prints the full double, which runs the labels into one another.
+                mainChartArea.AxisX.LabelStyle.Format = GetAxisLabelFormat(fXInterval);
+
                 // Set Y-axis range with dynamic scaling
                 mainChartArea.AxisY.Minimum = fMinYValue;
                 mainChartArea.AxisY.Maximum = fMaxYValue;
@@ -219,6 +344,11 @@ namespace RandomNumberGenerator
                 double fYRange = fMaxYValue - fMinYValue;
                 double fYInterval = CalculateOptimalYInterval(fYRange);
                 mainChartArea.AxisY.Interval = fYInterval;
+
+                // The axis carries each session as a share of its own readings, so it is labelled to the
+                // precision the interval needs, the same way the value axis is. It used to be labelled in
+                // whole numbers because it counted readings, and a share of a session is not a count.
+                mainChartArea.AxisY.LabelStyle.Format = GetAxisLabelFormat(fYInterval);
             }
         }
 
@@ -288,9 +418,12 @@ namespace RandomNumberGenerator
             }
 
             double fCalculatedInterval = fBaseInterval * Math.Pow(10, fPowerOf10);
-            
-            // Ensure the interval is at least 1 for frequency data (since frequencies are integers)
-            return Math.Max(fCalculatedInterval, m_fMINIMUM_Y_INTERVAL);
+
+            // The interval follows the data. It used to be held at one or more, because the axis counted
+            // readings and a count cannot fall between two whole numbers; the axis carries each session as
+            // a share of its own readings now, and a share can. Holding it at one put a comparison whose
+            // tallest bin held a percent or two of its session between a single pair of ticks.
+            return fCalculatedInterval;
         }
 
         /// <summary>
@@ -339,36 +472,64 @@ namespace RandomNumberGenerator
             {
                 ChartType = SeriesChartType.Column,
                 ChartArea = m_sMAIN_CHART_AREA_NAME,
-                Color = Color.FromArgb(iAlpha, baseColor)
+                Color = Color.FromArgb(iAlpha, baseColor),
+                BorderColor = Color.FromArgb(iAlpha, baseColor),
+                BorderWidth = 0
             };
+
+            // Fill most of the space each bin is given, so the bars read as a distribution rather than as a
+            // row of separated lines
+            histogramSeries["PointWidth"] = m_sPOINT_WIDTH;
 
             return histogramSeries;
         }
 
         /// <summary>
+        /// Turns bin counts into the share of the readings that fell into each bin, as a percentage of the
+        /// set they came from. A set with nothing in it contributes nothing rather than dividing by zero.
+        /// </summary>
+        /// <param name="iBins">IN - The number of readings that fell into each bin</param>
+        /// <param name="iTotalReadings">IN - How many readings the set held altogether</param>
+        /// <returns>The share of the set in each bin, as a percentage</returns>
+        private static double[] CalculateShares(int[] iBins, int iTotalReadings)
+        {
+            double[] fShares = new double[iBins.Length];
+            if (0 >= iTotalReadings)
+            {
+                return fShares;
+            }
+
+            for (int iBinIndex = 0; iBinIndex < iBins.Length; iBinIndex++)
+            {
+                fShares[iBinIndex] = ((iBins[iBinIndex] * m_fPERCENT) / iTotalReadings);
+            }
+            return fShares;
+        }
+
+        /// <summary>
         /// Calculates the frequency range from both bin arrays for dynamic Y-axis scaling
         /// </summary>
-        /// <param name="iBins1">IN - First bin array</param>
-        /// <param name="iBins2">IN - Second bin array</param>
+        /// <param name="fBins1">IN - First bin array</param>
+        /// <param name="fBins2">IN - Second bin array</param>
         /// <returns>Tuple containing minimum and maximum frequency values</returns>
-        private (double fMinYValue, double fMaxYValue) CalculateFrequencyRange(int[] iBins1, int[] iBins2)
+        private (double fMinYValue, double fMaxYValue) CalculateFrequencyRange(double[] fBins1, double[] fBins2)
         {
-            int iMaxFrequency = 0;
+            double fMaxFrequency = 0;
 
             // Find the maximum frequency from both bin arrays
-            foreach (int iFrequency in iBins1)
+            foreach (double fFrequency in fBins1)
             {
-                if (iFrequency > iMaxFrequency)
+                if (fFrequency > fMaxFrequency)
                 {
-                    iMaxFrequency = iFrequency;
+                    fMaxFrequency = fFrequency;
                 }
             }
 
-            foreach (int iFrequency in iBins2)
+            foreach (double fFrequency in fBins2)
             {
-                if (iFrequency > iMaxFrequency)
+                if (fFrequency > fMaxFrequency)
                 {
-                    iMaxFrequency = iFrequency;
+                    fMaxFrequency = fFrequency;
                 }
             }
 
@@ -376,7 +537,7 @@ namespace RandomNumberGenerator
             double fMinYValue = m_fDEFAULT_Y_AXIS_MINIMUM;
             double fMaxYValue;
 
-            if (iMaxFrequency == 0)
+            if (m_fMINIMUM_SHARE >= fMaxFrequency)
             {
                 // No data points - use default range
                 fMaxYValue = m_fDEFAULT_Y_AXIS_MAXIMUM;
@@ -384,13 +545,13 @@ namespace RandomNumberGenerator
             else
             {
                 // Add padding to the maximum frequency for better visualization
-                double fPadding = iMaxFrequency * m_fY_RANGE_PADDING_FACTOR;
-                fMaxYValue = iMaxFrequency + fPadding;
+                double fPadding = fMaxFrequency * m_fY_RANGE_PADDING_FACTOR;
+                fMaxYValue = fMaxFrequency + fPadding;
                 
                 // Ensure minimum padding
-                if (fMaxYValue < (iMaxFrequency + m_fMINIMUM_Y_PADDING))
+                if (fMaxYValue < (fMaxFrequency + m_fMINIMUM_Y_PADDING))
                 {
-                    fMaxYValue = iMaxFrequency + m_fMINIMUM_Y_PADDING;
+                    fMaxYValue = fMaxFrequency + m_fMINIMUM_Y_PADDING;
                 }
             }
 
@@ -403,8 +564,32 @@ namespace RandomNumberGenerator
         // Chart configuration constants
         private const string m_sMAIN_CHART_AREA_NAME = "chartAreaHistogram";
         private const string m_sX_AXIS_TITLE = "Value";
-        private const string m_sY_AXIS_TITLE = "Frequency";
-        private const int m_iDEFAULT_BIN_COUNT = 100;
+        private const string m_sY_AXIS_TITLE = "% of the session's readings";
+
+        // Choosing the bin count. The factor and exponent are the usual cube-root rule; the floor and
+        // ceiling keep a small sample readable and a long session from turning into a comb.
+        private const double m_fBIN_COUNT_FACTOR = 2.0;
+        private const double m_fBIN_COUNT_EXPONENT = 1.0 / 3.0;
+        private const int m_iMINIMUM_BIN_COUNT = 10;
+        private const int m_iMAXIMUM_BIN_COUNT = 60;
+
+        // Turning bin counts into shares. A bin holding nothing at all is treated as empty rather than as a
+        // share too small to see, so an empty comparison falls back to the default axis.
+        private const double m_fPERCENT = 100.0;
+        private const double m_fMINIMUM_SHARE = 0.0;
+
+        // Axis labelling
+        private const string m_sDEFAULT_LABEL_FORMAT = "0.000";
+        private const int m_iMAXIMUM_LABEL_DECIMALS = 6;
+
+        // Building the format for a given number of decimals
+        private const string m_sWHOLE_NUMBER_LABEL_FORMAT = "0";
+        private const string m_sDECIMAL_LABEL_PREFIX = "0.";
+        private const char m_cLABEL_DECIMAL_PLACE = '0';
+        private const int m_iNO_DECIMALS = 0;
+
+        // How much of the space a bin is given the bar fills
+        private const string m_sPOINT_WIDTH = "0.9";
 
         // Dynamic range calculation constants
         private const double m_fDEFAULT_X_AXIS_MINIMUM = 0.0;
@@ -420,7 +605,6 @@ namespace RandomNumberGenerator
         private const double m_fY_RANGE_PADDING_FACTOR = 0.1; // 10% padding for Y-axis
         private const double m_fMINIMUM_Y_PADDING = 2.0; // Minimum padding for Y-axis
         private const double m_fDEFAULT_Y_INTERVAL = 1.0;
-        private const double m_fMINIMUM_Y_INTERVAL = 1.0; // Minimum interval for frequency data
 
         // Series color alpha values
         private const int m_iSERIES1_ALPHA = 120;

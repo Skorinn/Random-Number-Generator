@@ -8,10 +8,15 @@
 // Revision History: 
 //====================================================================================================================
 // 2025/01/20 - Mike Pullen - Original implementation.
+// 2026/09/07 - Mike Pullen - Cover the chosen bin count and the axis label precision
+// 2026/09/07 - Mike Pullen - Cover the axis being a share of a session rather than a count of readings
+// 2026/09/09 - Mike Pullen - Pin the axis label format to the precision the interval needs
 //*********************************************************************************************************************
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Reflection;
 
 namespace RandomNumberGenerator.Test
 {
@@ -80,6 +85,18 @@ namespace RandomNumberGenerator.Test
         private const int m_iLARGE_BIN_COUNT = 20;
         private const int m_iINVALID_BIN_COUNT_ZERO = 0;
         private const int m_iINVALID_BIN_COUNT_NEGATIVE = -5;
+
+        // Sample sizes for checking how the bin count is chosen, and the bounds it is held between
+        private const int m_iTINY_SAMPLE_SIZE = 5;
+        private const int m_iMODERATE_SAMPLE_SIZE = 200;
+        private const int m_iLARGE_SAMPLE_SIZE = 100000;
+        private const int m_iMINIMUM_BIN_COUNT = 10;
+        private const int m_iMAXIMUM_BIN_COUNT = 60;
+        private const int m_iMAXIMUM_LABEL_DECIMALS = 6;
+
+        // The chart plots shares of a session rather than counts of readings, so the axis is a percentage
+        private const double m_fY_AXIS_HEADROOM = 4.0;
+        private const double m_fUNEVEN_SHARE_ALLOWANCE = 3.0;
 
         // Y-axis scaling test constants
         private const double m_fEXPECTED_Y_AXIS_TOLERANCE = 0.01; // Tolerance for Y-axis value comparisons
@@ -630,9 +647,13 @@ namespace RandomNumberGenerator.Test
             Assert.AreEqual(m_fDEFAULT_Y_MINIMUM, fYAxisMinimum, m_fEXPECTED_Y_AXIS_TOLERANCE, 
                            "Y-axis minimum should be set to default value for frequency data");
 
-            // Verify Y-axis maximum is reasonable for low frequency data (should be modest)
-            Assert.IsTrue((fYAxisMaximum > m_fDEFAULT_Y_MINIMUM && fYAxisMaximum <= 10.0), 
-                         $"Y-axis maximum should scale modestly for low frequency data. Actual: {fYAxisMaximum}");
+            // The chart plots each session as a share of its own readings, so with five readings spread so
+            // that no bin holds more than one, the tallest bar is a fifth of the session
+            const double fEXPECTED_TALLEST_SHARE = 20.0;
+            Assert.IsTrue((fYAxisMaximum >= fEXPECTED_TALLEST_SHARE),
+                         $"Y-axis maximum should reach the tallest share. Actual: {fYAxisMaximum}");
+            Assert.IsTrue((fYAxisMaximum <= (fEXPECTED_TALLEST_SHARE + m_fY_AXIS_HEADROOM)),
+                         $"Y-axis maximum should not tower over the tallest share. Actual: {fYAxisMaximum}");
 
             // Verify Y-axis interval is set appropriately
             double fYAxisInterval = chartArea.AxisY.Interval;
@@ -763,10 +784,14 @@ namespace RandomNumberGenerator.Test
             Assert.AreEqual(m_fDEFAULT_Y_MINIMUM, fYAxisMinimum, m_fEXPECTED_Y_AXIS_TOLERANCE, 
                            "Y-axis minimum should be set to default value");
 
-            // Verify Y-axis maximum scales appropriately for large data set
-            // With 1000 data points and 20 bins, expect significant frequency counts
-            Assert.IsTrue((fYAxisMaximum > 20.0), 
-                         $"Y-axis maximum should scale appropriately for large data set. Actual: {fYAxisMaximum}");
+            // A thousand readings spread over twenty bins put roughly a twentieth of the session in each, so
+            // the axis stays around that share however many readings there are. Plotting shares rather than
+            // counts is what lets a long session and a short one be compared on the same chart.
+            const double fEVEN_SHARE = 5.0;
+            Assert.IsTrue((fYAxisMaximum > fEVEN_SHARE),
+                         $"Y-axis maximum should reach past an even share. Actual: {fYAxisMaximum}");
+            Assert.IsTrue((fYAxisMaximum < (fEVEN_SHARE * m_fUNEVEN_SHARE_ALLOWANCE)),
+                         $"Y-axis maximum should stay near the share, not the count. Actual: {fYAxisMaximum}");
 
             // Verify Y-axis interval is reasonable
             double fYAxisInterval = chartArea.AxisY.Interval;
@@ -906,8 +931,330 @@ namespace RandomNumberGenerator.Test
             // Verify Y-axis scales independently based on frequency data
             Assert.AreEqual(m_fDEFAULT_Y_MINIMUM, fYAxisMinimum, m_fEXPECTED_Y_AXIS_TOLERANCE, 
                            "Y-axis minimum should be independent of X-axis range");
-            Assert.IsTrue((fYAxisMaximum > m_fDEFAULT_Y_MAXIMUM_EMPTY), 
+            Assert.IsTrue((fYAxisMaximum > m_fDEFAULT_Y_MAXIMUM_EMPTY),
                          $"Y-axis maximum should scale based on frequency, not X-axis range. Actual: {fYAxisMaximum}");
+        }
+
+        #endregion
+        #region Bin Count and Axis Labelling Tests
+
+        /// <summary>
+        /// Tests that a plot with no bin count given divides the data into bins that follow the sample size
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void Plot_NoBinCount_ChoosesBinCountFromSampleSize()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            HistogramChart histogramChart = new HistogramChart();
+
+            // Two hundred readings spread over a range, which the cube root rule divides into twelve bins
+            List<double> spreadData = BuildSpreadData(m_iMODERATE_SAMPLE_SIZE);
+            const int iEXPECTED_BINS = 12;
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            histogramChart.Plot(spreadData, m_sTEST_LABEL_1, new List<double>(), m_sTEST_LABEL_2);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            Assert.AreEqual(iEXPECTED_BINS, histogramChart.Series[0].Points.Count,
+                            "The bin count should follow the cube root of the sample size");
+        }
+
+        /// <summary>
+        /// Tests that a handful of readings still produces enough bins to show a shape
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void Plot_TinySample_UsesTheMinimumBinCount()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            HistogramChart histogramChart = new HistogramChart();
+            List<double> tinyData = BuildSpreadData(m_iTINY_SAMPLE_SIZE);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            histogramChart.Plot(tinyData, m_sTEST_LABEL_1, new List<double>(), m_sTEST_LABEL_2);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            Assert.AreEqual(m_iMINIMUM_BIN_COUNT, histogramChart.Series[0].Points.Count,
+                            "A sample smaller than the floor should still be given the floor");
+        }
+
+        /// <summary>
+        /// Tests that a long session does not produce more bins than the chart can show as bars
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void Plot_LargeSample_CapsTheBinCount()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            HistogramChart histogramChart = new HistogramChart();
+            List<double> largeData = BuildSpreadData(m_iLARGE_SAMPLE_SIZE);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            histogramChart.Plot(largeData, m_sTEST_LABEL_1, new List<double>(), m_sTEST_LABEL_2);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            Assert.AreEqual(m_iMAXIMUM_BIN_COUNT, histogramChart.Series[0].Points.Count,
+                            "A sample large enough to exceed the ceiling should be held at it");
+        }
+
+        /// <summary>
+        /// Tests that the axis labels are printed to the precision that tells one tick from the next, rather
+        /// than at the full precision of a double, which runs the labels into one another
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void Plot_BitAverages_LabelsAxisToTickPrecision()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            HistogramChart histogramChart = new HistogramChart();
+
+            // Values of the shape the device produces, which are what showed the full precision on the axis
+            List<double> bitAverages = new List<double>();
+            for (int iIndex = 0; iIndex < m_iMODERATE_SAMPLE_SIZE; iIndex++)
+            {
+                bitAverages.Add(0.489044189453125 + (iIndex * 0.0001220703125));
+            }
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            histogramChart.Plot(bitAverages, m_sTEST_LABEL_1, new List<double>(), m_sTEST_LABEL_2);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            var chartArea = histogramChart.ChartAreas[0];
+            string sFormat = chartArea.AxisX.LabelStyle.Format;
+            Assert.IsFalse(string.IsNullOrEmpty(sFormat), "The x-axis should be given a label format");
+
+            // The label the axis minimum produces has to be short enough to sit beside its neighbour
+            string sLabel = chartArea.AxisX.Minimum.ToString(sFormat);
+            int iDecimals = (sLabel.Length - sLabel.IndexOf('.') - 1);
+            Assert.IsTrue((iDecimals <= m_iMAXIMUM_LABEL_DECIMALS),
+                          $"An axis label should not run to more than {m_iMAXIMUM_LABEL_DECIMALS} decimals. Actual: '{sLabel}'");
+
+            // The frequency axis counts readings, so it is labelled with whole numbers
+            string sFrequencyLabel = 3.0.ToString(chartArea.AxisY.LabelStyle.Format);
+            Assert.AreEqual("3", sFrequencyLabel, "The frequency axis should be labelled with whole numbers");
+        }
+
+        /// <summary>
+        /// Builds a set of readings spread evenly over a range, so the bins they fall into are decided by
+        /// how many of them there are rather than by where they happen to sit
+        /// </summary>
+        /// <param name="iCount">IN - How many readings to build</param>
+        /// <returns>The readings</returns>
+        private static List<double> BuildSpreadData(int iCount)
+        {
+            List<double> data = new List<double>(iCount);
+            for (int iIndex = 0; iIndex < iCount; iIndex++)
+            {
+                data.Add(iIndex / (double)iCount);
+            }
+            return data;
+        }
+
+        /// <summary>
+        /// Tests the axis labels are printed to the precision the tick interval needs, and no further
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void GetAxisLabelFormat_VaryingIntervals_PrintsToThePrecisionTheIntervalNeeds()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // An interval and the label a value should carry under the format chosen for it. A whole number
+            // interval needs no decimals; the finer the interval, the more places it takes to tell two ticks
+            // apart. The interval is capped so a very fine one cannot ask for a label of any length.
+            var cases = new[]
+            {
+                new { Interval = 10.0,     Value = 5.0,        Expected = "5"        },
+                new { Interval = 1.0,      Value = 5.0,        Expected = "5"        },
+                new { Interval = 0.5,      Value = 0.25,       Expected = "0.3"      },
+                new { Interval = 0.1,      Value = 0.25,       Expected = "0.3"      },
+                new { Interval = 0.01,     Value = 0.256,      Expected = "0.26"     },
+                new { Interval = 0.001,    Value = 0.2564,     Expected = "0.256"    },
+                new { Interval = 0.0000001, Value = 0.12345678, Expected = "0.123457" },
+            };
+
+            // Reach the format chooser, which is private because nothing outside the chart picks a format
+            MethodInfo formatMethod = typeof(HistogramChart).GetMethod("GetAxisLabelFormat",
+                                          BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.IsNotNull(formatMethod, "GetAxisLabelFormat should be there to test");
+
+            //**************************************************************//
+            // Act & Assert
+            //**************************************************************//
+
+            foreach (var testCase in cases)
+            {
+                string sFormat = (string)formatMethod.Invoke(null, new object[] { testCase.Interval });
+                string sLabel = testCase.Value.ToString(sFormat, CultureInfo.InvariantCulture);
+
+                // Verify the label reads as a number rather than one left ending at the decimal point
+                Assert.IsFalse(sLabel.EndsWith("."),
+                               $"An interval of {testCase.Interval} produced '{sLabel}', which ends at the point");
+                Assert.AreEqual(testCase.Expected, sLabel,
+                                $"An interval of {testCase.Interval} labelled {testCase.Value} wrongly");
+            }
+        }
+
+        /// <summary>
+        /// Tests an interval of nothing falls back to a format rather than dividing by it
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void GetAxisLabelFormat_NoInterval_FallsBackToADefault()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            const double fNO_INTERVAL = 0.0;
+            const double fNEGATIVE_INTERVAL = -1.0;
+
+            MethodInfo formatMethod = typeof(HistogramChart).GetMethod("GetAxisLabelFormat",
+                                          BindingFlags.NonPublic | BindingFlags.Static);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            string sNoInterval = (string)formatMethod.Invoke(null, new object[] { fNO_INTERVAL });
+            string sNegative = (string)formatMethod.Invoke(null, new object[] { fNEGATIVE_INTERVAL });
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify neither produces something that is not a format at all
+            Assert.IsFalse(string.IsNullOrEmpty(sNoInterval));
+            Assert.IsFalse(string.IsNullOrEmpty(sNegative));
+            Assert.AreEqual(sNoInterval, sNegative, "Both should fall back the same way");
+        }
+
+        /// <summary>
+        /// Tests the share axis divides itself finely enough to read when the tallest bin holds only a small
+        /// part of its session, which is what a flat distribution across many bins gives
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void CalculateOptimalYInterval_SmallShares_DividesTheAxisFinelyEnoughToRead()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // The axis carries a percentage, so its range is the tallest bin's share of its session. Spread
+            // evenly over the most bins the chart will use, a bin holds under two percent of it.
+            const double fSMALL_SHARE = 1.7;
+            const double fVERY_SMALL_SHARE = 0.4;
+            const int iFEWEST_USEFUL_TICKS = 3;
+
+            HistogramChart histogramChart = new HistogramChart();
+            MethodInfo intervalMethod = typeof(HistogramChart).GetMethod("CalculateOptimalYInterval",
+                                            BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.IsNotNull(intervalMethod, "CalculateOptimalYInterval should be there to test");
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            double fSmallInterval = (double)intervalMethod.Invoke(histogramChart, new object[] { fSMALL_SHARE });
+            double fVerySmallInterval = (double)intervalMethod.Invoke(histogramChart, new object[] { fVERY_SMALL_SHARE });
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the axis is divided rather than left holding the data between a single pair of ticks,
+            // which is what it did while the interval was held at a whole number for counting readings
+            Assert.IsTrue((fSMALL_SHARE / fSmallInterval) >= iFEWEST_USEFUL_TICKS,
+                          $"A range of {fSMALL_SHARE}% was divided at {fSmallInterval}, which is too coarse to read");
+            Assert.IsTrue((fVERY_SMALL_SHARE / fVerySmallInterval) >= iFEWEST_USEFUL_TICKS,
+                          $"A range of {fVERY_SMALL_SHARE}% was divided at {fVerySmallInterval}, which is too coarse to read");
+
+            // Verify the labels can tell one tick from the next, rather than rounding them all to the same
+            // whole number the way a count would be labelled
+            MethodInfo formatMethod = typeof(HistogramChart).GetMethod("GetAxisLabelFormat",
+                                          BindingFlags.NonPublic | BindingFlags.Static);
+            string sFormat = (string)formatMethod.Invoke(null, new object[] { fVerySmallInterval });
+            string sFirstTick = fVerySmallInterval.ToString(sFormat, CultureInfo.InvariantCulture);
+            string sSecondTick = (fVerySmallInterval * 2).ToString(sFormat, CultureInfo.InvariantCulture);
+            Assert.AreNotEqual(sFirstTick, sSecondTick,
+                               $"Two ticks {fVerySmallInterval} apart both read '{sFirstTick}'");
+        }
+
+        /// <summary>
+        /// Tests a range that is still large enough for whole numbers is left with them, so the common case
+        /// is not given decimals it does not need
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void CalculateOptimalYInterval_LargerShares_KeepsWholeNumberLabels()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // What a session of a few thousand readings actually gives, measured from a recorded run
+            const double fTYPICAL_SHARE = 8.1;
+
+            HistogramChart histogramChart = new HistogramChart();
+            MethodInfo intervalMethod = typeof(HistogramChart).GetMethod("CalculateOptimalYInterval",
+                                            BindingFlags.NonPublic | BindingFlags.Instance);
+            MethodInfo formatMethod = typeof(HistogramChart).GetMethod("GetAxisLabelFormat",
+                                          BindingFlags.NonPublic | BindingFlags.Static);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            double fInterval = (double)intervalMethod.Invoke(histogramChart, new object[] { fTYPICAL_SHARE });
+            string sFormat = (string)formatMethod.Invoke(null, new object[] { fInterval });
+            string sLabel = (fInterval * 2).ToString(sFormat, CultureInfo.InvariantCulture);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify a share this size is still labelled in whole numbers rather than gaining a decimal place
+            Assert.IsFalse(sLabel.Contains("."), $"A typical share was labelled '{sLabel}'");
         }
 
         #endregion
