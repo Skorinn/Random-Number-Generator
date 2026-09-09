@@ -135,7 +135,8 @@ stopping the recording.
 |---|---|
 | `RandomNumberGenerator.csproj` | The application. Windows Forms, .NET Framework 4.8, AnyCPU |
 | `TruRNGpro/TruRNGpro.vcxproj` | Native DLL holding the device interface and the simulator. x64 |
-| `RandomNumberGenerator.Test/` | Unit tests. MSTest and Moq |
+| `tests/RandomNumberGenerator.Test/` | Unit tests. MSTest and Moq |
+| `tests/manual/` | Suites that drive the built application, some needing the device attached |
 
 The application talks to the native DLL through two exported functions, `Initialize` and
 `GetRandomBitAverage`, which sit behind an interface implemented by both the real device and the simulator.
@@ -143,7 +144,7 @@ The application talks to the native DLL through two exported functions, `Initial
 ## Tests
 
 ```
-vstest.console.exe "RandomNumberGenerator.Test\bin\Debug\Random Number Generator.Test.dll"
+vstest.console.exe "tests\RandomNumberGenerator.Test\bin\Debug\Random Number Generator.Test.dll"
 ```
 
 `vstest.console.exe` is under the Visual Studio installation, in
@@ -162,7 +163,7 @@ in place.
 The coding standards are written down and are followed throughout:
 
 - `CODING_GUIDELINES.md` for the application
-- `RandomNumberGenerator.Test/CODING_GUIDELINES_TESTS.md` for the tests
+- `tests/RandomNumberGenerator.Test/CODING_GUIDELINES_TESTS.md` for the tests
 - `TruRNGpro/CODING_GUIDELINES_CPP.md` for the native code
 
 `CLAUDE.md` describes the architecture and the build for anyone, or anything, new to the codebase.

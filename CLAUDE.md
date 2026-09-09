@@ -11,7 +11,10 @@ the results. The device access layer is a native C++ DLL (`TruRNGpro`) called th
 Three projects in `RandomNumberGenerator.sln`:
 - `RandomNumberGenerator.csproj` — WinForms app, AnyCPU (64-bit; `Prefer32Bit=false`)
 - `TruRNGpro/TruRNGpro.vcxproj` — native C++ DLL, **x64 only** (solution maps `Any CPU` → `x64`)
-- `RandomNumberGenerator.Test/` — MSTest + Moq unit tests
+- `tests/RandomNumberGenerator.Test/` — MSTest + Moq unit tests
+
+Both kinds of test live under `tests/`: the unit tests above, and `tests/manual/`, which drives the built
+application and is described in its own README.
 
 ## Build and test
 
@@ -28,12 +31,12 @@ nuget restore RandomNumberGenerator.sln
 & $msbuild RandomNumberGenerator.sln /p:Configuration=Debug /p:Platform="Any CPU"
 
 # Run all tests
-& $vstest "RandomNumberGenerator.Test\bin\Debug\Random Number Generator.Test.dll"
+& $vstest "tests\RandomNumberGenerator.Test\bin\Debug\Random Number Generator.Test.dll"
 
 # Run a single test / class / category
-& $vstest "RandomNumberGenerator.Test\bin\Debug\Random Number Generator.Test.dll" /Tests:WriteDataPoint_ValidWriter_Success
-& $vstest "RandomNumberGenerator.Test\bin\Debug\Random Number Generator.Test.dll" /TestCaseFilter:"FullyQualifiedName~RNGXMLWriterTests"
-& $vstest "RandomNumberGenerator.Test\bin\Debug\Random Number Generator.Test.dll" /TestCaseFilter:"TestCategory=Component"
+& $vstest "tests\RandomNumberGenerator.Test\bin\Debug\Random Number Generator.Test.dll" /Tests:WriteDataPoint_ValidWriter_Success
+& $vstest "tests\RandomNumberGenerator.Test\bin\Debug\Random Number Generator.Test.dll" /TestCaseFilter:"FullyQualifiedName~RNGXMLWriterTests"
+& $vstest "tests\RandomNumberGenerator.Test\bin\Debug\Random Number Generator.Test.dll" /TestCaseFilter:"TestCategory=Component"
 ```
 
 Build ordering matters. The native project copies `TruRNGpro.dll` to `<sln>\bin\`, and both the app and the
@@ -241,7 +244,7 @@ here (`DeviceInterfaces` supplies the `USBDeviceNotification` constants used in 
 
 ## Coding conventions
 
-`CODING_GUIDELINES.md` (app), `RandomNumberGenerator.Test/CODING_GUIDELINES_TESTS.md` (tests), and
+`CODING_GUIDELINES.md` (app), `tests/RandomNumberGenerator.Test/CODING_GUIDELINES_TESTS.md` (tests), and
 `TruRNGpro/CODING_GUIDELINES_CPP.md` (native) are authoritative and are actually followed throughout. The
 non-obvious rules new code is expected to match:
 

@@ -147,7 +147,7 @@ jobs:
               exit 1
           }
 
-          & $vstest "RandomNumberGenerator.Test\bin\Release\Random Number Generator.Test.dll" /Logger:"console;verbosity=minimal"
+          & $vstest "tests\RandomNumberGenerator.Test\bin\Release\Random Number Generator.Test.dll" /Logger:"console;verbosity=minimal"
           if ($LASTEXITCODE -ne 0)
           {
               Write-Host "::error::The tests did not pass, so nothing is released."
