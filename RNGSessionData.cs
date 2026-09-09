@@ -88,13 +88,13 @@ namespace RandomNumberGenerator
             // Data file object provided cannot be null
             if (null == dataFile)
             {
-                throw new ArgumentNullException("Specified data file object cannot be null");
+                throw new ArgumentNullException(nameof(dataFile), "Specified data file object cannot be null");
             }
 
             // Timer object provided cannot be null
             if (null == timer)
             {
-                throw new ArgumentNullException("Specified timer object cannot be null");
+                throw new ArgumentNullException(nameof(timer), "Specified timer object cannot be null");
             }
 
             m_DataFile = dataFile;

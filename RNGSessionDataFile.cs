@@ -74,7 +74,7 @@ namespace RandomNumberGenerator
             // Writer object provided cannot be null
             if (null == writer)
             {
-                throw new ArgumentNullException("Specified writer object cannot be null");
+                throw new ArgumentNullException(nameof(writer), "Specified writer object cannot be null");
             }
 
             m_Writer = writer;
@@ -90,7 +90,7 @@ namespace RandomNumberGenerator
             // Writer object provided cannot be null
             if (null == writer)
             {
-                throw new ArgumentNullException("Specified writer object cannot be null");
+                throw new ArgumentNullException(nameof(writer), "Specified writer object cannot be null");
             }
 
             m_Writer = writer;
@@ -137,7 +137,7 @@ namespace RandomNumberGenerator
             // Session data object provided cannot be null
             if (null == sessionData)
             {
-                throw new ArgumentNullException("Specified data object cannot be null");
+                throw new ArgumentNullException(nameof(sessionData), "Specified data object cannot be null");
             }
 
             // Default the status to failure
@@ -214,7 +214,7 @@ namespace RandomNumberGenerator
             // Data point object provided cannot be null
             if (null == dataPoint)
             {
-                throw new ArgumentNullException("Specified data point object cannot be null");
+                throw new ArgumentNullException(nameof(dataPoint), "Specified data point object cannot be null");
             }
 
             // Default the status to failure
@@ -242,12 +242,12 @@ namespace RandomNumberGenerator
             // Validate parameters
             if (null == sessionData)
             {
-                throw new ArgumentNullException("Specified session data object cannot be null");
+                throw new ArgumentNullException(nameof(sessionData), "Specified session data object cannot be null");
             }
 
             if (string.IsNullOrEmpty(sFilePath))
             {
-                throw new ArgumentNullException("Specified file path cannot be null or empty");
+                throw new ArgumentNullException(nameof(sFilePath), "Specified file path cannot be null or empty");
             }
 
             bool bStatus = false;

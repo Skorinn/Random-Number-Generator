@@ -1168,6 +1168,95 @@ namespace RandomNumberGenerator.Test
             Assert.AreEqual(sNoInterval, sNegative, "Both should fall back the same way");
         }
 
+        /// <summary>
+        /// Tests the share axis divides itself finely enough to read when the tallest bin holds only a small
+        /// part of its session, which is what a flat distribution across many bins gives
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void CalculateOptimalYInterval_SmallShares_DividesTheAxisFinelyEnoughToRead()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // The axis carries a percentage, so its range is the tallest bin's share of its session. Spread
+            // evenly over the most bins the chart will use, a bin holds under two percent of it.
+            const double fSMALL_SHARE = 1.7;
+            const double fVERY_SMALL_SHARE = 0.4;
+            const int iFEWEST_USEFUL_TICKS = 3;
+
+            HistogramChart histogramChart = new HistogramChart();
+            MethodInfo intervalMethod = typeof(HistogramChart).GetMethod("CalculateOptimalYInterval",
+                                            BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.IsNotNull(intervalMethod, "CalculateOptimalYInterval should be there to test");
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            double fSmallInterval = (double)intervalMethod.Invoke(histogramChart, new object[] { fSMALL_SHARE });
+            double fVerySmallInterval = (double)intervalMethod.Invoke(histogramChart, new object[] { fVERY_SMALL_SHARE });
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify the axis is divided rather than left holding the data between a single pair of ticks,
+            // which is what it did while the interval was held at a whole number for counting readings
+            Assert.IsTrue((fSMALL_SHARE / fSmallInterval) >= iFEWEST_USEFUL_TICKS,
+                          $"A range of {fSMALL_SHARE}% was divided at {fSmallInterval}, which is too coarse to read");
+            Assert.IsTrue((fVERY_SMALL_SHARE / fVerySmallInterval) >= iFEWEST_USEFUL_TICKS,
+                          $"A range of {fVERY_SMALL_SHARE}% was divided at {fVerySmallInterval}, which is too coarse to read");
+
+            // Verify the labels can tell one tick from the next, rather than rounding them all to the same
+            // whole number the way a count would be labelled
+            MethodInfo formatMethod = typeof(HistogramChart).GetMethod("GetAxisLabelFormat",
+                                          BindingFlags.NonPublic | BindingFlags.Static);
+            string sFormat = (string)formatMethod.Invoke(null, new object[] { fVerySmallInterval });
+            string sFirstTick = fVerySmallInterval.ToString(sFormat, CultureInfo.InvariantCulture);
+            string sSecondTick = (fVerySmallInterval * 2).ToString(sFormat, CultureInfo.InvariantCulture);
+            Assert.AreNotEqual(sFirstTick, sSecondTick,
+                               $"Two ticks {fVerySmallInterval} apart both read '{sFirstTick}'");
+        }
+
+        /// <summary>
+        /// Tests a range that is still large enough for whole numbers is left with them, so the common case
+        /// is not given decimals it does not need
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void CalculateOptimalYInterval_LargerShares_KeepsWholeNumberLabels()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // What a session of a few thousand readings actually gives, measured from a recorded run
+            const double fTYPICAL_SHARE = 8.1;
+
+            HistogramChart histogramChart = new HistogramChart();
+            MethodInfo intervalMethod = typeof(HistogramChart).GetMethod("CalculateOptimalYInterval",
+                                            BindingFlags.NonPublic | BindingFlags.Instance);
+            MethodInfo formatMethod = typeof(HistogramChart).GetMethod("GetAxisLabelFormat",
+                                          BindingFlags.NonPublic | BindingFlags.Static);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            double fInterval = (double)intervalMethod.Invoke(histogramChart, new object[] { fTYPICAL_SHARE });
+            string sFormat = (string)formatMethod.Invoke(null, new object[] { fInterval });
+            string sLabel = (fInterval * 2).ToString(sFormat, CultureInfo.InvariantCulture);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify a share this size is still labelled in whole numbers rather than gaining a decimal place
+            Assert.IsFalse(sLabel.Contains("."), $"A typical share was labelled '{sLabel}'");
+        }
+
         #endregion
     }
 }

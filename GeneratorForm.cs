@@ -86,12 +86,12 @@ namespace RandomNumberGenerator
         {
             if (null == sessionData)
             {
-                throw new ArgumentNullException("Specified data object cannot be null");
+                throw new ArgumentNullException(nameof(sessionData), "Specified data object cannot be null");
             }
 
             if (null == timer)
             {
-                throw new ArgumentNullException("Specified timer object cannot be null");
+                throw new ArgumentNullException(nameof(timer), "Specified timer object cannot be null");
             }
 
             // Record the session and timer objects provided

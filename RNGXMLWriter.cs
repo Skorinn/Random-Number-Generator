@@ -165,7 +165,7 @@ namespace RandomNumberGenerator
             // Validate the data point
             if (null == dataPoint)
             {
-                throw new ArgumentNullException("Data point cannot be null.");
+                throw new ArgumentNullException(nameof(dataPoint), "Data point cannot be null.");
             }
 
             // Limit access to the file to one thread at a time

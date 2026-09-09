@@ -12,6 +12,8 @@
 //                            and put the key above the plot
 // 2026/09/07 - Mike Pullen - Plot each session as a share of its own readings, so two sessions of
 //                            different lengths can be compared
+// 2026/09/09 - Mike Pullen - Let the share axis interval follow the data rather than holding it at whole
+//                            numbers, which it was doing from when the axis counted readings
 //*********************************************************************************************************************
 using System;
 using System.Collections.Generic;
@@ -343,8 +345,10 @@ namespace RandomNumberGenerator
                 double fYInterval = CalculateOptimalYInterval(fYRange);
                 mainChartArea.AxisY.Interval = fYInterval;
 
-                // Frequencies are counts, so the axis is labelled with whole numbers
-                mainChartArea.AxisY.LabelStyle.Format = m_sFREQUENCY_LABEL_FORMAT;
+                // The axis carries each session as a share of its own readings, so it is labelled to the
+                // precision the interval needs, the same way the value axis is. It used to be labelled in
+                // whole numbers because it counted readings, and a share of a session is not a count.
+                mainChartArea.AxisY.LabelStyle.Format = GetAxisLabelFormat(fYInterval);
             }
         }
 
@@ -414,9 +418,12 @@ namespace RandomNumberGenerator
             }
 
             double fCalculatedInterval = fBaseInterval * Math.Pow(10, fPowerOf10);
-            
-            // Ensure the interval is at least 1 for frequency data (since frequencies are integers)
-            return Math.Max(fCalculatedInterval, m_fMINIMUM_Y_INTERVAL);
+
+            // The interval follows the data. It used to be held at one or more, because the axis counted
+            // readings and a count cannot fall between two whole numbers; the axis carries each session as
+            // a share of its own readings now, and a share can. Holding it at one put a comparison whose
+            // tallest bin held a percent or two of its session between a single pair of ticks.
+            return fCalculatedInterval;
         }
 
         /// <summary>
@@ -573,7 +580,6 @@ namespace RandomNumberGenerator
 
         // Axis labelling
         private const string m_sDEFAULT_LABEL_FORMAT = "0.000";
-        private const string m_sFREQUENCY_LABEL_FORMAT = "0";
         private const int m_iMAXIMUM_LABEL_DECIMALS = 6;
 
         // Building the format for a given number of decimals
@@ -599,7 +605,6 @@ namespace RandomNumberGenerator
         private const double m_fY_RANGE_PADDING_FACTOR = 0.1; // 10% padding for Y-axis
         private const double m_fMINIMUM_Y_PADDING = 2.0; // Minimum padding for Y-axis
         private const double m_fDEFAULT_Y_INTERVAL = 1.0;
-        private const double m_fMINIMUM_Y_INTERVAL = 1.0; // Minimum interval for frequency data
 
         // Series color alpha values
         private const int m_iSERIES1_ALPHA = 120;
