@@ -9,6 +9,8 @@
 //=====================================================================================================================
 //* 09/10/2022 - Mike Pullen - Original implementation.
 //* 10/30/2022 - Mike Pullen - Recreated under VS2022 and added ARM64 support.
+//* 09/08/2026 - Mike Pullen - Opened the device again after a failed read rather than giving up on it, so a
+//*                            momentary fault no longer ends the session
 //*********************************************************************************************************************
 #pragma once
 #include "rng.h"
@@ -36,12 +38,15 @@ namespace RNGInterfaces
         static const size_t mc_iTRURNGPRO_BUFFER_SIZE = 32768; // Increased from 4096 to 32768 (8x increase)
         unsigned char m_Buffer[mc_iTRURNGPRO_BUFFER_SIZE]; // Buffer for reading from the device
         RandomFromTrueRNG* m_pTruRNGProInterface; // 3rd party interface that wraps the COM port setup and reads
+        unsigned int m_iPortNum; // Port the interface was opened on, so it can be opened again
+
+        bool ReadBuffer(); // One attempt at filling the buffer from the device
     };
 
     /// <summary>
     /// Default constructor. Note: Must call Initialize before use.
     /// </summary>
-    TruRNGpro::TruRNGpro() : m_pTruRNGProInterface(nullptr), m_Buffer{}
+    TruRNGpro::TruRNGpro() : m_pTruRNGProInterface(nullptr), m_Buffer{}, m_iPortNum(0)
     {
     }
 
@@ -49,7 +54,7 @@ namespace RNGInterfaces
     /// Constructor specifying port number
     /// </summary>
     /// <param name="iPortNum">IN - COM port the device is connected through</param>
-    TruRNGpro::TruRNGpro(unsigned int iPortNum) : m_Buffer{}
+    TruRNGpro::TruRNGpro(unsigned int iPortNum) : m_Buffer{}, m_iPortNum(iPortNum)
     {
         m_pTruRNGProInterface = new RandomFromTrueRNG(iPortNum);
     }
@@ -77,8 +82,28 @@ namespace RNGInterfaces
             m_pTruRNGProInterface = nullptr;
         }
         m_pTruRNGProInterface = new RandomFromTrueRNG(iPortNum);
+        m_iPortNum = iPortNum;
 
         return !(m_pTruRNGProInterface->bad);
+    }
+
+    /// <summary>
+    /// Makes one attempt at filling the buffer from the device
+    /// </summary>
+    /// <returns>true, if the whole buffer was filled, otherwise false</returns>
+    bool TruRNGpro::ReadBuffer()
+    {
+        // Nothing to read from if the interface was never built, or has gone bad
+        if ((nullptr == m_pTruRNGProInterface) || (m_pTruRNGProInterface->bad))
+        {
+            return false;
+        }
+
+        // Read the data from the device. A short read means the device stopped part way through, which the
+        // third party interface reports by marking itself bad, so the count is what decides.
+        int iBytesRead = m_pTruRNGProInterface->fill(m_Buffer, mc_iTRURNGPRO_BUFFER_SIZE);
+
+        return (iBytesRead == mc_iTRURNGPRO_BUFFER_SIZE);
     }
 
     /// <summary>
@@ -88,30 +113,30 @@ namespace RNGInterfaces
     /// <returns>true - if successful, otherwise false</returns>
     bool TruRNGpro::GetBitAverage(double& rfResult)
     {
-        // Ensure the interace was initialized
-        bool bStatus = (nullptr != m_pTruRNGProInterface);
         rfResult = 0.0;
 
-        if (true == bStatus)
-        {
-            // Skip and return error if interface is in a bad state
-            bStatus = !(m_pTruRNGProInterface->bad);
-        }
+        // Try to read from the device as it stands
+        bool bStatus = ReadBuffer();
 
-        if (true == bStatus)
+        // A read that fails leaves the third party interface marked bad, and it stays bad: every read
+        // after it fails too, so one momentary fault on the USB port ended the session and the readings
+        // stopped until the user pressed Start again. The device itself is fine - opening it again and
+        // carrying on works - so that is what is done here rather than giving up on it. Only if it will
+        // not open again is the read reported as having failed, which is what an unplugged device does.
+        if (false == bStatus)
         {
-            // Read the data from the device
-            int iBytesRead = m_pTruRNGProInterface->fill(m_Buffer, mc_iTRURNGPRO_BUFFER_SIZE);
-
-            // Skip and return an error if the number of bytes read doesn't match what was collected
-            bStatus = (iBytesRead == mc_iTRURNGPRO_BUFFER_SIZE);
+            // Build the interface again on the port it was opened on, and read once more
+            bool bReopened = Initialize(m_iPortNum);
+            if (true == bReopened)
+            {
+                bStatus = ReadBuffer();
+            }
         }
 
         if (true == bStatus)
         {
             // Loop through the bytes read from the device
             INT64 iBitSum = 0;
-            short iOddCount = 0;
             for (size_t iByteIndex = 0; iByteIndex < mc_iTRURNGPRO_BUFFER_SIZE; ++iByteIndex)
             {
                 // Add up the value of each individual bit
@@ -122,7 +147,9 @@ namespace RNGInterfaces
                 }
             }
 
-            // The result is the average of all of the bits
+            // The result is the average of all of the bits. Every reading is an average of the same number
+            // of bits, whether it took one attempt or two, so a recovered read is not a different kind of
+            // measurement from the ones around it.
             rfResult = (static_cast<double>(iBitSum) / (mc_iTRURNGPRO_BUFFER_SIZE * 8));
         }
 

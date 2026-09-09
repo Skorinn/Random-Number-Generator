@@ -8,6 +8,8 @@
 // Revision History: 
 //====================================================================================================================
 // 2024/02/03 - Mike Pullen - Original implementation.
+// 2026/09/08 - Mike Pullen - Marshalled the native bool as one byte, so a device that fails to initialize
+//                            is reported as having failed rather than as ready
 //*********************************************************************************************************************
 using System;
 using System.Runtime.InteropServices;
@@ -42,10 +44,17 @@ namespace RandomNumberGenerator
     {
         #region Imports
 
+        // The native side returns a C++ bool, which is one byte. Left to itself the marshaller expects the
+        // four byte Windows BOOL, so it reads three bytes of whatever the call left behind along with the
+        // answer, and a native false comes back as true often enough to matter: initializing against a port
+        // with nothing on it reported success, and the failure only showed up as a read error a moment
+        // later. I1 is the one byte bool, which is what these functions actually return and take.
         [DllImport("TruRNGpro.dll", CallingConvention = CallingConvention.Winapi)]
-        internal static extern bool Initialize(int iPort, bool bSimulate);
+        [return: MarshalAs(UnmanagedType.I1)]
+        internal static extern bool Initialize(int iPort, [MarshalAs(UnmanagedType.I1)] bool bSimulate);
 
         [DllImport("TruRNGpro.dll", CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.I1)]
         internal static extern bool GetRandomBitAverage(ref double fResult);
 
         #endregion

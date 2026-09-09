@@ -506,10 +506,16 @@ namespace RandomNumberGenerator
                 // A new session file has been selected, so end the current session
                 EndSession();
 
-                // The chart shows what is in the file, so it starts empty for the file being opened. An
+                // The window shows what is in the file, so it starts empty for the file being opened. An
                 // existing file fills it back in as it loads; without this the file being opened was drawn
-                // on top of the one before it.
+                // on top of the one before it, and its readings were counted along with them.
+                //
+                // The readings go with the chart. Loading an existing file resets them on the way in, so
+                // only a new file was left holding the last one's, which showed as an empty chart beside a
+                // count of the readings that used to be on it.
+                m_Data.Reset();
                 m_ResultChart.Clear();
+                UpdateStatisticsDisplay();
 
                 // Check if the file exists
                 bool bFileExists = File.Exists(sSelectedFile);
