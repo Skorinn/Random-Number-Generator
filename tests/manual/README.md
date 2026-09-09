@@ -1,6 +1,6 @@
 # Manual test suites
 
-These drive the built application rather than its classes. The unit tests in `RandomNumberGenerator.Test`
+These drive the built application rather than its classes. The unit tests in `tests/RandomNumberGenerator.Test`
 cover the layers underneath the window; nothing in them builds the form's event wiring, and nothing in them
 can reach the device at all. Everything here exists because a fault got past a clean unit run.
 
