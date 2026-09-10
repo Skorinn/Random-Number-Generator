@@ -37,6 +37,7 @@ $suites = @(
     "check-chart.ps1",
     "inproc-length.ps1",
     "check-appended.ps1",
+    "check-sensitivity.ps1",
     "check-device.ps1",
     "check-reinit.ps1",
     "check-nodevice.ps1"

@@ -39,6 +39,7 @@ already does.
 | `test-analyze.ps1` | no | The Analyse tab: the comparison table, the significance verdict and its wording, the histogram, and recovering a session file left unterminated by killing the application mid-write. |
 | `check-chart.ps1` | no | That the chart and the statistics beside it agree on every path — recording, a second session into the same file, a different file being chosen, an existing file being reopened, and Clear. |
 | `inproc-length.ps1` | no | The session length, and the data file surviving a session ending. Drives the form directly, so it covers the state machine rather than the pixels. |
+| `check-sensitivity.ps1` | no | That the verdict states what shift the two sessions could show, and warns when nothing was found because nothing could have been. |
 | `check-appended.ps1` | no | That a file grown by a second session reads back correctly on the Record tab and analyses correctly on the Analyse tab. |
 | `check-device.ps1` | **yes** | Device discovery, the native reads, a session recorded from the hardware, a second session appended to it, a timed session, and the recorded file analysing. Also that a port with nothing on it is refused. |
 | `check-reinit.ps1` | **yes** | Switching between the device and the simulator and back, which tears down the native interface and builds a new one each time. |

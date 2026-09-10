@@ -376,6 +376,289 @@ namespace RandomNumberGenerator.Test
         private const double m_fFREEDOM_TOLERANCE = 0.001;
         private const double m_fPROBABILITY_TOLERANCE = 0.000001;
 
+        /// <summary>
+        /// Tests the smallest detectable shift agrees with the test it is derived from. A shift of exactly
+        /// that size, applied to the readings, should sit right on the edge of significance: this is the
+        /// same arithmetic read the other way round, so the two have to meet.
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void SmallestDetectableShift_ShiftOfThatSize_SitsOnTheEdgeOfSignificance()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            const double fEXPECTED_MEAN = 0.5;
+            const double fEDGE_TOLERANCE = 0.002;
+
+            // Readings with a spread, sitting on the expected value so the shift applied below is the whole
+            // of the difference the test sees
+            List<double> readings = MakeSpreadReadings(200, fEXPECTED_MEAN, 0.001);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            double fDetectable = SignificanceTest.SmallestDetectableShift(readings);
+
+            // Move every reading by exactly that much and ask the test what it makes of it
+            List<double> shifted = new List<double>();
+            foreach (double fReading in readings)
+            {
+                shifted.Add(fReading + fDetectable);
+            }
+            SignificanceResult onTheEdge = SignificanceTest.CompareWithExpected(shifted, fEXPECTED_MEAN);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify a shift of exactly the detectable size lands on the significance level rather than
+            // somewhere unrelated to it
+            Assert.IsTrue(onTheEdge.Valid);
+            Assert.AreEqual(SignificanceResult.SIGNIFICANCE_LEVEL, onTheEdge.Probability, fEDGE_TOLERANCE,
+                            $"A shift of {fDetectable} gave a probability of {onTheEdge.Probability}");
+        }
+
+        /// <summary>
+        /// Tests a shift smaller than the detectable size cannot reach significance, which is the whole
+        /// point of warning about it
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void SmallestDetectableShift_SmallerShift_CannotReachSignificance()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            const double fEXPECTED_MEAN = 0.5;
+            const double fWELL_UNDER = 0.5;
+
+            List<double> readings = MakeSpreadReadings(200, fEXPECTED_MEAN, 0.001);
+            double fDetectable = SignificanceTest.SmallestDetectableShift(readings);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            // Half the shift the readings could show
+            List<double> shifted = new List<double>();
+            foreach (double fReading in readings)
+            {
+                shifted.Add(fReading + (fDetectable * fWELL_UNDER));
+            }
+            SignificanceResult tooSmall = SignificanceTest.CompareWithExpected(shifted, fEXPECTED_MEAN);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify a real shift of that size goes unfound, which is what the warning exists to say
+            Assert.IsTrue(tooSmall.Valid);
+            Assert.IsFalse(tooSmall.Significant,
+                           $"A shift of half the detectable size reached significance at {tooSmall.Probability}");
+        }
+
+        /// <summary>
+        /// Tests more readings pin the mean down more finely, at the rate the arithmetic says they should
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void SmallestDetectableShift_MoreReadings_PinsTheMeanDownMoreFinely()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Four times the readings should halve the detectable shift, as it falls with the root of the
+            // count. The tolerance is loose because the critical value also moves with the count.
+            const double fEXPECTED_RATIO = 2.0;
+            const double fRATIO_TOLERANCE = 0.15;
+
+            List<double> few = MakeSpreadReadings(100, 0.5, 0.001);
+            List<double> many = MakeSpreadReadings(400, 0.5, 0.001);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            double fFew = SignificanceTest.SmallestDetectableShift(few);
+            double fMany = SignificanceTest.SmallestDetectableShift(many);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            Assert.IsTrue(fMany < fFew, "More readings should pin the mean down more finely");
+            Assert.AreEqual(fEXPECTED_RATIO, (fFew / fMany), fRATIO_TOLERANCE,
+                            $"Four times the readings gave a ratio of {(fFew / fMany)}");
+        }
+
+        /// <summary>
+        /// Tests readings too few to measure a spread report no detectable shift rather than a number that
+        /// looks like one
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void SmallestDetectableShift_TooFewReadings_ReportsNoAnswer()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            List<double> single = new List<double> { 0.5 };
+            List<double> empty = new List<double>();
+            List<double> identical = new List<double> { 0.5, 0.5, 0.5, 0.5 };
+
+            //**************************************************************//
+            // Act & Assert
+            //**************************************************************//
+
+            // Verify each reports no answer rather than zero, which would read as "any shift is detectable"
+            Assert.IsTrue(double.IsNaN(SignificanceTest.SmallestDetectableShift(single)));
+            Assert.IsTrue(double.IsNaN(SignificanceTest.SmallestDetectableShift(empty)));
+            Assert.IsTrue(double.IsNaN(SignificanceTest.SmallestDetectableShift(identical)));
+        }
+
+        /// <summary>
+        /// Tests a session that cannot show the shift being looked for is reported as not sensitive enough,
+        /// and one that can is not
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void IsSensitiveEnough_AgainstTheShiftOfInterest_AnswersEitherWay()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            const double fJUST_INSIDE = 0.9;
+            const double fJUST_OUTSIDE = 1.1;
+
+            //**************************************************************//
+            // Act & Assert
+            //**************************************************************//
+
+            // Verify the answer turns on the shift being looked for rather than on a reading count
+            Assert.IsTrue(SignificanceTest.IsSensitiveEnough(SignificanceTest.SHIFT_OF_INTEREST * fJUST_INSIDE));
+            Assert.IsTrue(SignificanceTest.IsSensitiveEnough(SignificanceTest.SHIFT_OF_INTEREST));
+            Assert.IsFalse(SignificanceTest.IsSensitiveEnough(SignificanceTest.SHIFT_OF_INTEREST * fJUST_OUTSIDE));
+
+            // Verify no answer is not mistaken for a good one
+            Assert.IsFalse(SignificanceTest.IsSensitiveEnough(double.NaN));
+        }
+
+        /// <summary>
+        /// Tests a short device session cannot show the shift being looked for while a longer one can, using
+        /// the spread a real device actually produces. This is the case the warning was added for.
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void SmallestDetectableShift_RealDeviceSpread_TurnsOverAtTheExpectedLength()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            // Each device reading is the average of 32768 bytes, so its spread is about 0.5 over the root
+            // of that many bits. A minute of recording is roughly 550 readings.
+            const double fDEVICE_SPREAD = 0.00098;
+            const int iTEN_SECONDS = 90;
+            const int iTWO_MINUTES = 1100;
+
+            List<double> shortSession = MakeSpreadReadings(iTEN_SECONDS, 0.5, fDEVICE_SPREAD);
+            List<double> longSession = MakeSpreadReadings(iTWO_MINUTES, 0.5, fDEVICE_SPREAD);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            bool bShortEnough = SignificanceTest.IsSensitiveEnough(SignificanceTest.SmallestDetectableShift(shortSession));
+            bool bLongEnough = SignificanceTest.IsSensitiveEnough(SignificanceTest.SmallestDetectableShift(longSession));
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify ten seconds of device readings cannot speak to the shift and two minutes can
+            Assert.IsFalse(bShortEnough, "Ten seconds of readings should not be enough");
+            Assert.IsTrue(bLongEnough, "Two minutes of readings should be enough");
+        }
+
+        /// <summary>
+        /// Tests the difference two sessions can show between them is reported, and that it is coarser than
+        /// what either could show on its own - the noise of both stands between them
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void SmallestDetectableDifference_TwoSessions_IsCoarserThanEitherAlone()
+        {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            List<double> baseline = MakeSpreadReadings(300, 0.5, 0.001);
+            List<double> result = MakeSpreadReadings(300, 0.5, 0.001);
+
+            //**************************************************************//
+            // Act
+            //**************************************************************//
+
+            double fBaselineAlone = SignificanceTest.SmallestDetectableShift(baseline);
+            double fBetween = SignificanceTest.SmallestDetectableDifference(baseline, result);
+
+            //**************************************************************//
+            // Assert
+            //**************************************************************//
+
+            // Verify comparing two sessions is harder than measuring one against a fixed value, because both
+            // sides carry noise
+            Assert.IsFalse(double.IsNaN(fBetween));
+            Assert.IsTrue(fBetween > fBaselineAlone,
+                          $"Between them: {fBetween}, baseline alone: {fBaselineAlone}");
+        }
+
+        /// <summary>
+        /// Tests a null set of readings is refused rather than dereferenced
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void SmallestDetectableShift_NullReadings_Exception()
+        {
+            //**************************************************************//
+            // Act & Assert
+            //**************************************************************//
+
+            Assert.ThrowsException<ArgumentNullException>(() => SignificanceTest.SmallestDetectableShift(null));
+            Assert.ThrowsException<ArgumentNullException>(() =>
+                SignificanceTest.SmallestDetectableDifference(null, new List<double> { 0.5, 0.6 }));
+            Assert.ThrowsException<ArgumentNullException>(() =>
+                SignificanceTest.SmallestDetectableDifference(new List<double> { 0.5, 0.6 }, null));
+        }
+
+        /// <summary>
+        /// Builds readings with a known mean and spread, alternating either side of the mean so the spread
+        /// is exactly what was asked for rather than whatever a random draw happened to give
+        /// </summary>
+        /// <param name="iCount">IN - How many readings to make</param>
+        /// <param name="fMean">IN - The value to centre them on</param>
+        /// <param name="fSpread">IN - The standard deviation to give them</param>
+        /// <returns>The readings</returns>
+        private static List<double> MakeSpreadReadings(int iCount, double fMean, double fSpread)
+        {
+            List<double> readings = new List<double>();
+            for (int iIndex = 0; iIndex < iCount; ++iIndex)
+            {
+                // Half above and half below, so the mean lands where it was asked to and the spread is the
+                // offset itself
+                double fOffset = ((0 == (iIndex % 2)) ? fSpread : -fSpread);
+                readings.Add(fMean + fOffset);
+            }
+            return readings;
+        }
+
         #endregion
     }
 }

@@ -190,8 +190,26 @@ spreads, because a baseline is usually recorded for far longer than the run comp
 `CompareWithExpected` tests one session against the 0.5 an unbiased generator gives. Both are two-tailed: a
 one-tailed test would find a shift toward a target more easily, but only holds when the direction was
 predicted before the readings were taken, which the application cannot know. Every path that cannot produce
-a number — fewer than two readings, or readings with no spread — returns `Valid = false` rather than a
+a number - fewer than two readings, or readings with no spread - returns `Valid = false` rather than a
 probability, and `Significant` is false whenever the test did not run.
+
+A verdict of nothing found means nothing at all unless a shift worth finding could have been seen, so the
+analysis states what it could have seen. `SmallestDetectableDifference` is the half width of the confidence
+interval for the pair, which is the test read the other way round: instead of asking whether the shift that
+happened beats the noise, it asks how large a shift would have to be before it could. Below
+`SHIFT_OF_INTEREST` - one part in ten thousand, the order of the effect reported in the published work - the
+sessions cannot speak to the question, and the verdict says so in the warning colour rather than reporting a
+null result that reads as evidence of absence.
+
+The three verdicts are different weights, which is what `VerdictWeights` carries. A shift found is notable
+whatever the sensitivity, because it cleared the limit by being found at all. Nothing found from sessions
+that could have found something is the ordinary outcome. Nothing found from sessions that could not is the
+one that misleads, and is the only one that warns.
+
+Note that the device and the simulator have different noise floors: a device reading averages 262,144 bits
+and a simulated one 16,384, so the simulated spread is about four times wider and needs about sixteen times
+the readings to pin its mean down as finely. That is why the limit is worked out from each session's own
+spread rather than from a count of readings.
 
 The verdict is stated in words under the table rather than left to be read off the numbers, and is
 emphasised only when there is a shift to notice. `HistogramChart` plots each session as a percentage of its

@@ -157,6 +157,107 @@ namespace RandomNumberGenerator
         }
 
         /// <summary>
+        /// The smallest shift away from the expected value that a set of readings could show as significant.
+        /// A session answers the question it was recorded to answer only if the shift being looked for is
+        /// larger than this: below it, a shift could be perfectly real and still not reach significance,
+        /// because the readings are not pinned down finely enough to tell it from noise.
+        /// NOTE: This is the half width of the confidence interval, the same arithmetic the test itself
+        /// uses, read the other way round. The test asks whether the shift that happened is larger than the
+        /// noise; this asks how large a shift would have to be before it could.
+        /// </summary>
+        /// <param name="readings">IN - The readings to measure (cannot be null)</param>
+        /// <returns>The smallest shift that could reach significance, or NaN when there is too little to say</returns>
+        /// <exception cref="ArgumentNullException">Thrown when the readings are null</exception>
+        public static double SmallestDetectableShift(IList<double> readings)
+        {
+            if (null == readings)
+            {
+                throw new ArgumentNullException(nameof(readings), "Readings cannot be null");
+            }
+
+            // A spread cannot be measured from fewer than two readings, so nothing can be said about how
+            // finely they pin the mean down
+            if (m_iMINIMUM_READINGS > readings.Count)
+            {
+                return double.NaN;
+            }
+
+            double fMean = Mean(readings);
+            double fStandardError = (Variance(readings, fMean) / readings.Count);
+            if (m_fMINIMUM_ERROR >= fStandardError)
+            {
+                return double.NaN;
+            }
+
+            // The critical value comes from the same distribution the test uses, so the answer agrees with
+            // the test rather than approximating it. It is well above two for a handful of readings, which
+            // is exactly the case this exists to report on.
+            double fFreedom = (readings.Count - 1);
+            double fCritical = StudentT.InvCDF(0.0, 1.0, fFreedom, (1.0 - (SignificanceResult.SIGNIFICANCE_LEVEL / 2.0)));
+
+            return (fCritical * Math.Sqrt(fStandardError));
+        }
+
+        /// <summary>
+        /// The smallest difference between two sets of readings that could be shown as significant. This is
+        /// the pair's answer to the same question, and it is the one the verdict reports, because the
+        /// verdict is about the comparison rather than about either session on its own.
+        /// </summary>
+        /// <param name="baseline">IN - The baseline readings (cannot be null)</param>
+        /// <param name="result">IN - The result readings (cannot be null)</param>
+        /// <returns>The smallest difference that could reach significance, or NaN when there is too little to say</returns>
+        /// <exception cref="ArgumentNullException">Thrown when either set of readings is null</exception>
+        public static double SmallestDetectableDifference(IList<double> baseline, IList<double> result)
+        {
+            if (null == baseline)
+            {
+                throw new ArgumentNullException(nameof(baseline), "Baseline readings cannot be null");
+            }
+
+            if (null == result)
+            {
+                throw new ArgumentNullException(nameof(result), "Result readings cannot be null");
+            }
+
+            bool bEnoughData = ((m_iMINIMUM_READINGS <= baseline.Count) && (m_iMINIMUM_READINGS <= result.Count));
+            if (false == bEnoughData)
+            {
+                return double.NaN;
+            }
+
+            double fBaselineError = (Variance(baseline, Mean(baseline)) / baseline.Count);
+            double fResultError = (Variance(result, Mean(result)) / result.Count);
+            double fCombinedError = (fBaselineError + fResultError);
+            if (m_fMINIMUM_ERROR >= fCombinedError)
+            {
+                return double.NaN;
+            }
+
+            // Welch's degrees of freedom, as in the test the two are compared with
+            double fDenominator = (((fBaselineError * fBaselineError) / (baseline.Count - 1)) +
+                                   ((fResultError * fResultError) / (result.Count - 1)));
+            double fFreedom = ((fCombinedError * fCombinedError) / fDenominator);
+            if ((double.IsNaN(fFreedom)) || (0.0 >= fFreedom))
+            {
+                return double.NaN;
+            }
+
+            double fCritical = StudentT.InvCDF(0.0, 1.0, fFreedom, (1.0 - (SignificanceResult.SIGNIFICANCE_LEVEL / 2.0)));
+
+            return (fCritical * Math.Sqrt(fCombinedError));
+        }
+
+        /// <summary>
+        /// Whether readings pin their mean down finely enough to speak to the shift being looked for
+        /// </summary>
+        /// <param name="fDetectableShift">IN - The smallest shift that could reach significance</param>
+        /// <returns>true if a shift of the size being looked for could be shown; otherwise, false</returns>
+        public static bool IsSensitiveEnough(double fDetectableShift)
+        {
+            return ((false == double.IsNaN(fDetectableShift)) && (SHIFT_OF_INTEREST >= fDetectableShift));
+        }
+
+        /// <summary>
         /// Turns a statistic and its degrees of freedom into an outcome, taking the two-tailed probability
         /// from the distribution the statistic follows
         /// </summary>
@@ -221,6 +322,17 @@ namespace RandomNumberGenerator
 
         #endregion
         #region Constants
+
+        // A spread cannot be measured from fewer than two readings
+        /// <summary>
+        /// The size of shift a session is expected to be able to speak to. Readings that cannot pin their
+        /// mean down at least this finely are reported as too few, because a shift of this size could be
+        /// entirely real in them and still not reach significance.
+        /// NOTE: This is the order of the effect reported in the published work on influencing a generator:
+        /// around one part in ten thousand, a generator running at 0.5001 rather than 0.5. It is the figure
+        /// the wording in the interface quotes, so the two have to be changed together.
+        /// </summary>
+        public const double SHIFT_OF_INTEREST = 0.0001;
 
         // A spread cannot be measured from fewer than two readings
         private const int m_iMINIMUM_READINGS = 2;
