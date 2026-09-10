@@ -194,9 +194,11 @@ a number - fewer than two readings, or readings with no spread - returns `Valid 
 probability, and `Significant` is false whenever the test did not run.
 
 A verdict of nothing found means nothing at all unless a shift worth finding could have been seen, so the
-analysis states what it could have seen. `SmallestDetectableDifference` is the half width of the confidence
-interval for the pair, which is the test read the other way round: instead of asking whether the shift that
-happened beats the noise, it asks how large a shift would have to be before it could. Below
+analysis states what it could have seen. `SignificanceResult.DetectableDifference` is the half width of the
+confidence interval for the pair, which is the test read the other way round: instead of asking whether the
+shift that happened beats the noise, it asks how large a shift would have to be before it could. It comes
+back with the test, worked out in `BuildResult` from the same critical value the probability comes from, so
+the readings are walked once and the limit cannot disagree with the test it is quoted beside. Below
 `SHIFT_OF_INTEREST` - one part in ten thousand, the order of the effect reported in the published work - the
 sessions cannot speak to the question, and the verdict says so in the warning colour rather than reporting a
 null result that reads as evidence of absence.

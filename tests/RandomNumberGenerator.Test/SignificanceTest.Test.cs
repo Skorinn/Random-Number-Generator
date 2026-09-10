@@ -352,30 +352,6 @@ namespace RandomNumberGenerator.Test
             return readings;
         }
 
-        #endregion
-        #region Constants
-
-        // A fixed seed, so a test that passes today passes tomorrow
-        private const int m_iFIXED_SEED = 20260907;
-
-        // The value an unbiased generator's readings average to
-        private const double m_fEXPECTED_MEAN = 0.5;
-
-        // How widely the readings are scattered, of the order the device produces
-        private const double m_fSCATTER_WIDTH = 0.02;
-
-        // A shift large enough that it should be found rather than missed
-        private const double m_fCLEAR_SHIFT = 0.004;
-
-        // Session sizes, of the order a real comparison is made from
-        private const int m_iTYPICAL_COUNT = 400;
-        private const int m_iLONG_COUNT = 2000;
-        private const int m_iSHORT_COUNT = 120;
-
-        // Tolerances
-        private const double m_fFREEDOM_TOLERANCE = 0.001;
-        private const double m_fPROBABILITY_TOLERANCE = 0.000001;
-
         /// <summary>
         /// Tests the smallest detectable shift agrees with the test it is derived from. A shift of exactly
         /// that size, applied to the readings, should sit right on the edge of significance: this is the
@@ -625,7 +601,23 @@ namespace RandomNumberGenerator.Test
         /// </summary>
         [TestMethod]
         [TestCategory("Component")]
-        public void Tests_NullReadings_Exception()
+        public void CompareWithExpected_NullReadings_ThrowsArgumentNullException()
+        {
+            //**************************************************************//
+            // Act & Assert
+            //**************************************************************//
+
+            Assert.ThrowsException<ArgumentNullException>(
+                () => SignificanceTest.CompareWithExpected(null, m_fEXPECTED_MEAN));
+        }
+
+        /// <summary>
+        /// Tests a null result is refused rather than dereferenced. The baseline side is covered above; this
+        /// is the other one.
+        /// </summary>
+        [TestMethod]
+        [TestCategory("Component")]
+        public void CompareMeans_NullResult_ThrowsArgumentNullException()
         {
             //**************************************************************//
             // Arrange
@@ -637,9 +629,6 @@ namespace RandomNumberGenerator.Test
             // Act & Assert
             //**************************************************************//
 
-            // The side each test is given as null, which the existing cover misses for all but the baseline
-            Assert.ThrowsException<ArgumentNullException>(() => SignificanceTest.CompareWithExpected(null, 0.5));
-            Assert.ThrowsException<ArgumentNullException>(() => SignificanceTest.CompareMeans(null, readings));
             Assert.ThrowsException<ArgumentNullException>(() => SignificanceTest.CompareMeans(readings, null));
         }
 
@@ -666,6 +655,30 @@ namespace RandomNumberGenerator.Test
             }
             return readings;
         }
+
+        #endregion
+        #region Constants
+
+        // A fixed seed, so a test that passes today passes tomorrow
+        private const int m_iFIXED_SEED = 20260907;
+
+        // The value an unbiased generator's readings average to
+        private const double m_fEXPECTED_MEAN = 0.5;
+
+        // How widely the readings are scattered, of the order the device produces
+        private const double m_fSCATTER_WIDTH = 0.02;
+
+        // A shift large enough that it should be found rather than missed
+        private const double m_fCLEAR_SHIFT = 0.004;
+
+        // Session sizes, of the order a real comparison is made from
+        private const int m_iTYPICAL_COUNT = 400;
+        private const int m_iLONG_COUNT = 2000;
+        private const int m_iSHORT_COUNT = 120;
+
+        // Tolerances
+        private const double m_fFREEDOM_TOLERANCE = 0.001;
+        private const double m_fPROBABILITY_TOLERANCE = 0.000001;
 
         #endregion
     }
