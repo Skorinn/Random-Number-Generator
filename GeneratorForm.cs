@@ -81,6 +81,18 @@ namespace RandomNumberGenerator
             RNG_GUI_STATES_SIZE // Keep at end
         };
 
+        /// <summary>
+        /// How much attention a verdict is worth. Nothing found is the ordinary outcome of the experiment
+        /// and is not worth shouting about; a shift is worth noticing; and a session that could not have
+        /// shown the shift it was looking for is worth warning about, because its silence means nothing.
+        /// </summary>
+        public enum VerdictWeights
+        {
+            Ordinary = 0,
+            Notable = 1,
+            Warning = 2,
+        };
+
         #endregion
         #region Constructors
 
@@ -2450,32 +2462,62 @@ namespace RandomNumberGenerator
             bool bBothLoaded = ((null != baselineReadings) && (null != resultReadings));
             if (false == bBothLoaded)
             {
-                SetVerdict(m_sVERDICT_NEEDS_BOTH, false);
+                SetVerdict(m_sVERDICT_NEEDS_BOTH, VerdictWeights.Ordinary);
                 return;
             }
 
             SignificanceResult test = SignificanceTest.CompareMeans(baselineReadings, resultReadings);
             if (false == test.Valid)
             {
-                SetVerdict(m_sVERDICT_NOT_ENOUGH_DATA, false);
+                SetVerdict(m_sVERDICT_NOT_ENOUGH_DATA, VerdictWeights.Warning);
                 return;
             }
 
             double fShift = (Mean(resultReadings) - Mean(baselineReadings));
             string sDirection = (0 <= fShift) ? m_sDIRECTION_HIGHER : m_sDIRECTION_LOWER;
             string sProbability = FormatProbability(test);
+            string sFreedom = test.DegreesOfFreedom.ToString(m_sMOMENT_FORMAT);
+            string sShift = Math.Abs(fShift).ToString(m_sVALUE_FORMAT);
+
+            // How finely the two sessions between them pin a difference down. A verdict of nothing found
+            // means nothing at all unless a shift worth finding could have been seen, so the limit is
+            // stated either way rather than left for the reader to work out from the reading counts. It
+            // comes back with the test rather than being asked for separately, so the readings are walked
+            // once and the limit cannot disagree with the test it is quoted beside.
+            double fDetectable = test.DetectableDifference;
+            bool bSensitive = SignificanceTest.IsSensitiveEnough(fDetectable);
+            string sDetectable = fDetectable.ToString(m_sVALUE_FORMAT);
+            string sOfInterest = SignificanceTest.SHIFT_OF_INTEREST.ToString(m_sVALUE_FORMAT);
 
             if (true == test.Significant)
             {
-                SetVerdict($"Significant shift: the result sits {sDirection} than the baseline by " +
-                           $"{Math.Abs(fShift).ToString(m_sVALUE_FORMAT)}. A shift this large would arise by " +
-                           $"chance {sProbability} of the time (Welch's t, two-tailed, {test.DegreesOfFreedom.ToString(m_sMOMENT_FORMAT)} df).", true);
+                // The shift cleared the limit by having been found at all, so this reports the limit rather
+                // than warning about it, however short the sessions were
+                SetVerdict($"Significant shift: the result sits {sDirection} than the baseline by {sShift}. " +
+                           $"A shift this large would arise by chance {sProbability} of the time " +
+                           $"(Welch's t, two-tailed, {sFreedom} df). These sessions can show a difference of " +
+                           $"{sDetectable} or larger.", VerdictWeights.Notable);
+            }
+            else if (true == bSensitive)
+            {
+                SetVerdict($"No significant shift. The result sits {sDirection} than the baseline by {sShift}, " +
+                           $"but a shift that large would arise by chance {sProbability} of the time " +
+                           $"(Welch's t, two-tailed, {sFreedom} df). These sessions can show a difference of " +
+                           $"{sDetectable} or larger, so a shift of {sOfInterest} would have been found.",
+                           VerdictWeights.Ordinary);
             }
             else
             {
-                SetVerdict($"No significant shift. The result sits {sDirection} than the baseline by " +
-                           $"{Math.Abs(fShift).ToString(m_sVALUE_FORMAT)}, but a shift that large would arise by " +
-                           $"chance {sProbability} of the time (Welch's t, two-tailed, {test.DegreesOfFreedom.ToString(m_sMOMENT_FORMAT)} df).", false);
+                // Nothing was found and nothing could have been. This is the reading that misleads if it is
+                // left to stand on its own, so it is the one that carries the warning. The measurement is
+                // still reported in full first: the warning is about what the numbers can be taken to mean,
+                // not a reason to stop showing them.
+                SetVerdict($"No significant shift. The result sits {sDirection} than the baseline by {sShift}, " +
+                           $"but a shift that large would arise by chance {sProbability} of the time " +
+                           $"(Welch's t, two-tailed, {sFreedom} df). These sessions are too short to conclude " +
+                           $"anything from that: they can only show a difference of {sDetectable} or larger, so " +
+                           $"a shift of {sOfInterest}, the size this looks for, could be real here and still " +
+                           $"never reach significance. Record for longer.", VerdictWeights.Warning);
             }
         }
 
@@ -2484,12 +2526,32 @@ namespace RandomNumberGenerator
         /// ordinary outcome and is not worth shouting about.
         /// </summary>
         /// <param name="sVerdict">IN - The wording to show</param>
-        /// <param name="bSignificant">IN - Whether the verdict reports a shift worth noticing</param>
-        private void SetVerdict(string sVerdict, bool bSignificant)
+        /// <param name="weight">IN - How much attention the verdict is worth</param>
+        private void SetVerdict(string sVerdict, VerdictWeights weight)
         {
             m_VerdictLabel.Text = sVerdict;
-            m_VerdictLabel.Font = bSignificant ? m_VerdictFontBold : m_VerdictFontRegular;
-            m_VerdictLabel.ForeColor = bSignificant ? UiPalette.CardText : UiPalette.MutedText;
+
+            // Anything other than the ordinary outcome is set in the heavier face, so a verdict that needs
+            // reading is not the same weight as the one that says nothing happened
+            bool bOrdinary = (VerdictWeights.Ordinary == weight);
+            m_VerdictLabel.Font = bOrdinary ? m_VerdictFontRegular : m_VerdictFontBold;
+
+            // A warning takes the severity colour, which stands aside under a high contrast scheme and
+            // leaves the wording to carry it
+            switch (weight)
+            {
+                case VerdictWeights.Warning:
+                    m_VerdictLabel.ForeColor = StatusPalette.WarningText;
+                    break;
+
+                case VerdictWeights.Notable:
+                    m_VerdictLabel.ForeColor = UiPalette.CardText;
+                    break;
+
+                default:
+                    m_VerdictLabel.ForeColor = UiPalette.MutedText;
+                    break;
+            }
         }
 
         /// <summary>

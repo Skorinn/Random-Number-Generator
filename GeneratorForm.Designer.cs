@@ -696,7 +696,7 @@ namespace RandomNumberGenerator
             this.m_AnalyzeLayout.Name = "m_AnalyzeLayout";
             this.m_AnalyzeLayout.RowCount = 3;
             this.m_AnalyzeLayout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 126F));
-            this.m_AnalyzeLayout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 234F));
+            this.m_AnalyzeLayout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 290F));
             this.m_AnalyzeLayout.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
             this.m_AnalyzeLayout.Size = new System.Drawing.Size(741, 652);
             this.m_AnalyzeLayout.TabIndex = 0;
@@ -867,7 +867,7 @@ namespace RandomNumberGenerator
             this.m_VerdictLabel.Location = new System.Drawing.Point(14, 188);
             this.m_VerdictLabel.Name = "m_VerdictLabel";
             this.m_VerdictLabel.Padding = new System.Windows.Forms.Padding(0, 10, 0, 0);
-            this.m_VerdictLabel.Size = new System.Drawing.Size(713, 42);
+            this.m_VerdictLabel.Size = new System.Drawing.Size(713, 88);
             this.m_VerdictLabel.TabIndex = 1;
             this.m_VerdictLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             //

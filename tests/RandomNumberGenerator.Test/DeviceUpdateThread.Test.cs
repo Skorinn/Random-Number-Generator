@@ -644,17 +644,6 @@ namespace RandomNumberGenerator.Test
             mockParent.Verify(mock => mock.SetStatusBoxState(m_sTEST_STATUS_TEXT, It.IsAny<Color>(), It.IsAny<Color>()), Times.Never);
         }
 
-        #endregion
-        #region Helper Types
-
-        /// <summary>
-        /// Delegate for GetStatusBoxState callback to handle out parameters in Moq
-        /// </summary>
-        /// <param name="text">OUT - Status box text</param>
-        /// <param name="textColor">OUT - Status box text color</param>
-        /// <param name="backColor">OUT - Status box background color</param>
-        private delegate void GetStatusBoxStateCallback(out string text, out Color textColor, out Color backColor);
-
         /// <summary>
         /// Tests the device status colours are taken from the palette when they are used rather than held
         /// from when the class was first touched. The palette reports the scheme in force now, so anything
@@ -733,6 +722,17 @@ namespace RandomNumberGenerator.Test
                 Assert.AreNotEqual(Color.Empty, severityColour, $"{property.Name} came back unset");
             }
         }
+
+        #endregion
+        #region Helper Types
+
+        /// <summary>
+        /// Delegate for GetStatusBoxState callback to handle out parameters in Moq
+        /// </summary>
+        /// <param name="text">OUT - Status box text</param>
+        /// <param name="textColor">OUT - Status box text color</param>
+        /// <param name="backColor">OUT - Status box background color</param>
+        private delegate void GetStatusBoxStateCallback(out string text, out Color textColor, out Color backColor);
 
         #endregion
     }

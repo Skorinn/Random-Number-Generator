@@ -35,6 +35,19 @@ directly: mean, standard deviation, skewness and kurtosis for each, the differen
 a histogram of the two distributions overlaid. Statistics are calculated with
 [Math.NET Numerics](https://numerics.mathdotnet.com/).
 
+### Enough readings to answer
+
+A session that found nothing has only said something if it could have found something. The verdict therefore
+states the smallest difference the two sessions could show as significant, and warns when that is coarser
+than the shift being looked for — one part in ten thousand, a generator running at 0.5001 rather than 0.5,
+which is the order of the effect reported in the published work.
+
+A minute or so of recording from the device is enough to speak to a shift that size. Below that, a real
+shift can sit in the readings and never reach significance, and a verdict of *no significant shift* would
+be reporting the length of the session rather than anything about the generator. The limit is worked out
+from each session's own spread rather than from a count of readings, because a simulated reading averages
+far fewer bits than a device one and is correspondingly noisier.
+
 ### Targets
 
 A session can record a target value of `0` or `1` — the outcome the operator is attempting to influence —
