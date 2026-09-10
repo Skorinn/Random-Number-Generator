@@ -2481,8 +2481,10 @@ namespace RandomNumberGenerator
 
             // How finely the two sessions between them pin a difference down. A verdict of nothing found
             // means nothing at all unless a shift worth finding could have been seen, so the limit is
-            // stated either way rather than left for the reader to work out from the reading counts.
-            double fDetectable = SignificanceTest.SmallestDetectableDifference(baselineReadings, resultReadings);
+            // stated either way rather than left for the reader to work out from the reading counts. It
+            // comes back with the test rather than being asked for separately, so the readings are walked
+            // once and the limit cannot disagree with the test it is quoted beside.
+            double fDetectable = test.DetectableDifference;
             bool bSensitive = SignificanceTest.IsSensitiveEnough(fDetectable);
             string sDetectable = fDetectable.ToString(m_sVALUE_FORMAT);
             string sOfInterest = SignificanceTest.SHIFT_OF_INTEREST.ToString(m_sVALUE_FORMAT);

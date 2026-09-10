@@ -383,7 +383,7 @@ namespace RandomNumberGenerator.Test
         /// </summary>
         [TestMethod]
         [TestCategory("Component")]
-        public void SmallestDetectableShift_ShiftOfThatSize_SitsOnTheEdgeOfSignificance()
+        public void DetectableDifference_ShiftOfThatSize_SitsOnTheEdgeOfSignificance()
         {
             //**************************************************************//
             // Arrange
@@ -400,7 +400,7 @@ namespace RandomNumberGenerator.Test
             // Act
             //**************************************************************//
 
-            double fDetectable = SignificanceTest.SmallestDetectableShift(readings);
+            double fDetectable = SignificanceTest.CompareWithExpected(readings, fEXPECTED_MEAN).DetectableDifference;
 
             // Move every reading by exactly that much and ask the test what it makes of it
             List<double> shifted = new List<double>();
@@ -427,7 +427,7 @@ namespace RandomNumberGenerator.Test
         /// </summary>
         [TestMethod]
         [TestCategory("Component")]
-        public void SmallestDetectableShift_SmallerShift_CannotReachSignificance()
+        public void DetectableDifference_SmallerShift_CannotReachSignificance()
         {
             //**************************************************************//
             // Arrange
@@ -437,7 +437,7 @@ namespace RandomNumberGenerator.Test
             const double fWELL_UNDER = 0.5;
 
             List<double> readings = MakeSpreadReadings(200, fEXPECTED_MEAN, 0.001);
-            double fDetectable = SignificanceTest.SmallestDetectableShift(readings);
+            double fDetectable = SignificanceTest.CompareWithExpected(readings, fEXPECTED_MEAN).DetectableDifference;
 
             //**************************************************************//
             // Act
@@ -466,7 +466,7 @@ namespace RandomNumberGenerator.Test
         /// </summary>
         [TestMethod]
         [TestCategory("Component")]
-        public void SmallestDetectableShift_MoreReadings_PinsTheMeanDownMoreFinely()
+        public void DetectableDifference_MoreReadings_PinsTheMeanDownMoreFinely()
         {
             //**************************************************************//
             // Arrange
@@ -484,8 +484,8 @@ namespace RandomNumberGenerator.Test
             // Act
             //**************************************************************//
 
-            double fFew = SignificanceTest.SmallestDetectableShift(few);
-            double fMany = SignificanceTest.SmallestDetectableShift(many);
+            double fFew = SignificanceTest.CompareWithExpected(few, 0.5).DetectableDifference;
+            double fMany = SignificanceTest.CompareWithExpected(many, 0.5).DetectableDifference;
 
             //**************************************************************//
             // Assert
@@ -502,7 +502,7 @@ namespace RandomNumberGenerator.Test
         /// </summary>
         [TestMethod]
         [TestCategory("Component")]
-        public void SmallestDetectableShift_TooFewReadings_ReportsNoAnswer()
+        public void DetectableDifference_TooFewReadings_ReportsNoAnswer()
         {
             //**************************************************************//
             // Arrange
@@ -517,9 +517,9 @@ namespace RandomNumberGenerator.Test
             //**************************************************************//
 
             // Verify each reports no answer rather than zero, which would read as "any shift is detectable"
-            Assert.IsTrue(double.IsNaN(SignificanceTest.SmallestDetectableShift(single)));
-            Assert.IsTrue(double.IsNaN(SignificanceTest.SmallestDetectableShift(empty)));
-            Assert.IsTrue(double.IsNaN(SignificanceTest.SmallestDetectableShift(identical)));
+            Assert.IsTrue(double.IsNaN(SignificanceTest.CompareWithExpected(single, 0.5).DetectableDifference));
+            Assert.IsTrue(double.IsNaN(SignificanceTest.CompareWithExpected(empty, 0.5).DetectableDifference));
+            Assert.IsTrue(double.IsNaN(SignificanceTest.CompareWithExpected(identical, 0.5).DetectableDifference));
         }
 
         /// <summary>
@@ -556,7 +556,7 @@ namespace RandomNumberGenerator.Test
         /// </summary>
         [TestMethod]
         [TestCategory("Component")]
-        public void SmallestDetectableShift_RealDeviceSpread_TurnsOverAtTheExpectedLength()
+        public void DetectableDifference_RealDeviceSpread_TurnsOverAtTheExpectedLength()
         {
             //**************************************************************//
             // Arrange
@@ -575,8 +575,8 @@ namespace RandomNumberGenerator.Test
             // Act
             //**************************************************************//
 
-            bool bShortEnough = SignificanceTest.IsSensitiveEnough(SignificanceTest.SmallestDetectableShift(shortSession));
-            bool bLongEnough = SignificanceTest.IsSensitiveEnough(SignificanceTest.SmallestDetectableShift(longSession));
+            bool bShortEnough = SignificanceTest.IsSensitiveEnough(SignificanceTest.CompareWithExpected(shortSession, 0.5).DetectableDifference);
+            bool bLongEnough = SignificanceTest.IsSensitiveEnough(SignificanceTest.CompareWithExpected(longSession, 0.5).DetectableDifference);
 
             //**************************************************************//
             // Assert
@@ -593,7 +593,7 @@ namespace RandomNumberGenerator.Test
         /// </summary>
         [TestMethod]
         [TestCategory("Component")]
-        public void SmallestDetectableDifference_TwoSessions_IsCoarserThanEitherAlone()
+        public void DetectableDifference_TwoSessions_IsCoarserThanEitherAlone()
         {
             //**************************************************************//
             // Arrange
@@ -606,8 +606,8 @@ namespace RandomNumberGenerator.Test
             // Act
             //**************************************************************//
 
-            double fBaselineAlone = SignificanceTest.SmallestDetectableShift(baseline);
-            double fBetween = SignificanceTest.SmallestDetectableDifference(baseline, result);
+            double fBaselineAlone = SignificanceTest.CompareWithExpected(baseline, 0.5).DetectableDifference;
+            double fBetween = SignificanceTest.CompareMeans(baseline, result).DetectableDifference;
 
             //**************************************************************//
             // Assert
@@ -625,36 +625,44 @@ namespace RandomNumberGenerator.Test
         /// </summary>
         [TestMethod]
         [TestCategory("Component")]
-        public void SmallestDetectableShift_NullReadings_Exception()
+        public void Tests_NullReadings_Exception()
         {
+            //**************************************************************//
+            // Arrange
+            //**************************************************************//
+
+            List<double> readings = new List<double> { 0.5, 0.6 };
+
             //**************************************************************//
             // Act & Assert
             //**************************************************************//
 
-            Assert.ThrowsException<ArgumentNullException>(() => SignificanceTest.SmallestDetectableShift(null));
-            Assert.ThrowsException<ArgumentNullException>(() =>
-                SignificanceTest.SmallestDetectableDifference(null, new List<double> { 0.5, 0.6 }));
-            Assert.ThrowsException<ArgumentNullException>(() =>
-                SignificanceTest.SmallestDetectableDifference(new List<double> { 0.5, 0.6 }, null));
+            // The side each test is given as null, which the existing cover misses for all but the baseline
+            Assert.ThrowsException<ArgumentNullException>(() => SignificanceTest.CompareWithExpected(null, 0.5));
+            Assert.ThrowsException<ArgumentNullException>(() => SignificanceTest.CompareMeans(null, readings));
+            Assert.ThrowsException<ArgumentNullException>(() => SignificanceTest.CompareMeans(readings, null));
         }
 
         /// <summary>
-        /// Builds readings with a known mean and spread, alternating either side of the mean so the spread
-        /// is exactly what was asked for rather than whatever a random draw happened to give
+        /// Builds readings sitting a fixed distance either side of a mean, alternating, so their spread is
+        /// settled rather than whatever a random draw happened to give.
+        /// NOTE: fOffset is how far each reading sits from the mean, not the sample standard deviation the
+        /// readings end up with. Those are close but not equal: the sample deviation divides by one fewer
+        /// than the count, so it comes out slightly the larger of the two.
         /// </summary>
         /// <param name="iCount">IN - How many readings to make</param>
         /// <param name="fMean">IN - The value to centre them on</param>
-        /// <param name="fSpread">IN - The standard deviation to give them</param>
+        /// <param name="fOffset">IN - How far each reading sits either side of the mean</param>
         /// <returns>The readings</returns>
-        private static List<double> MakeSpreadReadings(int iCount, double fMean, double fSpread)
+        private static List<double> MakeSpreadReadings(int iCount, double fMean, double fOffset)
         {
             List<double> readings = new List<double>();
             for (int iIndex = 0; iIndex < iCount; ++iIndex)
             {
                 // Half above and half below, so the mean lands where it was asked to and the spread is the
                 // offset itself
-                double fOffset = ((0 == (iIndex % 2)) ? fSpread : -fSpread);
-                readings.Add(fMean + fOffset);
+                double fStep = ((0 == (iIndex % 2)) ? fOffset : -fOffset);
+                readings.Add(fMean + fStep);
             }
             return readings;
         }

@@ -48,6 +48,17 @@ namespace RandomNumberGenerator
         public double Probability { get; set; }
 
         /// <summary>
+        /// The smallest difference this test could have shown as significant, or NaN when there was too
+        /// little to test. A test that found nothing has said something only if it could have found
+        /// something, and this is what it could have found: below it a difference can be entirely real and
+        /// still not reach significance.
+        /// NOTE: This is the half width of the confidence interval, which is the same arithmetic the test
+        /// itself does, read the other way round. It comes back with the test rather than being worked out
+        /// separately so that the two cannot drift apart, and so the readings are walked once.
+        /// </summary>
+        public double DetectableDifference { get; set; }
+
+        /// <summary>
         /// Whether the difference is significant at the level the application reports against (read-only)
         /// </summary>
         public bool Significant { get => (Valid && (Probability < SIGNIFICANCE_LEVEL)); }
@@ -99,7 +110,7 @@ namespace RandomNumberGenerator
             bool bEnoughData = ((m_iMINIMUM_READINGS <= baseline.Count) && (m_iMINIMUM_READINGS <= result.Count));
             if (false == bEnoughData)
             {
-                return new SignificanceResult { Valid = false };
+                return NoResult();
             }
 
             double fBaselineMean = Mean(baseline);
@@ -111,7 +122,7 @@ namespace RandomNumberGenerator
             // Readings that never vary leave nothing to measure a difference against
             if (m_fMINIMUM_ERROR >= fCombinedError)
             {
-                return new SignificanceResult { Valid = false };
+                return NoResult();
             }
 
             double fStatistic = ((fResultMean - fBaselineMean) / Math.Sqrt(fCombinedError));
@@ -122,7 +133,7 @@ namespace RandomNumberGenerator
                                    ((fResultError * fResultError) / (result.Count - 1)));
             double fFreedom = ((fCombinedError * fCombinedError) / fDenominator);
 
-            return BuildResult(fStatistic, fFreedom);
+            return BuildResult(fStatistic, fFreedom, Math.Sqrt(fCombinedError));
         }
 
         /// <summary>
@@ -142,109 +153,18 @@ namespace RandomNumberGenerator
 
             if (m_iMINIMUM_READINGS > readings.Count)
             {
-                return new SignificanceResult { Valid = false };
+                return NoResult();
             }
 
             double fMean = Mean(readings);
             double fStandardError = (Variance(readings, fMean) / readings.Count);
             if (m_fMINIMUM_ERROR >= fStandardError)
             {
-                return new SignificanceResult { Valid = false };
+                return NoResult();
             }
 
             double fStatistic = ((fMean - fExpectedMean) / Math.Sqrt(fStandardError));
-            return BuildResult(fStatistic, (readings.Count - 1));
-        }
-
-        /// <summary>
-        /// The smallest shift away from the expected value that a set of readings could show as significant.
-        /// A session answers the question it was recorded to answer only if the shift being looked for is
-        /// larger than this: below it, a shift could be perfectly real and still not reach significance,
-        /// because the readings are not pinned down finely enough to tell it from noise.
-        /// NOTE: This is the half width of the confidence interval, the same arithmetic the test itself
-        /// uses, read the other way round. The test asks whether the shift that happened is larger than the
-        /// noise; this asks how large a shift would have to be before it could.
-        /// </summary>
-        /// <param name="readings">IN - The readings to measure (cannot be null)</param>
-        /// <returns>The smallest shift that could reach significance, or NaN when there is too little to say</returns>
-        /// <exception cref="ArgumentNullException">Thrown when the readings are null</exception>
-        public static double SmallestDetectableShift(IList<double> readings)
-        {
-            if (null == readings)
-            {
-                throw new ArgumentNullException(nameof(readings), "Readings cannot be null");
-            }
-
-            // A spread cannot be measured from fewer than two readings, so nothing can be said about how
-            // finely they pin the mean down
-            if (m_iMINIMUM_READINGS > readings.Count)
-            {
-                return double.NaN;
-            }
-
-            double fMean = Mean(readings);
-            double fStandardError = (Variance(readings, fMean) / readings.Count);
-            if (m_fMINIMUM_ERROR >= fStandardError)
-            {
-                return double.NaN;
-            }
-
-            // The critical value comes from the same distribution the test uses, so the answer agrees with
-            // the test rather than approximating it. It is well above two for a handful of readings, which
-            // is exactly the case this exists to report on.
-            double fFreedom = (readings.Count - 1);
-            double fCritical = StudentT.InvCDF(0.0, 1.0, fFreedom, (1.0 - (SignificanceResult.SIGNIFICANCE_LEVEL / 2.0)));
-
-            return (fCritical * Math.Sqrt(fStandardError));
-        }
-
-        /// <summary>
-        /// The smallest difference between two sets of readings that could be shown as significant. This is
-        /// the pair's answer to the same question, and it is the one the verdict reports, because the
-        /// verdict is about the comparison rather than about either session on its own.
-        /// </summary>
-        /// <param name="baseline">IN - The baseline readings (cannot be null)</param>
-        /// <param name="result">IN - The result readings (cannot be null)</param>
-        /// <returns>The smallest difference that could reach significance, or NaN when there is too little to say</returns>
-        /// <exception cref="ArgumentNullException">Thrown when either set of readings is null</exception>
-        public static double SmallestDetectableDifference(IList<double> baseline, IList<double> result)
-        {
-            if (null == baseline)
-            {
-                throw new ArgumentNullException(nameof(baseline), "Baseline readings cannot be null");
-            }
-
-            if (null == result)
-            {
-                throw new ArgumentNullException(nameof(result), "Result readings cannot be null");
-            }
-
-            bool bEnoughData = ((m_iMINIMUM_READINGS <= baseline.Count) && (m_iMINIMUM_READINGS <= result.Count));
-            if (false == bEnoughData)
-            {
-                return double.NaN;
-            }
-
-            double fBaselineError = (Variance(baseline, Mean(baseline)) / baseline.Count);
-            double fResultError = (Variance(result, Mean(result)) / result.Count);
-            double fCombinedError = (fBaselineError + fResultError);
-            if (m_fMINIMUM_ERROR >= fCombinedError)
-            {
-                return double.NaN;
-            }
-
-            // Welch's degrees of freedom, as in the test the two are compared with
-            double fDenominator = (((fBaselineError * fBaselineError) / (baseline.Count - 1)) +
-                                   ((fResultError * fResultError) / (result.Count - 1)));
-            double fFreedom = ((fCombinedError * fCombinedError) / fDenominator);
-            if ((double.IsNaN(fFreedom)) || (0.0 >= fFreedom))
-            {
-                return double.NaN;
-            }
-
-            double fCritical = StudentT.InvCDF(0.0, 1.0, fFreedom, (1.0 - (SignificanceResult.SIGNIFICANCE_LEVEL / 2.0)));
-
-            return (fCritical * Math.Sqrt(fCombinedError));
+            return BuildResult(fStatistic, (readings.Count - 1), Math.Sqrt(fStandardError));
         }
 
         /// <summary>
@@ -258,13 +178,27 @@ namespace RandomNumberGenerator
         }
 
         /// <summary>
+        /// The outcome for readings there was too little of to test
+        /// </summary>
+        /// <returns>An outcome reporting itself invalid, with no answer for what it could have found</returns>
+        private static SignificanceResult NoResult()
+        {
+            // The detectable difference is set to no answer rather than left at zero. Zero would read as
+            // "a difference of any size would have been found", which is the opposite of what having too
+            // little to test means, and anything asking whether the readings are sensitive enough would
+            // agree with it.
+            return new SignificanceResult { Valid = false, DetectableDifference = double.NaN };
+        }
+
+        /// <summary>
         /// Turns a statistic and its degrees of freedom into an outcome, taking the two-tailed probability
         /// from the distribution the statistic follows
         /// </summary>
         /// <param name="fStatistic">IN - The size of the difference in standard errors</param>
         /// <param name="fFreedom">IN - The degrees of freedom of the test</param>
+        /// <param name="fStandardError">IN - The standard error the statistic was measured against</param>
         /// <returns>The completed outcome</returns>
-        private static SignificanceResult BuildResult(double fStatistic, double fFreedom)
+        private static SignificanceResult BuildResult(double fStatistic, double fFreedom, double fStandardError)
         {
             // A statistic that is not a number says the arithmetic ran out of meaning rather than that the
             // difference was enormous, so it is reported as no test rather than as a certainty
@@ -272,19 +206,25 @@ namespace RandomNumberGenerator
                             (false == double.IsNaN(fFreedom)) && (0 < fFreedom));
             if (false == bUsable)
             {
-                return new SignificanceResult { Valid = false };
+                return NoResult();
             }
 
             // Both tails, so a shift in either direction counts against the null
             double fUpperTail = (1.0 - StudentT.CDF(0.0, 1.0, fFreedom, Math.Abs(fStatistic)));
             double fProbability = Math.Min(1.0, (2.0 * fUpperTail));
 
+            // How large a difference would have had to be to reach significance here. The critical value is
+            // taken from the same distribution the probability came from, so the two agree by construction
+            // rather than by two pieces of arithmetic happening to match.
+            double fCritical = StudentT.InvCDF(0.0, 1.0, fFreedom, (1.0 - (SignificanceResult.SIGNIFICANCE_LEVEL / 2.0)));
+
             return new SignificanceResult
             {
                 Valid = true,
                 Statistic = fStatistic,
                 DegreesOfFreedom = fFreedom,
-                Probability = fProbability
+                Probability = fProbability,
+                DetectableDifference = (fCritical * fStandardError)
             };
         }
 
