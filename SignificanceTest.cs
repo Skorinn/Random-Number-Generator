@@ -323,7 +323,6 @@ namespace RandomNumberGenerator
         #endregion
         #region Constants
 
-        // A spread cannot be measured from fewer than two readings
         /// <summary>
         /// The size of shift a session is expected to be able to speak to. Readings that cannot pin their
         /// mean down at least this finely are reported as too few, because a shift of this size could be
